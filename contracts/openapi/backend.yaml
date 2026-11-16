@@ -1,0 +1,6 @@
+openapi: 3.1.0
+info:
+  title: Dites-le-nous une fois — API métier
+  version: 0.0.0
+  description: Contrat initial sans endpoints. À définir collectivement avant intégration.
+paths: {}

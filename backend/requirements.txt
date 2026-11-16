@@ -1,0 +1,2 @@
+# Dépendances à définir et versions à fixer lors de l’initialisation du backend.
+# Stack prévue : FastAPI, Pydantic, PostgreSQL et Pytest.

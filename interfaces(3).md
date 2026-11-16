@@ -1,0 +1,8 @@
+# Les interfaces que nous développons
+
+| # | Interface | Pour qui | Rôle | Écrans principaux | Priorité |
+|---|---|---|---|---|---|
+| 1 | **Portail usager** | Awa, Issa | Donner à l'usager la transparence, le consentement et le contrôle sur ses données | Connexion ; **journal** (qui a consulté quoi, quand, pour quelle démarche, sur quelle base) ; **consentement** (donner, consulter et retirer son accord pour un échange de données) ; bouton « Je ne reconnais pas cette consultation » ; lien pour faire corriger une erreur auprès de l'administration source ; suivi de ses démarches | 1 |
+| 2 | **Guichet agent** | Agent de l'administration qui demande (ONI) | Instruire une démarche sans demander de pièces à l'usager | Ouvrir un dossier et identifier l'usager ; lancer les vérifications ; voir le résultat de chacune (oui, non, en attente, ambigu, introuvable, numérisation demandée) ; suivre les dossiers en attente | 1 |
+| 3 | **Console de la Centrale de confiance** | Autorité de gouvernance du réseau | Piloter les règles métier et surveiller le réseau | Conventions détaillées (qui peut demander quoi, pour quelle démarche, sur quelle base) ; état des administrations et de leurs registres (en marche, en panne) ; contestations envoyées par les usagers | 2 |
+| 4 | **Console locale de l'administration** | Administrateur de chaque administration qui détient des données | Configurer son service de vérification | Branchement du registre (avec bouton « tester la connexion ») ; services offerts ; conventions acceptées ; son journal. Bonus : file des actes à numériser | 3 (fichier de configuration d'abord) |

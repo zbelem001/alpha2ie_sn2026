@@ -1,0 +1,37 @@
+# Secrets et configuration locale
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Frontend
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# Données locales
+*.sqlite
+*.sqlite3
+*.log
+# Éditeurs et système
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+# Configuration personnelle des outils
+.aws/
+.codex/
+.agents/

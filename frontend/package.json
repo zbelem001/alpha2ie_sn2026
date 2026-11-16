@@ -1,0 +1,6 @@
+{
+  "name": "dites-le-nous-une-fois-frontend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Structure initiale du frontend Next.js, React et TypeScript. Application \u00e0 initialiser."
+}
