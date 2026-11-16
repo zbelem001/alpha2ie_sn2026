@@ -38,7 +38,7 @@ docker compose up -d --build
 | Justice (nationalité, casier) | http://localhost:8103/docs |
 | Police (pertes) | http://localhost:8104/docs |
 | Trésor (paiements, simulé) | http://localhost:8105/docs |
-| Keycloak | http://localhost:8180 |
+| Keycloak (comptes de démo : [infrastructure/keycloak/README.md](infrastructure/keycloak/README.md)) | http://localhost:8180 |
 | PostgreSQL | localhost:55432 |
 
 Pour changer les valeurs par défaut : `cp .env.example .env`, puis modifier `.env`.

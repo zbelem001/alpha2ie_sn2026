@@ -13,7 +13,7 @@ docker compose ps
 | Service | Rôle | Port sur la machine |
 |---|---|---|
 | `postgres` | Bases `keycloak` et `backend` (créées par `postgres/init/`) | 55432 |
-| `keycloak` | Identités, sessions, rôles | 8180 |
+| `keycloak` | Identités, sessions, rôles : realm `dlnuf` importé au démarrage ([keycloak/README.md](keycloak/README.md)) | 8180 |
 | `civil-registry`, `transport-registry` | Registres simulés | 8101, 8102 |
 | `justice-registry`, `police-registry`, `treasury-registry` | Registres fictifs | 8103, 8104, 8105 |
 
@@ -32,6 +32,5 @@ Pendant la panne, le connecteur répond `unavailable` ; il n'invente jamais de r
 
 ## À venir
 
-- `keycloak/` : realm exporté (rôles `usager`, `agent`, `admin-local`, `admin-centrale`, attributs `identifiant_pivot` et `niveau_garantie`, comptes de démonstration).
 - Notifications simulées (SMS et e-mail).
 - Services `backend` et `frontend`, déjà préparés en commentaire dans `docker-compose.yml`.

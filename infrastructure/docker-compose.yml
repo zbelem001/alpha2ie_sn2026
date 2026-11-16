@@ -49,7 +49,8 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
-    command: ["start-dev"]
+    # Le realm « dlnuf » est importé au premier démarrage seulement (voir keycloak/README.md).
+    command: ["start-dev", "--import-realm"]
     restart: unless-stopped
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
@@ -59,8 +60,27 @@ services:
       KC_DB_USERNAME: ${POSTGRES_USER:-dlnuf}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-dlnuf-dev}
       KC_HEALTH_ENABLED: "true"
+      # Adresse publique unique : l'émetteur (iss) des jetons est toujours
+      # http://localhost:8180/realms/dlnuf, que l'appel vienne du navigateur ou
+      # d'un conteneur. Les conteneurs joignent les points d'accès serveur à
+      # serveur (jetons, clés) par http://keycloak:8080.
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_HOST_PORT:-8180}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import:ro
     ports:
       - "${KEYCLOAK_HOST_PORT:-8180}:8080"
+    healthcheck:
+      # L'image ne contient ni curl ni wget : requête HTTP en bash sur le port de gestion.
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy

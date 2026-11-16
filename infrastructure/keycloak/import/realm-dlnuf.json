@@ -1,0 +1,318 @@
+{
+  "realm": "dlnuf",
+  "displayName": "Dites-le-nous une fois",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": true,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "maxDeltaTimeSeconds": 43200,
+  "passwordPolicy": "length(4) and maxLength(6) and regexPattern(^[0-9]+$)",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "fr",
+    "en"
+  ],
+  "defaultLocale": "fr",
+  "roles": {
+    "realm": [
+      {
+        "name": "usager",
+        "description": "Citoyen : consulte son journal, gère ses consentements, suit ses démarches"
+      },
+      {
+        "name": "agent",
+        "description": "Agent de guichet d'une administration demandeuse (ex. ONI)"
+      },
+      {
+        "name": "admin-local",
+        "description": "Administrateur d'une administration qui détient des données"
+      },
+      {
+        "name": "admin-centrale",
+        "description": "Autorité de gouvernance du réseau (Centrale de confiance)"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "dlnuf-frontend",
+      "name": "Portail usager et espaces d'administration (Next.js)",
+      "description": "Client confidentiel : le secret reste côté serveur Next.js.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-frontend-secret-a-changer",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": true,
+      "rootUrl": "http://localhost:3000",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "identifiant_pivot",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "identifiant_pivot",
+            "claim.name": "identifiant_pivot",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "niveau_garantie",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "niveau_garantie",
+            "claim.name": "niveau_garantie",
+            "jsonType.label": "int",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "administration",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "administration",
+            "claim.name": "administration",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-backend",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "dlnuf-backend",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "dlnuf-backend",
+      "name": "API métier (audience des jetons)",
+      "description": "N'ouvre aucun flux de connexion : sert d'audience (aud) aux jetons vérifiés par le backend.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-backend-secret-a-changer",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "22670000001",
+      "enabled": true,
+      "firstName": "Awa",
+      "lastName": "KABORE",
+      "attributes": {
+        "identifiant_pivot": [
+          "ACTE:OUAGA:2004:01234"
+        ],
+        "niveau_garantie": [
+          "2"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-dlnuf",
+        "usager"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "1234",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "22670000002",
+      "enabled": true,
+      "firstName": "Issa",
+      "lastName": "SAWADOGO",
+      "attributes": {
+        "identifiant_pivot": [
+          "ACTE:OUAGA:1998:00456"
+        ],
+        "niveau_garantie": [
+          "2"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-dlnuf",
+        "usager"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "1234",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "22670000003",
+      "enabled": true,
+      "firstName": "Mariam",
+      "lastName": "OUATTARA",
+      "attributes": {
+        "identifiant_pivot": [
+          "ACTE:OUAGA:1997:00933"
+        ],
+        "niveau_garantie": [
+          "3"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-dlnuf",
+        "usager"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "1234",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "22670000010",
+      "enabled": true,
+      "firstName": "Agent",
+      "lastName": "ONI",
+      "attributes": {
+        "administration": [
+          "BF/GOV/ONI"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-dlnuf",
+        "agent"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "1234",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "22670000020",
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "MAIRIE",
+      "attributes": {
+        "administration": [
+          "BF/GOV/MAIRIE-OUAGA"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-dlnuf",
+        "admin-local"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "1234",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "22670000030",
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "CENTRALE",
+      "attributes": {},
+      "realmRoles": [
+        "default-roles-dlnuf",
+        "admin-centrale"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "1234",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"unmanagedAttributePolicy\": \"ADMIN_VIEW\", \"attributes\": [{\"name\": \"username\", \"displayName\": \"Numéro de téléphone\", \"validations\": {\"length\": {\"min\": 8, \"max\": 15}, \"pattern\": {\"pattern\": \"^[0-9]+$\", \"error-message\": \"Chiffres uniquement, ex. 22670000001\"}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"required\": {\"roles\": [\"admin\", \"user\"]}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"required\": {\"roles\": [\"admin\", \"user\"]}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"identifiant_pivot\", \"displayName\": \"Identifiant pivot (référence de l'acte de naissance)\", \"validations\": {\"pattern\": {\"pattern\": \"^ACTE:[A-Z]+:[0-9]{4}:[0-9]{5}$\", \"error-message\": \"Format attendu : ACTE:COMMUNE:AAAA:NNNNN\"}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"group\": \"identification\"}, {\"name\": \"niveau_garantie\", \"displayName\": \"Niveau de garantie de l'identification (1 à 3)\", \"validations\": {\"options\": {\"options\": [\"1\", \"2\", \"3\"]}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"group\": \"identification\"}, {\"name\": \"administration\", \"displayName\": \"Administration de rattachement (identifiant X-Road)\", \"validations\": {\"pattern\": {\"pattern\": \"^[A-Z]+/[A-Z]+/[A-Z0-9-]+$\", \"error-message\": \"Ex. BF/GOV/ONI\"}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"group\": \"rattachement\"}], \"groups\": [{\"name\": \"user-metadata\", \"displayHeader\": \"User metadata\", \"displayDescription\": \"Attributes, which refer to user metadata\"}, {\"name\": \"identification\", \"displayHeader\": \"Identification de l'usager\", \"displayDescription\": \"Renseigné par l'administration, jamais modifiable par l'usager\"}, {\"name\": \"rattachement\", \"displayHeader\": \"Rattachement\", \"displayDescription\": \"Administration des agents et administrateurs\"}]}"
+          ]
+        }
+      }
+    ]
+  }
+}
