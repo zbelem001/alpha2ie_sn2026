@@ -1,0 +1,7 @@
+# Connecteur direct : identifiant X-Road du fournisseur -> URL de base de son registre.
+# Noms de services Docker Compose (réseau interne). Hors Docker : routing.local.yaml.
+BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL: http://civil-registry:8000
+BF/GOV/TRANSPORT/PERMIS: http://transport-registry:8000
+BF/GOV/JUSTICE/REGISTRES: http://justice-registry:8000
+BF/GOV/POLICE/PERTES: http://police-registry:8000
+BF/GOV/TRESOR/PAIEMENTS: http://treasury-registry:8000

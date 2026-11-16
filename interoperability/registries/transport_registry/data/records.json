@@ -1,0 +1,34 @@
+[
+  {
+    "pivot_id": "ACTE:OUAGA:2004:01234",
+    "last_name": "KABORE",
+    "first_names": "Awa",
+    "birth_date": "2004-03-12",
+    "driving_licence": { "categories": ["B"], "issued_on": "2024-05-02", "expires_on": "2034-05-01" },
+    "_scenario": "Permis B valide"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1998:00456",
+    "last_name": "SAWADOGO",
+    "first_names": "Issa",
+    "birth_date": "1998-07-23",
+    "driving_licence": { "categories": ["A", "B"], "issued_on": "2019-01-15", "expires_on": "2029-01-14" },
+    "_scenario": "Permis A et B valide"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1995:00321",
+    "last_name": "TRAORE",
+    "first_names": "Moussa",
+    "birth_date": "1995-06-01",
+    "driving_licence": { "categories": ["B"], "issued_on": "2014-01-11", "expires_on": "2024-01-10" },
+    "_scenario": "Homonyme 1 : permis expiré"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1988:00230",
+    "last_name": "YAMEOGO",
+    "first_names": "Paul",
+    "birth_date": "1988-02-20",
+    "driving_licence": { "categories": ["B", "C"], "issued_on": "2021-09-01", "expires_on": "2031-08-31" },
+    "_scenario": "Permis B et C valide"
+  }
+]

@@ -1,3 +1,117 @@
-# Structure initiale : services à configurer par la personne 3.
-# Aucun service applicatif n’est encore disponible.
-services: {}
+# Environnement de développement — Dites-le-nous une fois
+#
+# Depuis la racine du dépôt (compose.yaml inclut ce fichier) :
+#   docker compose up -d --build
+#
+# Panne d'un registre (épreuve) :
+#   docker compose stop justice-registry
+#   docker compose start justice-registry
+
+name: dlnuf
+
+# Même Dockerfile pour les cinq registres. Pas de nom d'image commun : cinq
+# constructions parallèles vers un même nom entrent en conflit. Les couches
+# sont partagées par le cache, chaque registre a seulement sa propre étiquette.
+x-registry: &registry
+  build:
+    context: ../interoperability
+  restart: unless-stopped
+  environment:
+    REFERENCE_DATE: ${REFERENCE_DATE:-}
+    SIMULATED_LATENCY_MS: ${SIMULATED_LATENCY_MS:-0}
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+    interval: 10s
+    timeout: 3s
+    retries: 3
+    start_period: 5s
+
+services:
+  # --- Données et identité -----------------------------------------------------------
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dlnuf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dlnuf-dev}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    command: ["start-dev"]
+    restart: unless-stopped
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-dev}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-dlnuf}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-dlnuf-dev}
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${KEYCLOAK_HOST_PORT:-8180}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # --- Registres simulés (une image, cinq registres) -----------------------------------
+
+  civil-registry:
+    <<: *registry
+    command: ["uvicorn", "registries.civil_registry.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8101:8000"
+
+  transport-registry:
+    <<: *registry
+    command: ["uvicorn", "registries.transport_registry.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8102:8000"
+
+  justice-registry:
+    <<: *registry
+    command: ["uvicorn", "mock_registry.justice.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8103:8000"
+
+  police-registry:
+    <<: *registry
+    command: ["uvicorn", "mock_registry.police.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8104:8000"
+
+  treasury-registry:
+    <<: *registry
+    command: ["uvicorn", "mock_registry.treasury.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8105:8000"
+
+  # --- Applications (à activer quand backend/ et frontend/ existent) --------------------
+  #
+  # backend:                      # Personne 2
+  #   build: ../backend
+  #   environment:
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-dlnuf}:${POSTGRES_PASSWORD:-dlnuf-dev}@postgres:5432/backend
+  #     REGISTRY_CONNECTOR: direct          # ou xroad (phase 3)
+  #     XROAD_CLIENT_ID: BF/GOV/ONI/CNIB
+  #   ports: ["8000:8000"]
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #
+  # frontend:                     # Personne 1
+  #   build: ../frontend
+  #   ports: ["3000:3000"]
+
+volumes:
+  postgres-data:

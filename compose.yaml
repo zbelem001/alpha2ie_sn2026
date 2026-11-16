@@ -1,0 +1,7 @@
+# Point d'entrée : `docker compose up -d --build` depuis la racine du dépôt.
+# La définition des services est dans infrastructure/docker-compose.yml.
+name: dlnuf
+
+include:
+  - path: infrastructure/docker-compose.yml
+    env_file: .env.example

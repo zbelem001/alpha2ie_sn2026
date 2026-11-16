@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "registry-request.json",
+  "title": "Requête vers un service de registre",
+  "description": "Corps transmis par le connecteur au service d'un registre : c'est le `payload` de RegistryConnector.query(organization, service, payload). Il est identique en appel direct et via X-Road. Statut : PROPOSITION à valider entre Personne 2 et Personne 3.",
+  "type": "object",
+  "required": ["subject"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "description": "Identifiant unique de la requête côté demandeur, pour la traçabilité. Généré par le connecteur s'il est absent."
+    },
+    "procedure": {
+      "type": ["string", "null"],
+      "maxLength": 64,
+      "description": "Démarche pour laquelle la donnée est demandée, ex. « cnib-application »."
+    },
+    "subject": {
+      "type": "object",
+      "description": "Personne concernée : son identifiant pivot, ou des critères de recherche (nom, prénoms, date de naissance).",
+      "additionalProperties": false,
+      "properties": {
+        "pivot_id": {
+          "type": "string",
+          "pattern": "^ACTE:[A-Z]+:[0-9]{4}:[0-9]{5}$",
+          "description": "Référence de l'acte de naissance, ex. ACTE:OUAGA:2004:01234."
+        },
+        "last_name": { "type": "string", "minLength": 1 },
+        "first_names": { "type": "string", "minLength": 1 },
+        "birth_date": { "type": "string", "format": "date" },
+        "birth_place": { "type": "string", "minLength": 1 }
+      },
+      "anyOf": [
+        { "required": ["pivot_id"] },
+        { "required": ["last_name", "first_names", "birth_date"] }
+      ]
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Paramètres propres à un service, ex. { \"document_type\": \"CNIB\" } pour loss-declaration."
+    }
+  }
+}

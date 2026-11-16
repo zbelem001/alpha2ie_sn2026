@@ -4,6 +4,8 @@
 !.env.example
 *.pem
 *.key
+*.p12
+secrets/
 # Frontend
 node_modules/
 .next/
@@ -17,6 +19,8 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+*.egg-info/
+build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
