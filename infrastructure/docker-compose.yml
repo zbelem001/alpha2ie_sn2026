@@ -49,7 +49,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
-    command: ["start-dev"]
+    command: ["start-dev", "--import-realm"]
     restart: unless-stopped
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
@@ -61,6 +61,8 @@ services:
       KC_HEALTH_ENABLED: "true"
     ports:
       - "${KEYCLOAK_HOST_PORT:-8180}:8080"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,6 +105,9 @@ services:
   #   build: ../backend
   #   environment:
   #     DATABASE_URL: postgresql://${POSTGRES_USER:-dlnuf}:${POSTGRES_PASSWORD:-dlnuf-dev}@postgres:5432/backend
+  #     KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8180/realms/dlnuf}
+  #     KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/dlnuf/protocol/openid-connect/certs
+  #     KEYCLOAK_CLIENT_ID: dlnuf-api
   #     REGISTRY_CONNECTOR: direct          # ou xroad (phase 3)
   #     XROAD_CLIENT_ID: BF/GOV/ONI/CNIB
   #   ports: ["8000:8000"]

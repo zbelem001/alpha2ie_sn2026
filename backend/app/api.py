@@ -1,10 +1,10 @@
-"""Routes métier MVP. Authentification Keycloak à raccorder avant exposition réseau."""
+"""Routes métier MVP, protégées par des jetons Bearer Keycloak."""
 from datetime import datetime, timezone
 import hashlib
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -24,6 +24,7 @@ from app.database.models import (
     RegistryRequest,
     RequestAttempt,
 )
+from app.security import Principal, get_current_principal, require_role
 
 router = APIRouter(prefix="/v1")
 
@@ -31,7 +32,6 @@ router = APIRouter(prefix="/v1")
 class CaseCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     procedure_code: str
-    requester_administration: str
     subject_ref: str = Field(min_length=1, max_length=160)
 
 
@@ -138,8 +138,21 @@ def _case_or_404(db: Session, case_id: UUID) -> Case:
     return case
 
 
+def _authorize_case_access(case: Case, db: Session, principal: Principal) -> None:
+    if "agent" in principal.roles:
+        administration = db.get(Administration, case.requester_administration_id)
+        if administration and principal.administration_code == administration.code:
+            return
+    if "citizen" in principal.roles and principal.citizen_ref == case.subject_ref:
+        return
+    raise HTTPException(status_code=403, detail="Accès interdit à ce dossier")
+
+
 @router.get("/procedures")
-def list_procedures(db: Session = Depends(get_db)):
+def list_procedures(
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
     procedures = db.scalars(select(Procedure).where(Procedure.active.is_(True))).all()
     result = []
     for procedure in procedures:
@@ -161,9 +174,15 @@ def list_procedures(db: Session = Depends(get_db)):
 
 
 @router.post("/cases", status_code=status.HTTP_201_CREATED)
-def create_case(body: CaseCreate, db: Session = Depends(get_db)):
+def create_case(
+    body: CaseCreate,
+    principal: Principal = Depends(require_role("agent")),
+    db: Session = Depends(get_db),
+):
     procedure = db.scalar(select(Procedure).where(Procedure.code == body.procedure_code, Procedure.active.is_(True)))
-    requester = db.scalar(select(Administration).where(Administration.code == body.requester_administration,
+    if not principal.administration_code:
+        raise HTTPException(status_code=403, detail="Jeton agent sans administration")
+    requester = db.scalar(select(Administration).where(Administration.code == principal.administration_code,
                                                        Administration.active.is_(True)))
     if procedure is None or requester is None:
         raise HTTPException(status_code=404, detail="Démarche ou administration inconnue")
@@ -186,13 +205,26 @@ def create_case(body: CaseCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/cases/{case_id}")
-def get_case(case_id: UUID, db: Session = Depends(get_db)):
-    return _serialize_case(db, _case_or_404(db, case_id))
+def get_case(
+    case_id: UUID,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    case = _case_or_404(db, case_id)
+    _authorize_case_access(case, db, principal)
+    return _serialize_case(db, case)
 
 
 @router.post("/cases/{case_id}/consent", status_code=status.HTTP_201_CREATED)
-def record_consent(case_id: UUID, body: ConsentCreate, db: Session = Depends(get_db)):
+def record_consent(
+    case_id: UUID,
+    body: ConsentCreate,
+    principal: Principal = Depends(require_role("citizen")),
+    db: Session = Depends(get_db),
+):
     case = _case_or_404(db, case_id)
+    if principal.citizen_ref != case.subject_ref:
+        raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut répondre au consentement")
     links = db.scalars(select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == case.procedure_id)).all()
     allowed = {db.get(Question, link.question_id).code: link.question_id for link in links}
     if len(set(body.question_codes)) != len(body.question_codes) or not set(body.question_codes) <= allowed.keys():
@@ -216,8 +248,14 @@ def record_consent(case_id: UUID, body: ConsentCreate, db: Session = Depends(get
 
 
 @router.delete("/cases/{case_id}/consent")
-def revoke_consent(case_id: UUID, db: Session = Depends(get_db)):
+def revoke_consent(
+    case_id: UUID,
+    principal: Principal = Depends(require_role("citizen")),
+    db: Session = Depends(get_db),
+):
     case = _case_or_404(db, case_id)
+    if principal.citizen_ref != case.subject_ref:
+        raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut révoquer son consentement")
     consent = db.scalar(select(Consent).where(Consent.case_id == case.id, Consent.status == "granted")
                         .order_by(Consent.created_at.desc()))
     if consent is None:
@@ -232,8 +270,13 @@ def revoke_consent(case_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/cases/{case_id}/checks")
-def execute_checks(case_id: UUID, db: Session = Depends(get_db)):
+def execute_checks(
+    case_id: UUID,
+    principal: Principal = Depends(require_role("agent")),
+    db: Session = Depends(get_db),
+):
     case = _case_or_404(db, case_id)
+    _authorize_case_access(case, db, principal)
     now = datetime.now(timezone.utc)
     consent = db.scalar(select(Consent).where(Consent.case_id == case.id, Consent.status == "granted")
                         .order_by(Consent.created_at.desc()))
@@ -318,8 +361,13 @@ def execute_checks(case_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/cases/{case_id}/journal")
-def get_journal(case_id: UUID, db: Session = Depends(get_db)):
+def get_journal(
+    case_id: UUID,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
     case = _case_or_404(db, case_id)
+    _authorize_case_access(case, db, principal)
     events = db.scalars(select(AuditEvent).where(AuditEvent.case_id == case.id)
                         .order_by(AuditEvent.occurred_at)).all()
     return [{"id": str(event.id), "occurred_at": event.occurred_at,

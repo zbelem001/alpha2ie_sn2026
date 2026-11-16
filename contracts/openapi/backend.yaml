@@ -7,6 +7,8 @@ info:
     Les réponses brutes des registres ne sont jamais exposées ni conservées.
 servers:
   - url: http://localhost:8000
+security:
+  - BearerAuth: []
 tags:
   - name: procedures
   - name: cases
@@ -15,6 +17,7 @@ tags:
 paths:
   /health:
     get:
+      security: []
       tags: [system]
       summary: Vérifier que l’API est disponible
       responses:
@@ -51,10 +54,9 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [procedure_code, requester_administration, subject_ref]
+              required: [procedure_code, subject_ref]
               properties:
                 procedure_code: { type: string, example: prise_de_service }
-                requester_administration: { type: string, example: BF/GOV/FONCTION-PUBLIQUE }
                 subject_ref: { type: string, description: Identifiant pivot fictif du citoyen, example: ACTE:OUAGA:2004:01234 }
       responses:
         '201':
@@ -64,6 +66,8 @@ paths:
               schema: { $ref: '#/components/schemas/Case' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/cases/{case_id}:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -77,6 +81,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Case' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/cases/{case_id}/consent:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -106,6 +112,8 @@ paths:
               schema: { $ref: '#/components/schemas/Consent' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Invalid' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     delete:
       tags: [consent]
       summary: Révoquer le consentement actif du dossier
@@ -116,6 +124,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Consent' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/cases/{case_id}/checks:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -142,6 +152,7 @@ paths:
                     items: { $ref: '#/components/schemas/Check' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /v1/cases/{case_id}/journal:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -157,7 +168,14 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/AuditEvent' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   parameters:
     CaseId:
       name: case_id
@@ -249,6 +267,14 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
       description: Consentement ou droit requis absent
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Jeton Keycloak absent, invalide ou expiré
+      headers:
+        WWW-Authenticate:
+          schema: { type: string }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
