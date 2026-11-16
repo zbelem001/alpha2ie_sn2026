@@ -90,6 +90,16 @@ Chaque appel réel et chaque refus métier doit être visible dans `audit_events
 
 Pas de table `citizens` contenant les attributs d’état civil, pas de copie des registres, pas de stockage d’image CNIB, d’acte ou de casier, et pas de notifications SMS réelles. La gestion d’identité et des sessions relève de Keycloak ; le backend ne garde qu’une référence d’acteur/administration utile à l’autorisation et à l’audit.
 
-## Étape d’implémentation suivante
+## Mise en route locale
 
-Après validation de ce modèle avec l’équipe : fixer SQLAlchemy/Alembic (ou une solution de migration convenue), créer la migration initiale, configurer `DATABASE_URL` vers la base Compose `backend`, puis brancher les dépôts de données des modules `procedures`, `consent`, `requests`, `orchestration` et `audit`.
+Depuis `backend/`, après avoir démarré PostgreSQL avec `docker compose up -d postgres` à la racine :
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+DATABASE_URL=postgresql+psycopg://dlnuf:dlnuf-dev@localhost:55432/backend .venv/bin/alembic upgrade head
+DATABASE_URL=postgresql+psycopg://dlnuf:dlnuf-dev@localhost:55432/backend .venv/bin/python -m scripts.seed_demo
+DATABASE_URL=postgresql+psycopg://dlnuf:dlnuf-dev@localhost:55432/backend REGISTRY_ROUTES_FILE=../interoperability/connectors/routing.local.yaml .venv/bin/uvicorn app.main:app --reload
+```
+
+L’URL locale vise le port publié par Compose. Dans un futur conteneur backend, utiliser le nom de service `postgres` et le port interne `5432`. L’API expose actuellement `GET /health`; les dépôts et endpoints métier seront branchés ensuite sur `SessionLocal` / `get_db`.
