@@ -161,7 +161,7 @@ def list_procedures(db: Session = Depends(get_db)):
 
 
 @router.post("/cases", status_code=status.HTTP_201_CREATED)
-ndef create_case(body: CaseCreate, db: Session = Depends(get_db)):
+def create_case(body: CaseCreate, db: Session = Depends(get_db)):
     procedure = db.scalar(select(Procedure).where(Procedure.code == body.procedure_code, Procedure.active.is_(True)))
     requester = db.scalar(select(Administration).where(Administration.code == body.requester_administration,
                                                        Administration.active.is_(True)))
@@ -263,8 +263,10 @@ def execute_checks(case_id: UUID, db: Session = Depends(get_db)):
             Permission.requester_administration_id == case.requester_administration_id,
             Permission.question_id == question.id,
             Permission.active.is_(True),
+            (Permission.valid_from.is_(None) | (Permission.valid_from <= now)),
+            (Permission.valid_until.is_(None) | (Permission.valid_until > now)),
         ))
-        if question.id not in consent_ids or (permission is None and link.required):
+        if not question.active or permission is None or question.id not in consent_ids:
             request.status = "blocked"
             _add_event(db, case, "check_blocked", "consentement ou autorisation absent", outcome="blocked", question=question)
             continue
