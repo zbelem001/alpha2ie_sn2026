@@ -20,6 +20,7 @@ from app.database.models import (
     Question,
     Registry,
     RegistryRequest,
+    RequestAttempt,
 )
 from app.security import Principal
 
@@ -200,3 +201,51 @@ def test_registry_boolean_must_be_a_boolean(
     assert request.minimal_result == expected_result
     if expected_check_status == "error":
         assert request.attempt_count == 1
+
+
+def test_unavailable_registry_can_be_retried_without_duplicate_request(db: Session, monkeypatch):
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    case = create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)
+    case_id = UUID(case["id"])
+    consent = record_consent(
+        case_id,
+        ConsentCreate(decision="granted", question_codes=["passport_cnib_valid"], notice_version="demo-1", channel="web"),
+        citizen,
+        db,
+    )
+    db.get(Consent, UUID(consent["id"])).expires_at = None
+
+    class IntermittentConnector:
+        attempts = 0
+
+        def query(self, organization, service, payload):
+            self.attempts += 1
+            if self.attempts == 1:
+                raise TimeoutError("registre hors ligne")
+            return {"status": "ok", "data": {"valid": True}, "transport_id": "retry-succeeded"}
+
+    connector = IntermittentConnector()
+    monkeypatch.setattr(connectors, "build_connector", lambda: connector)
+
+    first = execute_checks(case_id, agent, db)
+    assert first["status"] == "pending"
+    assert first["checks"][0]["status"] == "unavailable"
+    request = db.scalar(select(RegistryRequest).where(RegistryRequest.case_id == case_id))
+    request_id = request.id
+    idempotency_key = request.idempotency_key
+
+    second = execute_checks(case_id, agent, db)
+
+    assert second["status"] == "completed"
+    assert second["checks"][0]["status"] == "confirmed"
+    assert second["checks"][0]["attempt_count"] == 2
+    assert db.scalar(select(func.count()).select_from(RegistryRequest).where(RegistryRequest.case_id == case_id)) == 1
+    assert request.id == request_id
+    assert request.idempotency_key == idempotency_key
+    attempts = db.scalars(
+        select(RequestAttempt).where(RequestAttempt.registry_request_id == request_id).order_by(RequestAttempt.attempt_number)
+    ).all()
+    assert [attempt.attempt_number for attempt in attempts] == [1, 2]
+    assert [attempt.status for attempt in attempts] == ["failed", "succeeded"]
