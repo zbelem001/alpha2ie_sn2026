@@ -1,0 +1,294 @@
+openapi: 3.1.0
+info:
+  title: Couche passerelle — notifications simulées (SMS, e-mail)
+  description: 'Service de notifications simulé (SMS et e-mail).
+
+
+    Contrat (contracts/schemas/) :
+
+    - POST /notifications              : envoyer (notification-request -> notification-response)
+
+    - GET  /replies?after=<seq>        : réponses SMS du citoyen (sms-reply), dans
+    l''ordre d''arrivée
+
+    - webhook vers NOTIFICATION_REPLY_WEBHOOK_URL : chaque réponse SMS, dès sa réception
+    (sms-reply)
+
+
+    Consultation :
+
+    - GET  /notifications              : messages envoyés, du plus récent au plus
+    ancien (filtres : recipient, reference, channel)
+
+    - GET  /notifications/{id}         : un message
+
+    - GET  /health
+
+
+    Démonstration (hors contrat) :
+
+    - GET  /                           : boîte d''envoi
+
+    - GET  /phone/{numéro}             : téléphone simulé du citoyen, avec réponse
+
+    - POST /simulate/replies           : le citoyen répond (utilisé par le téléphone
+    simulé)
+
+    - GET  /simulate/phones/{numéro}/thread
+
+    - POST /simulate/reset             : tout effacer
+
+
+    Destinataires toujours injoignables : 22670000099 et injoignable@exemple.bf.
+
+    '
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Health Health Get
+  /notifications:
+    post:
+      summary: Send
+      operationId: send_notifications_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+    get:
+      summary: List Notifications
+      operationId: list_notifications_notifications_get
+      parameters:
+      - name: recipient
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Recipient
+      - name: reference
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reference
+      - name: channel
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(sms|email)$
+          - type: 'null'
+          title: Channel
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response List Notifications Notifications Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /replies:
+    get:
+      summary: List Replies
+      operationId: list_replies_replies_get
+      parameters:
+      - name: after
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          description: Numéro d'ordre (seq) de la dernière réponse déjà lue
+          default: 0
+          title: After
+        description: Numéro d'ordre (seq) de la dernière réponse déjà lue
+      - name: sender
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^[0-9]{8,15}$
+          - type: 'null'
+          title: Sender
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response List Replies Replies Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /notifications/{notification_id}:
+    get:
+      summary: Get Notification
+      operationId: get_notification_notifications__notification_id__get
+      parameters:
+      - name: notification_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Notification Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Get Notification Notifications  Notification Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /simulate/replies:
+    post:
+      tags:
+      - démonstration
+      summary: Simulate Reply
+      operationId: simulate_reply_simulate_replies_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              additionalProperties: true
+              type: object
+              title: Body
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /simulate/phones/{number}/thread:
+    get:
+      tags:
+      - démonstration
+      summary: Phone Thread
+      operationId: phone_thread_simulate_phones__number__thread_get
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Number
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Phone Thread Simulate Phones  Number  Thread Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /simulate/reset:
+    post:
+      tags:
+      - démonstration
+      summary: Reset
+      operationId: reset_simulate_reset_post
+      responses:
+        '204':
+          description: Successful Response
+components:
+  schemas:
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+servers:
+- url: http://localhost:8107

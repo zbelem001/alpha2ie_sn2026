@@ -1,0 +1,104 @@
+openapi: 3.1.0
+info:
+  title: Couche registres — contrat commun des registres simulés
+  version: 0.1.0
+  description: Interface commune aux six registres simulés (état civil, permis, justice,
+    ONI, police, trésor). Chaque registre expose POST /services/{service} ; la liste
+    de ses services est donnée par GET /services. Générée depuis registries/common/app_factory.py.
+    À remplacer par le contrat OpenAPI du jury dès sa publication.
+paths:
+  /health:
+    get:
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Health Health Get
+  /services:
+    get:
+      summary: List Services
+      operationId: list_services_services_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response List Services Services Get
+  /services/{service}:
+    post:
+      summary: Call Service
+      operationId: call_service_services__service__post
+      parameters:
+      - name: service
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+servers:
+- url: http://localhost:8101
+  description: état civil
+- url: http://localhost:8102
+  description: permis
+- url: http://localhost:8103
+  description: justice
+- url: http://localhost:8104
+  description: police
+- url: http://localhost:8105
+  description: trésor
+- url: http://localhost:8106
+  description: ONI

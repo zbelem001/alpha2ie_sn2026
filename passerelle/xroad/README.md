@@ -1,6 +1,6 @@
-# Banc de test X-Road
+# Banc de test X-Road (couche passerelle)
 
-Responsable : Personne 3. Réservé au développement : images de test NIIS, mots de passe par défaut, autorité de certification de test.
+Responsable : Personne 3. Copie de `interoperability/xroad`, lancée par `compose.couches.yaml` (architecture par couche). Réservé au développement : images de test NIIS, mots de passe par défaut, autorité de certification de test.
 
 Le banc fait passer les appels du backend vers les registres simulés par X-Road, sans rien changer au backend : il suffit de passer `REGISTRY_CONNECTOR` de `direct` à `xroad`. Si le banc n'est pas prêt, `REGISTRY_CONNECTOR=direct` garde tout fonctionnel.
 
@@ -9,23 +9,23 @@ Le banc fait passer les appels du backend vers les registres simulés par X-Road
 Depuis la racine du dépôt :
 
 ```bash
-docker compose --profile xroad up -d --build        # démarre et configure le banc, avec le reste
-docker compose --profile xroad logs -f xroad-setup  # suivre la configuration
+docker compose -f compose.couches.yaml --profile xroad up -d --build        # démarre et configure le banc, avec le reste
+docker compose -f compose.couches.yaml --profile xroad logs -f xroad-setup  # suivre la configuration
 ```
 
-Une seule commande : le service `xroad-setup` démarre avec les serveurs, attend qu'ils répondent, configure ce qui manque, puis s'arrête. Le banc est prêt quand son journal affiche « Banc X-Road prêt en … s » (et `docker compose --profile xroad ps -a xroad-setup` indique `Exited (0)`). Pour que `docker compose up -d --build` suffise, sans `--profile` : `COMPOSE_PROFILES=xroad` dans `.env`.
+Une seule commande : le service `xroad-setup` démarre avec les serveurs, attend qu'ils répondent, configure ce qui manque, puis s'arrête. Le banc est prêt quand son journal affiche « Banc X-Road prêt en … s » (et `docker compose -f compose.couches.yaml --profile xroad ps -a xroad-setup` indique `Exited (0)`). Pour que la commande suffise sans `--profile` : `COMPOSE_PROFILES=xroad` dans `.env`.
 
 - **Démarrage** : 5 à 9 minutes avant que les quatre serveurs répondent (quatre serveurs Java démarrent en même temps). `up -d` rend la main tout de suite ; `xroad-setup` attend jusqu'à 12 minutes.
-- **Configuration** : environ 7 minutes la première fois (mesuré : 402 s, soit 12 minutes en tout avec le démarrage, d'un seul passage sur un banc neuf). Le script ([configuration/setup_bench.py](configuration/setup_bench.py)) est relançable : les étapes déjà faites sont sautées, et une relance sur un banc configuré ne fait que la vérification finale (une quinzaine de secondes). Les messages « en attente » sont normaux : une modification du serveur central n'atteint les Security Servers qu'avec la configuration globale suivante. En cas d'échec, Docker relance le script trois fois au plus ; à la main : `docker compose --profile xroad run --rm xroad-setup`.
+- **Configuration** : environ 7 minutes la première fois (mesuré : 402 s, soit 12 minutes en tout avec le démarrage, d'un seul passage sur un banc neuf). Le script ([configuration/setup_bench.py](configuration/setup_bench.py)) est relançable : les étapes déjà faites sont sautées, et une relance sur un banc configuré ne fait que la vérification finale (une quinzaine de secondes). Les messages « en attente » sont normaux : une modification du serveur central n'atteint les Security Servers qu'avec la configuration globale suivante. En cas d'échec, Docker relance le script trois fois au plus ; à la main : `docker compose -f compose.couches.yaml --profile xroad run --rm xroad-setup`.
 - **Mémoire** : environ 5,3 Go de plus que le reste de l'environnement (serveur central 1,9 Go, chaque Security Server 1,6 à 1,7 Go). Docker Desktop doit disposer d'au moins 8 Go.
 - **Persistance** : toute la configuration est dans des volumes nommés (autorité de test, serveur central, chaque Security Server). Elle survit à `stop` / `start`, à `down` / `up` et à la recréation des conteneurs. Les trois serveurs se reconnectent seuls à leur jeton au démarrage (`XROAD_TOKEN_PIN`) : sans cela, le serveur central ne signe plus la configuration globale, qui expire, et plus aucun échange ne passe (`server.clientproxy.global_conf_outdated`, constaté avant la correction).
 - **Remise à zéro complète** : supprimer les conteneurs du banc, puis **tous** ses volumes ensemble. Ne jamais en supprimer une partie seulement : serveur central, Security Servers et autorité se reconnaissent par leurs clés et leurs certificats.
 
   ```bash
-  docker compose --profile xroad rm -sf xroad-setup xroad-cs xroad-ca ss-registres ss-demandeurs
-  docker volume rm dlnuf_xroad-ca-home dlnuf_xroad-ca-certs \
-    dlnuf_xroad-cs-config dlnuf_xroad-cs-db dlnuf_xroad-cs-data \
-    dlnuf_ss-registres-config dlnuf_ss-registres-db dlnuf_ss-demandeurs-config dlnuf_ss-demandeurs-db
+  docker compose -f compose.couches.yaml --profile xroad rm -sf xroad-setup xroad-cs xroad-ca ss-registres ss-demandeurs
+  docker volume rm dlnuf-couches_xroad-ca-home dlnuf-couches_xroad-ca-certs \
+    dlnuf-couches_xroad-cs-config dlnuf-couches_xroad-cs-db dlnuf-couches_xroad-cs-data \
+    dlnuf-couches_ss-registres-config dlnuf-couches_ss-registres-db dlnuf-couches_ss-demandeurs-config dlnuf-couches_ss-demandeurs-db
   ```
 
 ## Topologie
@@ -63,7 +63,7 @@ Chaque service REST pointe vers `POST /services/{service}` du registre simulé c
 | `BF/GOV/ONI/CNIB` | `identity`, `identity-match`, `is-adult`, `nationality`, `loss-declaration`, `payment-status` |
 | `BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT` | `is-adult`, `nationality`, `criminal-record` |
 
-Tout autre appel est refusé par X-Road, avant même d'atteindre le registre. Par exemple, l'ONI qui demande le casier judiciaire : X-Road renvoie `server.serverproxy.access_denied`, que le connecteur traduit en `refused`. Les droits se modifient dans `CONSUMERS`, en haut du script, puis on relance `docker compose --profile xroad run --rm xroad-setup`.
+Tout autre appel est refusé par X-Road, avant même d'atteindre le registre. Par exemple, l'ONI qui demande le casier judiciaire : X-Road renvoie `server.serverproxy.access_denied`, que le connecteur traduit en `refused`. Les droits se modifient dans `CONSUMERS`, en haut du script, puis on relance `docker compose -f compose.couches.yaml --profile xroad run --rm xroad-setup`.
 
 ## Brancher le backend
 
@@ -85,7 +85,7 @@ curl -s http://localhost:8280/r1/BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL/is-adult \
 
 ## Ce qui a été vérifié sur le banc
 
-Avec le connecteur du backend (`REGISTRY_CONNECTOR=xroad`), le 17/11/2026 :
+Avec le connecteur du backend (`REGISTRY_CONNECTOR=xroad`), le 17/11/2026, sur `interoperability/` :
 
 | Appel | Résultat |
 |---|---|
@@ -100,7 +100,7 @@ Avec le connecteur du backend (`REGISTRY_CONNECTOR=xroad`), le 17/11/2026 :
 | Identifiant pivot mal formé | `invalid_request` (réponse du registre, transmise par X-Road) |
 | Registre de la Justice arrêté | `unavailable`, puis `ok` dès son redémarrage |
 
-Déploiement et persistance, le 17/11/2026 :
+Déploiement et persistance, le 17/11/2026 (mesures faites sur `interoperability/`, avant la copie dans `passerelle/`) :
 
 | Situation | Résultat |
 |---|---|

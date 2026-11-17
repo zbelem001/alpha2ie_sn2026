@@ -1,0 +1,78 @@
+openapi: 3.1.0
+info:
+  title: Couche passerelle — interface d'échange X-Road
+  version: 0.1.0
+  description: |
+    Interface REST du Security Server du demandeur (interface « système d'information »
+    d'X-Road), telle que l'appelle le connecteur XRoadConnector (connectors/xroad.py).
+    Le Security Server signe la requête, vérifie le droit d'accès du demandeur, puis la
+    transmet au Security Server du fournisseur, qui appelle POST /services/{service} du
+    registre (voir registres/openapi.yaml).
+
+    En mode direct (REGISTRY_CONNECTOR=direct), le connecteur appelle le registre sans
+    X-Road, avec le même corps et la même réponse.
+
+    Les notifications simulées ont leur propre spécification : notifications.openapi.yaml.
+servers:
+  - url: http://localhost:8280
+    description: Security Server ss-demandeurs du banc, depuis la machine
+  - url: http://ss-demandeurs:8080
+    description: Security Server ss-demandeurs du banc, depuis un conteneur
+paths:
+  /r1/{instance}/{memberClass}/{memberCode}/{subsystemCode}/{service}:
+    post:
+      summary: Interroger un service d'un registre à travers X-Road
+      operationId: queryRegistryService
+      parameters:
+        - {name: instance, in: path, required: true, schema: {type: string, example: BF}}
+        - {name: memberClass, in: path, required: true, schema: {type: string, example: GOV}}
+        - {name: memberCode, in: path, required: true, schema: {type: string, example: MAIRIE-OUAGA}}
+        - {name: subsystemCode, in: path, required: true, schema: {type: string, example: ETAT-CIVIL}}
+        - {name: service, in: path, required: true, schema: {type: string, example: is-adult}}
+        - name: X-Road-Client
+          in: header
+          required: true
+          description: Identifiant du demandeur, au format INSTANCE/CLASSE/MEMBRE/SOUS-SYSTÈME.
+          schema: {type: string, example: BF/GOV/ONI/CNIB}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/schemas/registry-request.json
+      responses:
+        "200":
+          description: |
+            Réponse du registre, transmise telle quelle. Le statut métier (ok, not_found,
+            ambiguous, invalid_request…) est dans le corps. L'en-tête X-Road-Id donne
+            l'identifiant du message, repris par le connecteur dans transport_id.
+          headers:
+            X-Road-Id:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/schemas/registry-response.json
+        "4XX":
+          description: Réponse d'erreur du registre (requête invalide), transmise par X-Road.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/schemas/registry-response.json
+        "500":
+          description: |
+            Erreur X-Road. Le code est dans l'en-tête X-Road-Error ; le connecteur le traduit :
+            server.serverproxy.access_denied -> refused (hors convention) ;
+            server.serverproxy.unknown_service, unknown_member… -> invalid_request ;
+            tout autre code (registre injoignable, configuration globale expirée…) -> unavailable.
+          headers:
+            X-Road-Error:
+              schema: {type: string, example: server.serverproxy.access_denied}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type: {type: string}
+                  message: {type: string}
+                  detail: {type: string}

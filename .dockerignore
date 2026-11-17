@@ -6,3 +6,6 @@
 **/.pytest_cache
 frontend/node_modules
 frontend/.next
+espace-usager/node_modules
+espace-usager/.next
+**/*.egg-info

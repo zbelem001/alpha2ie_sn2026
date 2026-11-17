@@ -11,7 +11,7 @@ import uuid
 from collections import OrderedDict, deque
 from typing import Any
 
-from registries.common.envelope import utc_now_iso
+from notifications.common import utc_now_iso
 
 from .models import NotificationRequest, SimulatedReply
 

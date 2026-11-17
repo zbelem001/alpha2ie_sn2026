@@ -1,9 +1,9 @@
 """Configuration automatique du banc X-Road « BF » par les API REST.
 
-Lancé automatiquement par `docker compose --profile xroad up -d` (service
+Lancé automatiquement par `docker compose -f compose.couches.yaml --profile xroad up -d` (service
 xroad-setup), en même temps que les serveurs : il attend qu'ils répondent.
 À la main, depuis la racine du dépôt :
-    docker compose --profile xroad run --rm xroad-setup
+    docker compose -f compose.couches.yaml --profile xroad run --rm xroad-setup
 
 Relançable : chaque étape vérifie d'abord si elle est déjà faite. Les attentes
 sont normales : une modification du serveur central n'atteint les Security

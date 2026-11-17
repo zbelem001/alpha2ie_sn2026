@@ -1,0 +1,5 @@
+-r requirements.txt
+# Tests d'interopérabilité : les connecteurs interrogent les registres simulés en mémoire.
+-e ../registres
+pytest==8.3.4
+jsonschema==4.23.0

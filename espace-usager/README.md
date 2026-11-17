@@ -1,3 +1,8 @@
+> **Couche espace usager** (obligatoire, carte du jury). Responsable : Personne 1.
+> Copie de `frontend/` (branche `mirror-project`) ; le dossier d'origine reste en place.
+> Priorité de la carte : l'usager lance une démarche, voit le résultat et retrouve chaque consultation dans son espace (fin de la vidéo imposée).
+> L'application contient encore le guichet agent (`src/app/(agent)`, couche bonus [guichet-agent](../guichet-agent/README.md)) et l'administration locale. Dans le texte ci-dessous, « depuis `frontend/` » se lit « depuis `espace-usager/` ».
+
 # Frontend — Dites-le-nous une fois
 
 Next.js, React, TypeScript et CSS Modules. Références : [interfaces](../docs/interfaces%283%29.md), [architecture](../docs/organisation_equipe_architecture_repository.md) et [ajout d’une démarche](../docs/guide-ajout-demarche.md).

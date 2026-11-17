@@ -32,8 +32,8 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import ValidationError
 
-from registries.common.envelope import utc_now_iso
-from registries.common.logs import console_logger
+from notifications.common import utc_now_iso
+from notifications.common import console_logger
 
 from .models import PHONE_PATTERN, NotificationRequest, SimulatedReply
 from .pages import outbox_page, phone_page

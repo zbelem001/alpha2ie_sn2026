@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dlnuf-passerelle"
+version = "0.1.0"
+description = "Couche passerelle d'échange : connecteurs (direct, X-Road), banc X-Road, notifications simulées — Dites-le-nous une fois"
+requires-python = ">=3.12"
+# Dépendances minimales : celles des connecteurs et de NotificationClient, que la couche démarches installe.
+dependencies = ["httpx>=0.27", "PyYAML>=6"]
+
+[project.optional-dependencies]
+# Service de notifications simulées.
+service = ["fastapi>=0.115,<0.120", "starlette>=0.46,<0.49", "uvicorn>=0.30", "pydantic>=2.7"]
+# Les tests d'interopérabilité font aussi tourner les registres : `pip install -r requirements-dev.txt`.
+dev = ["dlnuf-passerelle[service]", "pytest>=8", "jsonschema>=4.22"]
+
+[tool.setuptools.packages.find]
+include = ["connectors*", "notifications*"]
+
+[tool.setuptools.package-data]
+connectors = ["*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
