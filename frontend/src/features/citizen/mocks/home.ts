@@ -1,6 +1,7 @@
 // Données fictives de démonstration. Une absence de demande est représentée par null.
 export type CitizenHomeData = {
   firstName: string;
+  phone: string;
   pendingRequest: null | {
     id: string;
     organization: string;
@@ -18,11 +19,13 @@ export type CitizenHomeData = {
     purpose: string;
     source: string;
     basis: string;
+    outcome?: string;
   }[];
 };
 
 export const citizenHomeDemo: CitizenHomeData = {
   firstName: "Awa",
+  phone: "11111111",
   pendingRequest: {
     id: "consent-demo-01",
     organization: "Office national d’identification",

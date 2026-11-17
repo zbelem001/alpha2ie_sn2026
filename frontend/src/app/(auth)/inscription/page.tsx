@@ -1,5 +1,5 @@
-import { RegistrationScreen } from "@/features/auth/screens/registration-screen";
+import { redirect } from "next/navigation";
 
 export default function RegistrationPage() {
-  return <RegistrationScreen />;
+  redirect("/");
 }

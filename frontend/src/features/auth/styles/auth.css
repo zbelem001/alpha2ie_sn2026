@@ -259,15 +259,15 @@
 .auth-space .pin-title, .auth-space .auth-complete h2 { margin: 0; color: var(--brand-navy); font-size: 1.2rem; font-weight: 650; }
 .auth-space .pin-reveal .login-form { margin-top: 20px; }
 .auth-space .auth-complete p { color: #596b75; font-size: 0.82rem; line-height: 1.7; }
-.auth-space .registration-page .field-label { display: block; }
+.auth-space .access-page .field-label { display: block; }
 
 @media (max-width: 720px) {
-  .auth-space .registration-page .login-heading { margin-bottom: 20px; }
-  .auth-space .registration-page .auth-back { margin-bottom: 22px; }
-  .auth-space .registration-page .auth-description { font-size: 0.8rem; }
-  .auth-space .registration-page .field-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; font-size: 0.72rem; }
-  .auth-space .registration-page .register-prompt { margin-top: 32px; }
-  .auth-space .registration-page .field-input { font-size: 16px; }
+  .auth-space .access-page .login-heading { margin-bottom: 20px; }
+  .auth-space .access-page .auth-back { margin-bottom: 22px; }
+  .auth-space .access-page .auth-description { font-size: 0.8rem; }
+  .auth-space .access-page .field-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; font-size: 0.72rem; }
+  .auth-space .access-page .register-prompt { margin-top: 32px; }
+  .auth-space .access-page .field-input { font-size: 16px; }
   .auth-space .otp-inputs { gap: 7px; }
   .auth-space .otp-input { height: 48px; font-size: 1.15rem; }
 }
@@ -715,3 +715,6 @@
     display: none;
   }
 }
+
+.auth-space .access-change-number { margin-bottom: 20px; }
+.auth-space .access-form-error { margin-top: 20px; }

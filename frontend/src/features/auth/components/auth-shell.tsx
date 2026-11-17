@@ -86,9 +86,9 @@ function PaintCapsules({ className }: { className?: string }) {
   );
 }
 
-export function AuthShell({ children, registration = false }: { children: ReactNode; registration?: boolean }) {
+export function AuthShell({ children }: { children: ReactNode }) {
   return (
-    <main className={`login-page${registration ? " registration-page" : ""}`}>
+    <main className="login-page access-page">
       <PaintCapsules className="paint paint--mobile" />
       <PaintCapsules className="paint paint--visual" />
       <header className="login-brand">
