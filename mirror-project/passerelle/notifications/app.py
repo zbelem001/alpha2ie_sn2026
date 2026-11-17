@@ -1,6 +1,6 @@
 """Service de notifications simulé (SMS et e-mail).
 
-Contrat (contracts/schemas/) :
+Contrat (passerelle/schemas/) :
 - POST /notifications              : envoyer (notification-request -> notification-response)
 - GET  /replies?after=<seq>        : réponses SMS du citoyen (sms-reply), dans l'ordre d'arrivée
 - webhook vers NOTIFICATION_REPLY_WEBHOOK_URL : chaque réponse SMS, dès sa réception (sms-reply)

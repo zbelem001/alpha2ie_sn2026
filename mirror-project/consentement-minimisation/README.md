@@ -17,4 +17,6 @@ Enchaînement visé : registre → consentement et minimisation → journal → 
 
 ## À livrer
 
+`schemas/consent.json` : schéma réservé (vide), à définir.
+
 `openapi.yaml`, le code (service à part, placé côté détenteur, configuré par l'adresse d'un registre conforme), et ses tests.

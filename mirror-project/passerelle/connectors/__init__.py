@@ -4,11 +4,11 @@ Ils respectent structurellement le Protocol RegistryConnector du backend :
 
     query(organization: str, service: str, payload: dict) -> dict
 
-Le payload suit contracts/schemas/registry-request.json, la réponse
-contracts/schemas/registry-response.json.
+Le payload suit registres/schemas/registry-request.json, la réponse
+registres/schemas/registry-response.json.
 
 NotificationClient envoie les SMS et e-mails (simulés) et lit les réponses du
-citoyen : contracts/schemas/notification-*.json et sms-reply.json.
+citoyen : passerelle/schemas/notification-*.json et sms-reply.json.
 """
 
 from .direct import HttpRegistryConnector, load_routes

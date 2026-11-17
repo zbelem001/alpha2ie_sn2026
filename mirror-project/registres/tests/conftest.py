@@ -16,21 +16,19 @@ from mock_registry.treasury.app import create_app as create_treasury
 from registries.civil_registry.app import create_app as create_civil
 from registries.transport_registry.app import create_app as create_transport
 
-CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
+# Contrat de la couche : registres/schemas et registres/examples.
+LAYER = Path(__file__).resolve().parents[1]
 TODAY = date(2026, 11, 16)
 
 
 def _validator(name: str) -> Draft202012Validator:
-    schema = json.loads((CONTRACTS / "schemas" / name).read_text(encoding="utf-8"))
+    schema = json.loads((LAYER / "schemas" / name).read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     return Draft202012Validator(schema)
 
 
 RESPONSE_SCHEMA = _validator("registry-response.json")
 REQUEST_SCHEMA = _validator("registry-request.json")
-NOTIFICATION_REQUEST_SCHEMA = _validator("notification-request.json")
-NOTIFICATION_RESPONSE_SCHEMA = _validator("notification-response.json")
-SMS_REPLY_SCHEMA = _validator("sms-reply.json")
 
 
 def assert_conforms(validator: Draft202012Validator, document: Any) -> None:

@@ -1,4 +1,4 @@
-"""Validation des requêtes (contrat : contracts/schemas/registry-request.json)."""
+"""Validation des requêtes (contrat : registres/schemas/registry-request.json)."""
 
 from __future__ import annotations
 

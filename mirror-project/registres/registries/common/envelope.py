@@ -1,4 +1,4 @@
-"""Enveloppe de réponse commune (contrat : contracts/schemas/registry-response.json)."""
+"""Enveloppe de réponse commune (contrat : registres/schemas/registry-response.json)."""
 
 from __future__ import annotations
 

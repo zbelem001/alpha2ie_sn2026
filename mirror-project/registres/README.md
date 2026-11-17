@@ -20,7 +20,8 @@ Une seule image ([Dockerfile](Dockerfile)) pour les six registres ; le registre 
 ## Spécification et tests
 
 - [openapi.yaml](openapi.yaml) : contrat commun (`POST /services/{service}`, `GET /services`, `GET /health`), généré depuis `registries/common/app_factory.py`. **À remplacer par le contrat OpenAPI du jury dès sa publication.**
-- Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (36 tests). Aucune dépendance vers les autres couches.
+- [schemas/](schemas) : requête et réponse d'un registre (`registry-request.json`, `registry-response.json`), utilisées aussi par la passerelle et la couche démarches ; [examples/registry-exchanges.json](examples/registry-exchanges.json) : exemples d'échanges vérifiés par les tests.
+- Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (38 tests). Aucune dépendance vers les autres couches.
 
 ## À faire
 

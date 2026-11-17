@@ -1,5 +1,5 @@
 {
-  "description": "Exemples d'échanges avec les registres. Chaque entrée : appel RegistryConnector.query(organization, service, payload) et réponse attendue. Ces exemples sont vérifiés par interoperability/tests/test_contracts.py.",
+  "description": "Exemples d'échanges avec les registres. Chaque entrée : appel RegistryConnector.query(organization, service, payload) et réponse attendue. Ces exemples sont vérifiés par registres/tests/test_contracts.py.",
   "examples": [
     {
       "name": "Passeport : l’ONI confirme une CNIB valide sans divulguer numéro ni dates",

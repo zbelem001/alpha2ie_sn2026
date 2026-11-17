@@ -1,5 +1,5 @@
 {
-  "description": "Exemples d'échanges avec le service de notifications simulé. Vérifiés par interoperability/tests/test_contracts.py.",
+  "description": "Exemples d'échanges avec le service de notifications simulé. Vérifiés par passerelle/tests/test_contracts.py.",
   "sends": [
     {
       "title": "Demande de consentement par SMS (démo, étape « sans consentement »)",

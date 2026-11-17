@@ -1,4 +1,4 @@
-"""Validation des demandes (contracts/schemas/notification-request.json) et des réponses du citoyen."""
+"""Validation des demandes (passerelle/schemas/notification-request.json) et des réponses du citoyen."""
 
 from __future__ import annotations
 

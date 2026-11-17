@@ -13,10 +13,12 @@ La carte du jury ne nomme pas cette couche : c'est l'orchestration des démarche
 
 ## Spécification
 
-[openapi.yaml](openapi.yaml) est une copie conforme de `contracts/openapi/backend.yaml`. Elle n'est pas valide en l'état (à corriger dans l'original) :
+[openapi.yaml](openapi.yaml) est une copie conforme de `contracts/openapi/backend.yaml` (racine du dépôt). Elle n'est pas valide en l'état (à corriger dans l'original) :
 
 - lignes 71 et 291 : une virgule dans une description non entre guillemets coupe la valeur en deux clés YAML ;
 - `#/components/schemas/Error` est référencé mais n'est pas défini.
+
+`schemas/citizen.json` et `schemas/request.json` : schémas réservés (vides), à définir.
 
 ## Démarrage sur une base neuve
 

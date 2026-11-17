@@ -16,21 +16,24 @@ from mock_registry.treasury.app import create_app as create_treasury
 from registries.civil_registry.app import create_app as create_civil
 from registries.transport_registry.app import create_app as create_transport
 
-CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
+# Contrats : notifications dans passerelle/schemas ; échanges avec les registres
+# dans registres/schemas (la passerelle transporte le contrat de la couche registres).
+LAYER = Path(__file__).resolve().parents[1]
+REGISTRES = LAYER.parent / "registres"
 TODAY = date(2026, 11, 16)
 
 
-def _validator(name: str) -> Draft202012Validator:
-    schema = json.loads((CONTRACTS / "schemas" / name).read_text(encoding="utf-8"))
+def _validator(path: Path) -> Draft202012Validator:
+    schema = json.loads(path.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     return Draft202012Validator(schema)
 
 
-RESPONSE_SCHEMA = _validator("registry-response.json")
-REQUEST_SCHEMA = _validator("registry-request.json")
-NOTIFICATION_REQUEST_SCHEMA = _validator("notification-request.json")
-NOTIFICATION_RESPONSE_SCHEMA = _validator("notification-response.json")
-SMS_REPLY_SCHEMA = _validator("sms-reply.json")
+RESPONSE_SCHEMA = _validator(REGISTRES / "schemas" / "registry-response.json")
+REQUEST_SCHEMA = _validator(REGISTRES / "schemas" / "registry-request.json")
+NOTIFICATION_REQUEST_SCHEMA = _validator(LAYER / "schemas" / "notification-request.json")
+NOTIFICATION_RESPONSE_SCHEMA = _validator(LAYER / "schemas" / "notification-response.json")
+SMS_REPLY_SCHEMA = _validator(LAYER / "schemas" / "sms-reply.json")
 
 
 def assert_conforms(validator: Draft202012Validator, document: Any) -> None:

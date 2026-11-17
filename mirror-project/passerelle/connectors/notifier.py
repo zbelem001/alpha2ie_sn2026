@@ -5,7 +5,7 @@ pour un problème de service. Panne, délai dépassé ou réponse illisible donn
 le statut « unavailable » ; le backend relance plus tard avec le même
 notification_id, ce qui n'envoie jamais deux fois le même message.
 
-Contrat : contracts/schemas/notification-request.json, notification-response.json, sms-reply.json.
+Contrat : passerelle/schemas/notification-request.json, notification-response.json, sms-reply.json.
 """
 
 from __future__ import annotations

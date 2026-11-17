@@ -39,7 +39,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: ../contracts/schemas/registry-request.json
+              $ref: ../registres/schemas/registry-request.json
       responses:
         "200":
           description: |
@@ -52,13 +52,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: ../contracts/schemas/registry-response.json
+                $ref: ../registres/schemas/registry-response.json
         "4XX":
           description: Réponse d'erreur du registre (requête invalide), transmise par X-Road.
           content:
             application/json:
               schema:
-                $ref: ../contracts/schemas/registry-response.json
+                $ref: ../registres/schemas/registry-response.json
         "500":
           description: |
             Erreur X-Road. Le code est dans l'en-tête X-Road-Error ; le connecteur le traduit :

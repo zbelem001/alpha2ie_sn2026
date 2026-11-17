@@ -18,7 +18,8 @@ Le paquet installé par la couche démarches (`pip install -e ../passerelle`) ne
 
 - [openapi.yaml](openapi.yaml) : interface X-Road du Security Server du demandeur, telle que l'appelle le connecteur (`POST /r1/{instance}/{classe}/{membre}/{sous-système}/{service}`), avec la traduction des erreurs X-Road.
 - [notifications.openapi.yaml](notifications.openapi.yaml) : service de notifications simulées, généré depuis `notifications/app.py`.
-- Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (74 tests). `requirements-dev.txt` installe aussi `../registres` : les tests d'interopérabilité font tourner les registres en mémoire derrière les connecteurs.
+- [schemas/](schemas) : contrat des notifications (`notification-request.json`, `notification-response.json`, `sms-reply.json`) ; [examples/notification-exchanges.json](examples/notification-exchanges.json). Les échanges avec les registres suivent le contrat de la couche registres (`../registres/schemas`).
+- Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (72 tests). `requirements-dev.txt` installe aussi `../registres` : les tests d'interopérabilité font tourner les registres en mémoire derrière les connecteurs.
 
 ## À faire
 
