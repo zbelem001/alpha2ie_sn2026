@@ -5,3 +5,6 @@ name: dlnuf
 include:
   - path: infrastructure/docker-compose.yml
     env_file: .env.example
+  # Banc X-Road, inactif sans « --profile xroad »
+  - path: infrastructure/docker-compose.xroad.yml
+    env_file: .env.example

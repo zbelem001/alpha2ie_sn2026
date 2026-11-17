@@ -22,6 +22,15 @@ Les ports 5432 et 8080 ne sont pas utilisés côté machine, car ils sont souven
 
 Mémoire : environ 0,9 Go au total, dont environ 565 Mo pour Keycloak.
 
+## Banc X-Road (facultatif)
+
+```bash
+docker compose --profile xroad up -d
+docker compose --profile xroad run --rm xroad-setup
+```
+
+Serveur central, autorité de test et deux Security Servers, définis dans `docker-compose.xroad.yml`. Environ 5,3 Go de mémoire en plus, et 9 minutes de démarrage. Détails : [interoperability/xroad/README.md](../interoperability/xroad/README.md).
+
 ## Simuler une panne
 
 ```bash

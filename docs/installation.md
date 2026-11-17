@@ -12,6 +12,8 @@ docker compose up -d --build
 
 Cette commande démarre PostgreSQL (port 55432), Keycloak (port 8180), les cinq registres simulés (ports 8101 à 8105) et le service de notifications simulé (port 8106). Le détail est dans [infrastructure/README.md](../infrastructure/README.md).
 
+Banc X-Road, facultatif (Docker Desktop avec au moins 8 Go de mémoire) : `docker compose --profile xroad up -d`, puis `docker compose --profile xroad run --rm xroad-setup`. Voir [interoperability/xroad/README.md](../interoperability/xroad/README.md).
+
 Tests du lot interopérabilité :
 
 ```bash

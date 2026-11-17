@@ -9,7 +9,7 @@ interoperability/
 ├── mock_registry/         autres registres fictifs : Justice, Police, Trésor
 ├── connectors/            connecteurs utilisés par le backend (direct, X-Road, notifications)
 ├── notifications/         service de notifications simulé (SMS, e-mail) et téléphone du citoyen
-├── xroad/                 configuration X-Road (phase 3)
+├── xroad/                 banc de test X-Road et sa configuration automatique
 └── tests/
 ```
 
@@ -80,7 +80,7 @@ reply["status"]   # "ok", "not_found", "ambiguous", "refused", "unavailable" ou 
 |---|---|
 | `REGISTRY_CONNECTOR` | `direct` (défaut) ou `xroad` |
 | `REGISTRY_ROUTES_FILE` | Connecteur direct : table organisation vers URL (défaut `connectors/routing.yaml`, noms Docker ; `routing.local.yaml` hors Docker) |
-| `XROAD_SECURITY_SERVER_URL` | Connecteur X-Road : serveur de sécurité du demandeur |
+| `XROAD_SECURITY_SERVER_URL` | Connecteur X-Road : serveur de sécurité du demandeur (banc : `http://ss-demandeurs:8080`) |
 | `XROAD_CLIENT_ID` | Identifiant X-Road du demandeur (défaut `BF/GOV/ONI/CNIB`) |
 | `REGISTRY_TIMEOUT_S` | Délai d'attente (défaut 3 s) |
 
@@ -93,7 +93,7 @@ Garanties :
 
 Installation dans le backend : `pip install -e ../interoperability` (n'apporte que `httpx` et `PyYAML`).
 
-Le connecteur X-Road n'a été testé qu'avec des réponses simulées : il sera validé sur le banc X-Road en phase 3.
+Le connecteur X-Road est validé sur le banc X-Road 7.8.3 : voir [xroad/README.md](xroad/README.md).
 
 ## Notifications simulées
 

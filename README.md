@@ -8,7 +8,7 @@ Socle d’interopérabilité administrative : vérifications ciblées, consentem
 
 | Lot | État |
 |---|---|
-| `interoperability/`, `infrastructure/` | Registres simulés, connecteurs, notifications simulées, Keycloak et Docker Compose opérationnels (voir « Démarrer ») |
+| `interoperability/`, `infrastructure/` | Registres simulés, connecteurs, notifications simulées, Keycloak et Docker Compose opérationnels (voir « Démarrer ») ; banc X-Road facultatif, validé de bout en bout ([interoperability/xroad](interoperability/xroad/README.md)) |
 | `contracts/` | Contrats proposés, à valider : backend ↔ registres (`registry-request`, `registry-response`) et backend ↔ notifications (`notification-request`, `notification-response`, `sms-reply`) ; autres schémas réservés |
 | `frontend/`, `backend/` | Arborescence initiale, à initialiser |
 
@@ -43,6 +43,8 @@ docker compose up -d --build
 | PostgreSQL | localhost:55432 |
 
 Pour changer les valeurs par défaut : `cp .env.example .env`, puis modifier `.env`.
+
+Banc X-Road (facultatif, 5,3 Go de mémoire en plus) : `docker compose --profile xroad up -d`, puis `docker compose --profile xroad run --rm xroad-setup`.
 
 ## Contrat entre le backend et les registres
 
