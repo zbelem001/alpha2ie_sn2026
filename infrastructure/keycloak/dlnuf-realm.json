@@ -5,7 +5,8 @@
   "roles": {
     "realm": [
       { "name": "agent", "description": "Agent d’une administration demandeuse" },
-      { "name": "citizen", "description": "Citoyen propriétaire de ses données" }
+      { "name": "citizen", "description": "Citoyen propriétaire de ses données" },
+      { "name": "local-admin", "description": "Administrateur habilité de son administration locale" }
     ]
   },
   "clientScopes": [
@@ -170,6 +171,17 @@
       "attributes": {},
       "credentials": [{ "type": "password", "value": "CitoyenDemo-2026!", "temporary": false }],
       "realmRoles": ["citizen"]
+    },
+    {
+      "username": "admin-passeport-demo",
+      "firstName": "Administrateur local",
+      "lastName": "Passeport Demo",
+      "email": "admin-passeport-demo@example.test",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": { "administration_code": ["BF/GOV/DIPF/PASSEPORTS"] },
+      "credentials": [{ "type": "password", "value": "AdminPasseport-2026!", "temporary": false }],
+      "realmRoles": ["local-admin"]
     }
   ]
 }

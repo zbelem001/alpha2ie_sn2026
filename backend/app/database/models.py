@@ -38,8 +38,25 @@ class Registry(Base):
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     administration_id: Mapped[UUID] = mapped_column(ForeignKey("administrations.id", ondelete="RESTRICT"))
     code: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, default="Registre")
+    base_url: Mapped[str | None] = mapped_column(String(500))
     connector_config_ref: Mapped[str | None] = mapped_column(String(200))
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_test_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_test_success: Mapped[bool | None] = mapped_column(Boolean)
+
+
+class RegistryService(Base):
+    __tablename__ = "registry_services"
+    __table_args__ = (UniqueConstraint("registry_id", "code", name="uq_registry_services_registry_id"),)
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    registry_id: Mapped[UUID] = mapped_column(ForeignKey("registries.id", ondelete="RESTRICT"), index=True)
+    code: Mapped[str] = mapped_column(String(100), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Question(Base):
@@ -56,23 +73,33 @@ class Question(Base):
 
 class Permission(Base):
     __tablename__ = "permissions"
-    __table_args__ = (UniqueConstraint("requester_administration_id", "question_id"),)
+    __table_args__ = (
+        UniqueConstraint("requester_administration_id", "question_id"),
+        CheckConstraint("status IN ('approved','requested','suspended','not_requested')", name="ck_permissions_status"),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     requester_administration_id: Mapped[UUID] = mapped_column(ForeignKey("administrations.id", ondelete="RESTRICT"))
     question_id: Mapped[UUID] = mapped_column(ForeignKey("questions.id", ondelete="RESTRICT"))
-    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="not_requested")
+    purpose: Mapped[str | None] = mapped_column(Text)
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Procedure(Base):
     __tablename__ = "procedures"
+    __table_args__ = (CheckConstraint("consent_days BETWEEN 1 AND 30", name="ck_procedures_consent_days"),)
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     owner_administration_id: Mapped[UUID] = mapped_column(ForeignKey("administrations.id", ondelete="RESTRICT"))
     title: Mapped[str] = mapped_column(String(200), nullable=False)
+    purpose: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    consent_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     config_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
@@ -89,6 +116,23 @@ class ProcedureQuestion(Base):
     question_id: Mapped[UUID] = mapped_column(ForeignKey("questions.id", ondelete="RESTRICT"))
     required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
+    document_type: Mapped[str | None] = mapped_column(String(40))
+    document_label: Mapped[str | None] = mapped_column(String(160))
+    document_hint: Mapped[str | None] = mapped_column(String(300))
+
+
+class AdministrationAuditEvent(Base):
+    __tablename__ = "administration_audit_events"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    administration_id: Mapped[UUID] = mapped_column(ForeignKey("administrations.id", ondelete="RESTRICT"), index=True)
+    actor_sub: Mapped[str] = mapped_column(String(160), nullable=False)
+    actor_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    actor_role: Mapped[str] = mapped_column(String(40), nullable=False, default="local-admin")
+    action: Mapped[str] = mapped_column(String(120), nullable=False)
+    target: Mapped[str] = mapped_column(String(200), nullable=False)
+    detail: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 class Case(Base):
@@ -98,13 +142,16 @@ class Case(Base):
             "status IN ('received','in_progress','pending','completed','rejected','cancelled')",
             name="ck_cases_status",
         ),
+        CheckConstraint("consent_channel IN ('assisted','web')", name="ck_cases_consent_channel"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     procedure_id: Mapped[UUID] = mapped_column(ForeignKey("procedures.id", ondelete="RESTRICT"))
     requester_administration_id: Mapped[UUID] = mapped_column(ForeignKey("administrations.id", ondelete="RESTRICT"))
     subject_ref: Mapped[str] = mapped_column(String(160), nullable=False)
+    applicant_name: Mapped[str] = mapped_column(String(100), nullable=False, default="Citoyen", server_default="Citoyen")
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="received")
+    consent_channel: Mapped[str] = mapped_column(String(16), nullable=False, default="web", server_default="web")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -138,6 +185,46 @@ class ConsentQuestion(Base):
     question_id: Mapped[UUID] = mapped_column(ForeignKey("questions.id", ondelete="RESTRICT"))
 
 
+class ConsentOtpChallenge(Base):
+    """Short-lived provider OTP or explicitly simulated demo challenge."""
+    __tablename__ = "consent_otp_challenges"
+    __table_args__ = (
+        CheckConstraint("attempt_count BETWEEN 0 AND 5", name="ck_consent_otp_attempts"),
+        CheckConstraint("delivery_status IN ('sent','simulated','failed','consumed','expired')", name="ck_consent_otp_delivery_status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    case_id: Mapped[UUID] = mapped_column(ForeignKey("cases.id", ondelete="RESTRICT"), index=True)
+    requested_by_sub: Mapped[str] = mapped_column(String(160), nullable=False)
+    provider_pin_id: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True)
+    code_digest: Mapped[str | None] = mapped_column(String(64))
+    scope_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    delivery_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resend_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RegistrationOtpChallenge(Base):
+    """Phone verification challenge used before the first citizen registration."""
+    __tablename__ = "registration_otp_challenges"
+    __table_args__ = (
+        CheckConstraint("attempt_count BETWEEN 0 AND 5", name="ck_registration_otp_attempts"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    phone_number: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    provider_pin_id: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True)
+    code_digest: Mapped[str | None] = mapped_column(String(64))
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resend_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class RegistryRequest(Base):
     __tablename__ = "registry_requests"
     __table_args__ = (
@@ -155,6 +242,8 @@ class RegistryRequest(Base):
     idempotency_key: Mapped[str] = mapped_column(String(160), nullable=False)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     minimal_result: Mapped[dict | None] = mapped_column(JSON_VALUE)
+    lookup_identifier_type: Mapped[str | None] = mapped_column(String(80))
+    lookup_identifier_ciphertext: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -228,7 +317,7 @@ class Notification(Base):
 
 
 class CitizenIdentityLink(Base):
-    """Demo mapping from a Keycloak account and verified phone to a citizen pivot."""
+    """Mapping from a Keycloak account and verified phone to an internal citizen pivot."""
     __tablename__ = "citizen_identity_links"
     __table_args__ = (
         UniqueConstraint("principal_sub", name="uq_citizen_identity_links_principal_sub"),
@@ -240,3 +329,23 @@ class CitizenIdentityLink(Base):
     subject_ref: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
     phone_number: Mapped[str] = mapped_column(String(24), nullable=False)
     linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CitizenDocumentIdentifier(Base):
+    """Encrypted identifier supplied by the citizen for a specific source registry."""
+    __tablename__ = "citizen_document_identifiers"
+    __table_args__ = (
+        UniqueConstraint("principal_sub", "identifier_type", name="uq_citizen_identifier_account_type"),
+        UniqueConstraint("identifier_digest", name="uq_citizen_identifier_digest"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    principal_sub: Mapped[str] = mapped_column(
+        ForeignKey("citizen_identity_links.principal_sub", ondelete="CASCADE"), nullable=False, index=True
+    )
+    subject_ref: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    identifier_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    registry_code: Mapped[str] = mapped_column(String(120), nullable=False)
+    identifier_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    identifier_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

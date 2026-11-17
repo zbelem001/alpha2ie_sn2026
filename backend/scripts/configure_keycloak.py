@@ -28,10 +28,14 @@ if demo_phone and demo_phone_verified:
 
 PROFILE_ATTRIBUTES = {
     "administration_code": "Code de l’administration",
+    "account_kind": "Type de compte applicatif",
     "citizen_ref": "Référence citoyen",
     "phone_number": "Numéro de téléphone vérifié",
     "phone_number_verified": "Téléphone vérifié",
 }
+LOCAL_ADMIN_USERNAME = "admin-passeport-demo"
+LOCAL_ADMIN_PASSWORD = os.getenv("LOCAL_ADMIN_DEMO_PASSWORD", "AdminPasseport-2026!")
+LOCAL_ADMINISTRATION_CODE = "BF/GOV/DIPF/PASSEPORTS"
 
 
 def request_json(path: str, token: str, *, method: str = "GET", body: object = None) -> tuple[int, object]:
@@ -90,6 +94,50 @@ def configure(token: str) -> None:
             user_attributes.pop("phone_number", None)
         user_attributes.update(claims)
         request_json(f"/admin/realms/dlnuf/users/{user['id']}", token, method="PUT", body=user)
+
+    role_path = "/admin/realms/dlnuf/roles/local-admin"
+    try:
+        _, local_admin_role = request_json(role_path, token)
+    except urllib.error.HTTPError as error:
+        if error.code != 404:
+            raise
+        request_json("/admin/realms/dlnuf/roles", token, method="POST", body={
+            "name": "local-admin",
+            "description": "Administrateur habilité de son administration locale",
+        })
+        _, local_admin_role = request_json(role_path, token)
+
+    query = urllib.parse.urlencode({"username": LOCAL_ADMIN_USERNAME, "exact": "true"})
+    _, users = request_json(f"/admin/realms/dlnuf/users?{query}", token)
+    if not isinstance(users, list):
+        raise RuntimeError("Keycloak returned an invalid local-admin user list")
+    if users:
+        admin_user = users[0]
+        admin_user["enabled"] = True
+        attrs = admin_user.get("attributes") or {}
+        attrs["administration_code"] = [LOCAL_ADMINISTRATION_CODE]
+        admin_user["attributes"] = attrs
+        request_json(f"/admin/realms/dlnuf/users/{admin_user['id']}", token, method="PUT", body=admin_user)
+    else:
+        request_json("/admin/realms/dlnuf/users", token, method="POST", body={
+            "username": LOCAL_ADMIN_USERNAME,
+            "firstName": "Administrateur local",
+            "lastName": "Passeport Demo",
+            "email": "admin-passeport-demo@example.test",
+            "enabled": True,
+            "emailVerified": True,
+            "attributes": {"administration_code": [LOCAL_ADMINISTRATION_CODE]},
+            "credentials": [{"type": "password", "value": LOCAL_ADMIN_PASSWORD, "temporary": False}],
+        })
+        _, users = request_json(f"/admin/realms/dlnuf/users?{query}", token)
+        if not isinstance(users, list) or len(users) != 1:
+            raise RuntimeError("Keycloak did not return the created local-admin account")
+        admin_user = users[0]
+
+    _, mapped_roles = request_json(f"/admin/realms/dlnuf/users/{admin_user['id']}/role-mappings/realm", token)
+    if not any(role.get("name") == "local-admin" for role in mapped_roles or []):
+        request_json(f"/admin/realms/dlnuf/users/{admin_user['id']}/role-mappings/realm",
+                     token, method="POST", body=[local_admin_role])
 
 
 def main() -> None:

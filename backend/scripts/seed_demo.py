@@ -73,7 +73,7 @@ QUESTION_DEFINITIONS = [
         "passport_birth_act_found",
         "BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL",
         "identity",
-        "pivot_id",
+        "found",
         "Confirmer que l’acte d’état civil lié à la référence du dossier est retrouvé ; les autres attributs ne sont pas conservés.",
     ),
     (
@@ -91,6 +91,7 @@ DEMO_PROCEDURES = [
         "config_version": 1,
         "owner": "BF/GOV/FONCTION-PUBLIQUE",
         "title": "Pré-vérification partielle d’une candidature à un concours direct",
+        "purpose": "Vérifier les critères déclarés pour une candidature à un concours direct.",
         "questions": [
             ("candidate_minimum_age", 1, True),
             ("candidate_nationality", 2, True),
@@ -102,6 +103,7 @@ DEMO_PROCEDURES = [
         "config_version": 1,
         "owner": "BF/GOV/DIPF/PASSEPORTS",
         "title": "Pré-vérification d’une demande de passeport ordinaire (majeur)",
+        "purpose": "Vérifier les informations nécessaires à la demande de passeport ordinaire.",
         "questions": [
             ("passport_cnib_valid", 1, True),
             ("passport_birth_act_found", 2, True),
@@ -111,6 +113,18 @@ DEMO_PROCEDURES = [
         ],
     },
 ]
+
+QUESTION_DOCUMENTS = {
+    "candidate_minimum_age": ("birth", "Référence de l’acte de naissance", "Numéro, année et centre d’état civil si nécessaires"),
+    "candidate_nationality": ("nationality", "Numéro du certificat de nationalité", "Référence du certificat dans le registre concerné"),
+    "criminal_record_indicator": ("criminal", "Numéro du casier judiciaire", "Référence du bulletin dans le registre concerné"),
+    "passport_cnib_valid": ("cnib", "Numéro de CNIB", "Ex. référence fictive de CNIB"),
+    "passport_birth_act_found": ("birth", "Référence de l’acte de naissance", "Numéro, année et centre d’état civil si nécessaires"),
+    "passport_nationality": ("nationality", "Numéro du certificat de nationalité", "Référence du certificat dans le registre concerné"),
+    "passport_criminal_record_current": ("criminal", "Numéro du casier judiciaire", "Référence du bulletin dans le registre concerné"),
+    "passport_fiscal_stamp_paid": ("payment", "Référence du timbre fiscal", "Numéro du reçu ou de la transaction"),
+    "loss_declared": ("loss", "Numéro de déclaration de perte", "Référence de la déclaration"),
+}
 
 
 def main() -> None:
@@ -130,9 +144,11 @@ def main() -> None:
             row = db.scalar(select(Registry).where(Registry.administration_id == administrations[code].id,
                                                   Registry.code == "main"))
             if row is None:
-                row = Registry(administration_id=administrations[code].id, code="main")
+                row = Registry(administration_id=administrations[code].id, code="main", name=f"Registre — {administrations[code].name}")
                 db.add(row)
                 db.flush()
+            elif row.name == "Registre":
+                row.name = f"Registre — {administrations[code].name}"
             registries[code] = row
 
         questions = {}
@@ -163,12 +179,18 @@ def main() -> None:
                     code=definition["code"],
                     owner_administration_id=requester_id,
                     title=definition["title"],
+                    purpose=definition["purpose"],
+                    consent_days=30,
+                    published=True,
                     config_version=definition.get("config_version", 1),
                 )
                 db.add(procedure)
             else:
                 procedure.owner_administration_id = requester_id
                 procedure.title = definition["title"]
+                procedure.purpose = definition["purpose"]
+                procedure.consent_days = 30
+                procedure.published = True
                 procedure.config_version = definition.get("config_version", procedure.config_version)
                 procedure.active = True
             db.flush()
@@ -184,6 +206,9 @@ def main() -> None:
                     db.add(link)
                 link.required = required
                 link.position = position
+                document = QUESTION_DOCUMENTS.get(question_code)
+                if document:
+                    link.document_type, link.document_label, link.document_hint = document
 
                 permission = db.scalar(select(Permission).where(
                     Permission.requester_administration_id == requester_id,
@@ -196,6 +221,7 @@ def main() -> None:
                     )
                     db.add(permission)
                 permission.active = True
+                permission.status = "approved"
     print("Catalogue de démonstration initialisé : concours direct et passeport ordinaire.")
 
 

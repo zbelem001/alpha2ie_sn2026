@@ -27,6 +27,7 @@ from registries.common import (
     RegistryRequest,
     ServiceResult,
     create_registry_app,
+    resolve_by_identifier,
 )
 from registries.common.envelope import utc_now_iso
 from registries.common.models import PIVOT_PATTERN
@@ -47,6 +48,13 @@ def create_app(payments: list[dict[str, Any]] | None = None) -> FastAPI:
     payments = copy.deepcopy(payments)
 
     def payment_status(request: RegistryRequest) -> ServiceResult:
+        if request.parameters.get("document_identifier"):
+            payment = resolve_by_identifier(payments, request.parameters, "payment_reference", "reference")
+            if isinstance(payment, ServiceResult):
+                return payment
+            if payment.get("procedure") != request.procedure:
+                return ServiceResult.not_found()
+            return ServiceResult.ok({"paid": payment["status"] == "paid"})
         pivot_id = request.subject.pivot_id
         if not pivot_id or not request.procedure:
             return ServiceResult.invalid("payment-status exige subject.pivot_id et procedure")

@@ -8,7 +8,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Parcours nominal : née au Burkina, majeure"
+    "_scenario": "Parcours nominal : née au Burkina, majeure",
+    "birth_act_number": "ACTE-DEMO-OUAGA-2004-01234"
   },
   {
     "pivot_id": "ACTE:OUAGA:1979:00412",
@@ -19,7 +20,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Même nom qu'Awa mais autre date de naissance : pas d'ambiguïté"
+    "_scenario": "Même nom qu'Awa mais autre date de naissance : pas d'ambiguïté",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1979-00412"
   },
   {
     "pivot_id": "ACTE:OUAGA:1998:00456",
@@ -30,7 +32,8 @@
     "birth_place": "Abidjan",
     "birth_country": "CI",
     "death_date": null,
-    "_scenario": "Né à l'étranger (acte transcrit) : la Justice doit confirmer la nationalité"
+    "_scenario": "Né à l'étranger (acte transcrit) : la Justice doit confirmer la nationalité",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1998-00456"
   },
   {
     "pivot_id": "ACTE:OUAGA:2012:02210",
@@ -41,7 +44,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Mineure"
+    "_scenario": "Mineure",
+    "birth_act_number": "ACTE-DEMO-OUAGA-2012-02210"
   },
   {
     "pivot_id": "ACTE:OUAGA:2008:03175",
@@ -52,7 +56,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Majeur dans quelques jours (18 ans le 2026-11-19)"
+    "_scenario": "Majeur dans quelques jours (18 ans le 2026-11-19)",
+    "birth_act_number": "ACTE-DEMO-OUAGA-2008-03175"
   },
   {
     "pivot_id": "ACTE:OUAGA:2008:00560",
@@ -63,7 +68,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Née un 29 février : calcul d'âge en année non bissextile"
+    "_scenario": "Née un 29 février : calcul d'âge en année non bissextile",
+    "birth_act_number": "ACTE-DEMO-OUAGA-2008-00560"
   },
   {
     "pivot_id": "ACTE:OUAGA:1995:00321",
@@ -74,7 +80,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Homonyme 1 (même nom, même date, même lieu)"
+    "_scenario": "Homonyme 1 (même nom, même date, même lieu)",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1995-00321"
   },
   {
     "pivot_id": "ACTE:OUAGA:1995:00322",
@@ -85,7 +92,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Homonyme 2 (même nom, même date, même lieu)"
+    "_scenario": "Homonyme 2 (même nom, même date, même lieu)",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1995-00322"
   },
   {
     "pivot_id": "ACTE:OUAGA:1961:00087",
@@ -96,7 +104,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": "2023-08-30",
-    "_scenario": "Décédé : une demande de titre à son nom est suspecte"
+    "_scenario": "Décédé : une demande de titre à son nom est suspecte",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1961-00087"
   },
   {
     "pivot_id": "ACTE:OUAGA:1990:01502",
@@ -107,7 +116,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Nom accentué dans le registre : une recherche « OUEDRAOGO » doit la trouver"
+    "_scenario": "Nom accentué dans le registre : une recherche « OUEDRAOGO » doit la trouver",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1990-01502"
   },
   {
     "pivot_id": "ACTE:OUAGA:1985:00789",
@@ -118,7 +128,8 @@
     "birth_place": "Accra",
     "birth_country": "GH",
     "death_date": null,
-    "_scenario": "Né à l'étranger, nationalité burkinabè acquise par naturalisation"
+    "_scenario": "Né à l'étranger, nationalité burkinabè acquise par naturalisation",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1985-00789"
   },
   {
     "pivot_id": "ACTE:OUAGA:1992:01120",
@@ -129,7 +140,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Casier judiciaire avec condamnation"
+    "_scenario": "Casier judiciaire avec condamnation",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1992-01120"
   },
   {
     "pivot_id": "ACTE:OUAGA:2000:00654",
@@ -140,7 +152,8 @@
     "birth_place": "Lomé",
     "birth_country": "TG",
     "death_date": null,
-    "_scenario": "Né à l'étranger et absent du registre de la Justice"
+    "_scenario": "Né à l'étranger et absent du registre de la Justice",
+    "birth_act_number": "ACTE-DEMO-OUAGA-2000-00654"
   },
   {
     "pivot_id": "ACTE:OUAGA:1997:00933",
@@ -151,7 +164,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "CNIB déclarée perdue à la Police"
+    "_scenario": "CNIB déclarée perdue à la Police",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1997-00933"
   },
   {
     "pivot_id": "ACTE:OUAGA:1988:00230",
@@ -162,7 +176,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Passeport (et non CNIB) déclaré perdu ; titulaire du permis B et C"
+    "_scenario": "Passeport (et non CNIB) déclaré perdu ; titulaire du permis B et C",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1988-00230"
   },
   {
     "pivot_id": "ACTE:OUAGA:2001:01456",
@@ -173,7 +188,8 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Sans particularité"
+    "_scenario": "Sans particularité",
+    "birth_act_number": "ACTE-DEMO-OUAGA-2001-01456"
   },
   {
     "pivot_id": "ACTE:OUAGA:1993:00777",
@@ -184,6 +200,7 @@
     "birth_place": "Ouagadougou",
     "birth_country": "BF",
     "death_date": null,
-    "_scenario": "Sans particularité"
+    "_scenario": "Sans particularité",
+    "birth_act_number": "ACTE-DEMO-OUAGA-1993-00777"
   }
 ]

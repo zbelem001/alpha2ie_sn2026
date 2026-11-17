@@ -17,6 +17,7 @@ from registries.common import (
     ServiceResult,
     create_registry_app,
     load_records,
+    resolve_by_identifier,
     resolve_single,
 )
 
@@ -28,6 +29,11 @@ def create_app(records: list[Record] | None = None) -> FastAPI:
     records = load_records(DATA_FILE) if records is None else records
 
     def cnib_status(request: RegistryRequest) -> ServiceResult:
+        if request.parameters.get("document_identifier"):
+            found = resolve_by_identifier(records, request.parameters, "cnib_number", "cnib_number")
+            if isinstance(found, ServiceResult):
+                return found
+            return ServiceResult.ok({"valid": bool(found["valid"])})
         found = resolve_single(records, request.subject)
         if isinstance(found, ServiceResult):
             return found

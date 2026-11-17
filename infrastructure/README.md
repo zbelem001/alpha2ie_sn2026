@@ -20,7 +20,7 @@ docker compose ps
 
 Les ports 5432 et 8080 ne sont pas utilisés côté machine, car ils sont souvent déjà occupés.
 
-`keycloak-profile-init` est une tâche idempotente exécutée avant le backend. Elle déclare les claims `administration_code`, `citizen_ref`, `phone_number` et `phone_number_verified` dans le profil Keycloak, puis les associe aux comptes fictifs. Pour `citoyen-demo`, le numéro vient de `TWILIO_DEMO_TO` via `CITIZEN_DEMO_PHONE`. Le claim vérifié reste `false` par défaut ; ne définir `CITIZEN_DEMO_PHONE_VERIFIED=true` qu’après avoir confirmé la possession du numéro par un canal indépendant. La référence `citizen_ref` est rattachée ensuite par `POST /v1/citizen/identity-link`. La version du realm utilisée ne permet pas de déclarer ces attributs directement dans son fichier d’import.
+`keycloak-profile-init` est une tâche idempotente exécutée avant le backend. Elle déclare les claims `administration_code`, `citizen_ref`, `phone_number` et `phone_number_verified` dans le profil Keycloak, puis les associe aux comptes fictifs. En démonstration, le numéro Infobip configuré dans `TEST_PHONE_NUMBER` est transmis via `CITIZEN_DEMO_PHONE`. Le claim vérifié reste `false` par défaut ; ne définir `CITIZEN_DEMO_PHONE_VERIFIED=true` qu’après avoir confirmé la possession du numéro par un canal indépendant. La référence `citizen_ref` est rattachée ensuite par `POST /v1/citizen/identity-link`. La version du realm utilisée ne permet pas de déclarer ces attributs directement dans son fichier d’import.
 
 Mémoire : environ 0,85 Go au total, dont environ 565 Mo pour Keycloak.
 

@@ -7,7 +7,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-2004-01234",
+    "nationality_reference": "NAT-DEMO-OUAGA-2004-01234"
   },
   {
     "pivot_id": "ACTE:OUAGA:1979:00412",
@@ -17,7 +19,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1979-00412",
+    "nationality_reference": "NAT-DEMO-OUAGA-1979-00412"
   },
   {
     "pivot_id": "ACTE:OUAGA:1998:00456",
@@ -28,7 +32,9 @@
     "acquisition": "filiation",
     "convictions": 0,
     "_scenario": "Né à Abidjan de parents burkinabè",
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1998-00456",
+    "nationality_reference": "NAT-DEMO-OUAGA-1998-00456"
   },
   {
     "pivot_id": "ACTE:OUAGA:2012:02210",
@@ -38,7 +44,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-2012-02210",
+    "nationality_reference": "NAT-DEMO-OUAGA-2012-02210"
   },
   {
     "pivot_id": "ACTE:OUAGA:2008:03175",
@@ -48,7 +56,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-2008-03175",
+    "nationality_reference": "NAT-DEMO-OUAGA-2008-03175"
   },
   {
     "pivot_id": "ACTE:OUAGA:2008:00560",
@@ -58,7 +68,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-2008-00560",
+    "nationality_reference": "NAT-DEMO-OUAGA-2008-00560"
   },
   {
     "pivot_id": "ACTE:OUAGA:1995:00321",
@@ -68,7 +80,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1995-00321",
+    "nationality_reference": "NAT-DEMO-OUAGA-1995-00321"
   },
   {
     "pivot_id": "ACTE:OUAGA:1995:00322",
@@ -78,7 +92,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1995-00322",
+    "nationality_reference": "NAT-DEMO-OUAGA-1995-00322"
   },
   {
     "pivot_id": "ACTE:OUAGA:1961:00087",
@@ -88,7 +104,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1961-00087",
+    "nationality_reference": "NAT-DEMO-OUAGA-1961-00087"
   },
   {
     "pivot_id": "ACTE:OUAGA:1990:01502",
@@ -98,7 +116,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1990-01502",
+    "nationality_reference": "NAT-DEMO-OUAGA-1990-01502"
   },
   {
     "pivot_id": "ACTE:OUAGA:1985:00789",
@@ -109,7 +129,9 @@
     "acquisition": "naturalization",
     "convictions": 0,
     "_scenario": "Nationalité acquise : la réponse reste « burkinabè : oui »",
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1985-00789",
+    "nationality_reference": "NAT-DEMO-OUAGA-1985-00789"
   },
   {
     "pivot_id": "ACTE:OUAGA:1992:01120",
@@ -120,7 +142,9 @@
     "acquisition": "birth",
     "convictions": 1,
     "_scenario": "Casier avec condamnation",
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1992-01120",
+    "nationality_reference": "NAT-DEMO-OUAGA-1992-01120"
   },
   {
     "pivot_id": "ACTE:OUAGA:1997:00933",
@@ -130,7 +154,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": false
+    "criminal_record_valid": false,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1997-00933",
+    "nationality_reference": "NAT-DEMO-OUAGA-1997-00933"
   },
   {
     "pivot_id": "ACTE:OUAGA:1988:00230",
@@ -140,7 +166,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1988-00230",
+    "nationality_reference": "NAT-DEMO-OUAGA-1988-00230"
   },
   {
     "pivot_id": "ACTE:OUAGA:2001:01456",
@@ -150,7 +178,9 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-2001-01456",
+    "nationality_reference": "NAT-DEMO-OUAGA-2001-01456"
   },
   {
     "pivot_id": "ACTE:OUAGA:1993:00777",
@@ -160,6 +190,8 @@
     "burkinabe": true,
     "acquisition": "birth",
     "convictions": 0,
-    "criminal_record_valid": true
+    "criminal_record_valid": true,
+    "criminal_record_number": "CASIER-DEMO-OUAGA-1993-00777",
+    "nationality_reference": "NAT-DEMO-OUAGA-1993-00777"
   }
 ]

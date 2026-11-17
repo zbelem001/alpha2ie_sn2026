@@ -35,6 +35,46 @@ def test_acquired_nationality_does_not_reveal_how(justice):
     assert body["data"] == {"burkinabe": True}
 
 
+def test_registry_specific_document_identifiers_return_only_minimal_results(civil, justice, oni, treasury):
+    cnib = call(
+        oni,
+        "cnib-status",
+        {},
+        parameters={"identifier_type": "cnib_number", "document_identifier": "CNIB-DEMO-OUAGA-2004-01234"},
+    )
+    birth_act = call(
+        civil,
+        "identity",
+        {},
+        parameters={"identifier_type": "birth_act_number", "document_identifier": "ACTE-DEMO-OUAGA-2004-01234"},
+    )
+    nationality = call(
+        justice,
+        "nationality",
+        {},
+        parameters={"identifier_type": "nationality_reference", "document_identifier": "NAT-DEMO-OUAGA-2004-01234"},
+    )
+    criminal_record = call(
+        justice,
+        "criminal-record-current",
+        {},
+        parameters={"identifier_type": "criminal_record_number", "document_identifier": "CASIER-DEMO-OUAGA-2004-01234"},
+    )
+    payment = call(
+        treasury,
+        "payment-status",
+        {},
+        procedure="passeport_ordinaire_precheck",
+        parameters={"identifier_type": "payment_reference", "document_identifier": "PAY-2026-0004"},
+    )
+
+    assert cnib["data"] == {"valid": True}
+    assert birth_act["data"] == {"found": True}
+    assert nationality["data"] == {"burkinabe": True}
+    assert criminal_record["data"] == {"valid": True}
+    assert payment["data"] == {"paid": True}
+
+
 def test_person_absent_from_justice_is_not_found_never_yes(justice):
     for service in ("nationality", "criminal-record"):
         body = call(justice, service, {"pivot_id": "ACTE:OUAGA:2000:00654"})

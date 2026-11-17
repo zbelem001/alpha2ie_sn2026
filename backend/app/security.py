@@ -24,6 +24,7 @@ class Principal:
     citizen_ref: str | None
     phone_number: str | None = None
     phone_number_verified: bool = False
+    display_name: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -66,12 +67,15 @@ def get_current_principal(
             raise jwt.InvalidTokenError("rôles invalides")
         subject = claims.get("sub") or claims["jti"]
         citizen_ref = claims.get("citizen_ref")
-        if "citizen" in realm_roles and not citizen_ref:
+        if "citizen" in realm_roles:
             link = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.principal_sub == subject))
-            citizen_ref = link.subject_ref if link else None
+            citizen_ref = link.subject_ref if link else citizen_ref
         phone_number = claims.get("phone_number")
         if phone_number is not None and not isinstance(phone_number, str):
             raise jwt.InvalidTokenError("numéro de téléphone invalide")
+        display_name = claims.get("name") or claims.get("preferred_username") or subject
+        if not isinstance(display_name, str):
+            raise jwt.InvalidTokenError("nom de compte invalide")
         return Principal(
             subject=subject,
             roles=frozenset(role for role in realm_roles if isinstance(role, str)),
@@ -79,6 +83,7 @@ def get_current_principal(
             citizen_ref=citizen_ref,
             phone_number=phone_number,
             phone_number_verified=claims.get("phone_number_verified") is True,
+            display_name=display_name,
         )
     except (jwt.PyJWTError, jwt.PyJWKClientError, ValueError, TypeError) as exc:
         raise HTTPException(
@@ -91,6 +96,17 @@ def get_current_principal(
 def require_role(role: str):
     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
         if role not in principal.roles:
+            raise HTTPException(status_code=403, detail="Rôle insuffisant")
+        return principal
+
+    return dependency
+
+
+def require_any_role(*roles: str):
+    allowed = frozenset(roles)
+
+    def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+        if not principal.roles.intersection(allowed):
             raise HTTPException(status_code=403, detail="Rôle insuffisant")
         return principal
 

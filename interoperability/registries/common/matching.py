@@ -53,3 +53,21 @@ def resolve_single(records: list[Record], subject: Subject) -> Record | ServiceR
     if len(found) > 1:
         return ServiceResult.ambiguous()
     return found[0]
+
+
+def resolve_by_identifier(
+    records: list[Record], parameters: dict[str, Any], expected_type: str, field: str
+) -> Record | ServiceResult:
+    """Resolve one synthetic registry record by its registry-specific document ID."""
+    if parameters.get("identifier_type") != expected_type:
+        return ServiceResult.invalid("Type d’identifiant incompatible avec ce registre")
+    value = parameters.get("document_identifier")
+    if not isinstance(value, str) or not value.strip():
+        return ServiceResult.invalid("Identifiant de document manquant")
+    normalized = value.strip().upper()
+    found = [record for record in records if str(record.get(field, "")).strip().upper() == normalized]
+    if not found:
+        return ServiceResult.not_found()
+    if len(found) > 1:
+        return ServiceResult.ambiguous()
+    return found[0]

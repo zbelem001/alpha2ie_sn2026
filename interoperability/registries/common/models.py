@@ -23,13 +23,6 @@ class Subject(BaseModel):
     def has_criteria(self) -> bool:
         return bool(self.last_name and self.first_names and self.birth_date)
 
-    @model_validator(mode="after")
-    def _must_identify_someone(self) -> Subject:
-        if self.pivot_id is None and not self.has_criteria:
-            raise ValueError("pivot_id, ou last_name + first_names + birth_date, est requis")
-        return self
-
-
 class RegistryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -37,3 +30,10 @@ class RegistryRequest(BaseModel):
     procedure: str | None = Field(default=None, max_length=64)
     subject: Subject
     parameters: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _must_provide_lookup(self) -> RegistryRequest:
+        if self.subject.pivot_id is None and not self.subject.has_criteria:
+            if not (self.parameters.get("identifier_type") and self.parameters.get("document_identifier")):
+                raise ValueError("subject ou parameters.identifier_type + document_identifier est requis")
+        return self

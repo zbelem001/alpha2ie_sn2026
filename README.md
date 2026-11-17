@@ -50,6 +50,37 @@ Le conteneur backend applique les migrations et charge le catalogue de démonstr
 
 Pour changer les valeurs par défaut : `cp .env.example .env`, puis modifier `.env`.
 
+### SMS et codes Infobip
+
+Deux clés API distinctes sont attendues dans le `.env` local : `INFOBIP_OTP_API_KEY` pour les OTP d’inscription et de consentement, et `INFOBIP_SMS_API_KEY` pour les SMS simples. Elles peuvent être créées avec des droits API différents. Le domaine du compte (`INFOBIP_BASE_URL`), `TEST_PHONE_NUMBER` et l’expéditeur SMS (`INFOBIP_SENDER`) complètent la configuration. `.env` est ignoré par Git ; `.env.example` ne contient que des valeurs vides pour les secrets.
+
+Pour la 2FA, créer une application Infobip avec un PIN à six chiffres, cinq essais et une durée de vie de cinq minutes. Créer dans cette application deux modèles SMS qui contiennent `{{pin}}` : un pour l’inscription et un pour le consentement. Reporter l’identifiant de l’application dans `INFOBIP_2FA_APPLICATION_ID` et les deux identifiants de modèles dans `INFOBIP_2FA_REGISTRATION_MESSAGE_ID` et `INFOBIP_2FA_CONSENT_MESSAGE_ID`. Infobip génère le PIN, l’envoie et le valide avec son identifiant `pinId`; le backend ne fabrique ni ne stocke le code. Infobip décrit ce flux dans sa [documentation officielle 2FA](https://www.infobip.com/docs/2fa-service/using-2fa-api).
+
+En essai, les routes OTP et les SMS simples n’envoient qu’à `TEST_PHONE_NUMBER`. Le destinataire demandé doit donc être ce numéro vérifié, sinon le backend refuse l’envoi. Les SMS simples utilisent l’API v3 `POST /sms/3/messages` et le champ `sender`; voir le [guide officiel Infobip SMS](https://www.infobip.com/docs/tutorials/send-your-first-sms-message-using-infobip-api).
+
+Depuis `backend/`, charger la configuration puis prévisualiser un SMS simple sans appel réseau :
+
+Depuis `backend/`, charger la configuration puis prévisualiser le message personnalisé sans appel réseau :
+
+```bash
+set -a
+. ../.env
+set +a
+python -m scripts.test_infobip_sms --dry-run
+```
+
+Après avoir vérifié le numéro de test, envoyer un seul SMS :
+
+```bash
+python -m scripts.test_infobip_sms
+```
+
+Le texte des SMS simples est modifiable dans `backend/app/sms_templates.py`. Le script affiche l’identifiant `messageId` et le statut Infobip ; un statut accepté indique une prise en charge par l’API, pas nécessairement la livraison finale. Il avertit si le texte dépasse 160 caractères ou utilise Unicode (segments de 70 caractères).
+
+Pour un consentement à distance, l’ouverture du dossier crée aussi une notification plateforme et envoie le SMS d’invitation simple. Pour un recueil assisté au guichet, l’agent demande un OTP Infobip par `POST /v1/cases/{case_id}/consent/otp`, puis vérifie le PIN communiqué par le citoyen avec `POST /v1/cases/{case_id}/consent/otp/verify`. Le code est géré par Infobip; le backend conserve uniquement `pinId` et le périmètre de consentement. Les envois restent limités à cinq par dossier et par heure, avec 30 secondes entre les renvois.
+
+Pour l’inscription, `POST /v1/auth/registration/otp` envoie le code et `POST /v1/auth/registration/otp/verify` le vérifie. Ces routes sont prêtes côté backend, mais l’écran frontend utilise encore une simulation locale. La création effective du compte Keycloak après vérification reste à raccorder.
+
 ## Contrat entre le backend et les registres
 
 Le backend interroge un registre par :

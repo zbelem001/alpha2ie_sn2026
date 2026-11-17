@@ -11,27 +11,35 @@ from sqlalchemy.pool import StaticPool
 import connectors
 from app.api import (
     CaseCreate,
+    CitizenIdentifiersUpdate,
     ConsentCreate,
+    DocumentIdentifierInput,
     IdentityLinkCreate,
     create_case,
     execute_checks,
     link_citizen_identity,
+    get_citizen_identifiers,
     list_notifications,
     mark_notification_read,
     record_consent,
     revoke_consent,
+    save_citizen_identifiers,
+    RegistrationOtpVerify,
+    verify_registration_otp,
 )
 from app.database.base import Base
 from app.database.models import (
     Administration,
     AuditEvent,
     Case,
+    CitizenDocumentIdentifier,
     CitizenIdentityLink,
     Consent,
     Notification,
     Permission,
     Procedure,
     ProcedureQuestion,
+    RegistrationOtpChallenge,
     Question,
     Registry,
     RegistryRequest,
@@ -79,11 +87,16 @@ def add_procedure(db: Session) -> tuple[Administration, Administration, Procedur
         owner_administration_id=owner.id,
         title="Passeport adulte",
         config_version=1,
+        active=True,
+        published=True,
     )
     db.add(procedure)
     db.flush()
     db.add(ProcedureQuestion(procedure_id=procedure.id, question_id=question.id, required=True, position=1))
-    db.add(Permission(requester_administration_id=owner.id, question_id=question.id, active=True))
+    db.add(Permission(
+        requester_administration_id=owner.id, question_id=question.id,
+        active=True, status="approved",
+    ))
     db.commit()
     return owner, other, procedure
 
@@ -120,6 +133,63 @@ def test_agent_can_open_its_own_administrations_procedure(db: Session):
     assert db.scalar(select(func.count()).select_from(Case)) == 1
 
 
+def test_case_create_accepts_frontend_camel_case_and_document_references(db: Session, monkeypatch):
+    from cryptography.fernet import Fernet
+
+    owner, _, procedure = add_procedure(db)
+    subject_ref = "CITIZEN:FRONTEND-TEST"
+    db.add(CitizenIdentityLink(
+        principal_sub="citizen-sub", subject_ref=subject_ref, phone_number="+22670000001"
+    ))
+    db.commit()
+    monkeypatch.setenv("CITIZEN_IDENTIFIER_ENCRYPTION_KEY", Fernet.generate_key().decode())
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    body = CaseCreate.model_validate({
+        "procedureCode": procedure.code,
+        "channel": "assisted",
+        "phone": "70000001",
+        "applicantName": "Awa Demo",
+        "references": {"cnib": "CNIB-DEMO-123456"},
+    })
+
+    result = create_case(body, agent, db)
+
+    assert result["applicantName"] == "Awa Demo"
+    assert result["procedureCode"] == procedure.code
+    assert result["channel"] == "assisted"
+    assert result["phone"] == "+22670000001"
+    assert result["checks"][0]["questionCode"] == "passport_cnib_valid"
+    assert result["checks"][0]["document"]["key"] == "cnib"
+    assert result["checks"][0]["attemptCount"] == 0
+
+
+def test_simulated_registration_otp_is_accepted_for_demo_with_explicit_mode(db: Session, monkeypatch):
+    from uuid import uuid4
+    from app.otp_simulation import code_for, digest_code
+
+    monkeypatch.setenv("OTP_SIMULATION_SECRET", "test-secret-value-at-least-thirty-two-characters")
+    challenge_id = uuid4()
+    challenge = RegistrationOtpChallenge(
+        id=challenge_id,
+        phone_number="+22670000001",
+        provider_pin_id=None,
+        code_digest=digest_code(challenge_id, "registration", code_for(challenge_id, "registration")),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        resend_after=datetime.now(timezone.utc) + timedelta(seconds=30),
+    )
+    db.add(challenge)
+    db.commit()
+
+    result = verify_registration_otp(
+        RegistrationOtpVerify(challenge_id=challenge_id, code=code_for(challenge_id, "registration")), db
+    )
+
+    assert result["phone_verified"] is True
+    assert result["phoneVerificationSimulated"] is True
+    assert result["verification_mode"] == "simulation"
+    assert result["otp_validated"] is True
+
+
 def test_case_creation_notifies_citizen_and_keeps_sms_simulated(db: Session, monkeypatch):
     owner, _, procedure = add_procedure(db)
     agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
@@ -135,7 +205,9 @@ def test_case_creation_notifies_citizen_and_keeps_sms_simulated(db: Session, mon
         ("platform", "delivered"), ("sms", "simulated")
     ]
     assert all(item.recipient_ref == citizen.citizen_ref for item in notifications)
-    assert all("Connectez-vous à la plateforme" in item.message for item in notifications)
+    assert "Connectez-vous à la plateforme" in notifications[0].message
+    assert "consentement" in notifications[1].message
+    assert "{" not in notifications[1].message and "}" not in notifications[1].message
     assert all("consentement" in item.message for item in notifications)
 
     visible = list_notifications(citizen, db)
@@ -153,17 +225,15 @@ def test_case_creation_notifies_citizen_and_keeps_sms_simulated(db: Session, mon
     assert marked["read_at"] is not None
 
 
-def test_case_creation_dispatches_twilio_for_configured_demo_citizen(db: Session, monkeypatch):
+def test_case_creation_dispatches_infobip_for_configured_demo_citizen(db: Session, monkeypatch):
     owner, _, procedure = add_procedure(db)
     agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
-    monkeypatch.setenv("SMS_PROVIDER", "twilio")
-    monkeypatch.setenv("TWILIO_ACCOUNT_SID", "AC" + "1" * 32)
-    monkeypatch.setenv("TWILIO_API_KEY_SID", "SK" + "2" * 32)
-    monkeypatch.setenv("TWILIO_API_KEY_SECRET", "test-secret")
-    monkeypatch.setenv("TWILIO_MESSAGING_SERVICE_SID", "MG" + "3" * 32)
-    monkeypatch.setenv("TWILIO_DEMO_CITIZEN_REF", citizen.citizen_ref)
-    monkeypatch.setenv("TWILIO_DEMO_TO", "+22670000000")
+    monkeypatch.setenv("SMS_PROVIDER", "infobip")
+    monkeypatch.setenv("INFOBIP_SMS_API_KEY", "test-api-key")
+    monkeypatch.setenv("INFOBIP_BASE_URL", "test.api.infobip.com")
+    monkeypatch.setenv("INFOBIP_SENDER", "DLNUF")
+    monkeypatch.setenv("TEST_PHONE_NUMBER", "+22670000000")
     db.add(CitizenIdentityLink(
         principal_sub=citizen.subject,
         subject_ref=citizen.citizen_ref,
@@ -172,21 +242,24 @@ def test_case_creation_dispatches_twilio_for_configured_demo_citizen(db: Session
     db.commit()
     sent = {}
 
-    def fake_send(settings, to_number, body):
-        sent.update(to=to_number, body=body)
-        return "SM" + "4" * 32
+    class FakeProvider:
+        def send(self, body):
+            sent.update(body=body)
+            from app.sms_provider import SmsSendResult
+            return SmsSendResult("infobip-test-message", "PENDING_ACCEPTED", "PENDING")
 
-    monkeypatch.setattr("app.sms.send_twilio_sms", fake_send)
+    monkeypatch.setattr("app.sms.build_sms_provider", FakeProvider)
     case = create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)
     sms = db.scalar(select(Notification).where(
         Notification.case_id == UUID(case["id"]), Notification.channel == "sms"
     ))
 
     assert sms.delivery_status == "sent"
-    assert sms.provider_message_id == "SM" + "4" * 32
+    assert sms.provider_message_id == "infobip-test-message"
     assert sms.delivery_error is None
-    assert sent["to"] == "+22670000001"
-    assert "Connectez-vous à la plateforme" in sent["body"]
+    assert "Répondez sur la plateforme" in sent["body"]
+    assert procedure.title in sent["body"]
+    assert case["id"][:8].upper() in sent["body"]
 
 
 def test_citizen_can_link_confirmed_reference_with_verified_phone(db: Session, monkeypatch):
@@ -223,6 +296,84 @@ def test_citizen_identity_link_requires_confirmation_and_verified_phone(db: Sess
     with pytest.raises(HTTPException) as no_verified_phone:
         link_citizen_identity(IdentityLinkCreate(subject_ref="ACTE:OUAGA:2004:01234", confirmed=True), unverified, db)
     assert no_verified_phone.value.status_code == 403
+
+
+def test_citizen_can_register_optional_encrypted_document_identifiers(db: Session, monkeypatch):
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv("CITIZEN_IDENTIFIER_ENCRYPTION_KEY", Fernet.generate_key().decode())
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, None, "+22670000099", False)
+    body = CitizenIdentifiersUpdate(
+        confirmed=True,
+        identifiers=[DocumentIdentifierInput(identifier_type="cnib_number", value="cnib-demo-123456")],
+    )
+
+    result = save_citizen_identifiers(body, citizen, db)
+
+    assert result["linked"] is True
+    assert result["identifier_types"] == ["cnib_number"]
+    stored = db.scalar(select(CitizenDocumentIdentifier).where(
+        CitizenDocumentIdentifier.principal_sub == citizen.subject
+    ))
+    assert stored.identifier_ciphertext != "CNIB-DEMO-123456"
+    assert get_citizen_identifiers(citizen, db)["identifiers"] == [
+        {"identifier_type": "cnib_number", "value": "CNIB-DEMO-123456"}
+    ]
+
+
+def test_agent_can_find_citizen_by_document_identifier(db: Session, monkeypatch):
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv("CITIZEN_IDENTIFIER_ENCRYPTION_KEY", Fernet.generate_key().decode())
+    owner, _, procedure = add_procedure(db)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, None, "+22670000099", False)
+    save_citizen_identifiers(
+        CitizenIdentifiersUpdate(
+            confirmed=True,
+            identifiers=[DocumentIdentifierInput(identifier_type="cnib_number", value="CNIB-DEMO-123456")],
+        ),
+        citizen,
+        db,
+    )
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+
+    created = create_case(
+        CaseCreate(
+            procedure_code=procedure.code,
+            citizen_identifier=DocumentIdentifierInput(identifier_type="cnib_number", value="cnib-demo-123456"),
+        ),
+        agent,
+        db,
+    )
+
+    case = db.get(Case, UUID(created["id"]))
+    request = db.scalar(select(RegistryRequest).where(RegistryRequest.case_id == case.id))
+    assert case.subject_ref.startswith("CITIZEN:")
+    assert request.lookup_identifier_type == "cnib_number"
+    assert request.lookup_identifier_ciphertext != "CNIB-DEMO-123456"
+
+    linked_citizen = Principal("citizen-sub", frozenset({"citizen"}), None, case.subject_ref)
+    consent = record_consent(
+        case.id,
+        ConsentCreate(decision="granted", question_codes=["passport_cnib_valid"], notice_version="demo-1", channel="web"),
+        linked_citizen,
+        db,
+    )
+    db.get(Consent, UUID(consent["id"])).expires_at = None
+
+    class RegistryConnector:
+        def query(self, organization, service, payload):
+            assert payload["subject"] == {}
+            assert payload["parameters"] == {
+                "identifier_type": "cnib_number",
+                "document_identifier": "CNIB-DEMO-123456",
+            }
+            return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
+
+    monkeypatch.setattr(connectors, "build_connector", lambda: RegistryConnector())
+    result = execute_checks(UUID(created["id"]), agent, db)
+    assert result["status"] == "completed"
+    assert request.lookup_identifier_ciphertext is None
 
 
 def test_sms_cannot_be_recorded_as_consent_channel():

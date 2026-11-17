@@ -1,120 +1,57 @@
-"""Twilio SMS adapter for the consent-request outbox."""
+"""SMS outbox orchestration, independent from the active SMS provider."""
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+import logging
 
-import httpx
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.database.models import CitizenIdentityLink, Notification
+from app.database.models import Notification
+from app.sms_provider import SmsConfigurationError, SmsDeliveryError, build_sms_provider
+from app.sms_templates import message_character_warnings
 
-
-class SmsConfigurationError(RuntimeError):
-    pass
-
-
-@dataclass(frozen=True)
-class TwilioSettings:
-    account_sid: str
-    api_key_sid: str
-    api_key_secret: str
-    messaging_service_sid: str | None
-    from_number: str | None
-    demo_citizen_ref: str | None
-    demo_to_number: str | None
-
-    @classmethod
-    def from_environment(cls) -> "TwilioSettings":
-        account_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
-        api_key_sid = os.getenv("TWILIO_API_KEY_SID", "").strip()
-        api_key_secret = os.getenv("TWILIO_API_KEY_SECRET", "").strip()
-        messaging_service_sid = os.getenv("TWILIO_MESSAGING_SERVICE_SID", "").strip() or None
-        from_number = os.getenv("TWILIO_FROM_NUMBER", "").strip() or None
-        demo_citizen_ref = os.getenv("TWILIO_DEMO_CITIZEN_REF", "").strip()
-        demo_to_number = os.getenv("TWILIO_DEMO_TO", "").strip()
-        if not all((account_sid, api_key_sid, api_key_secret)):
-            raise SmsConfigurationError("twilio_credentials_missing")
-        if not account_sid.startswith("AC") or not api_key_sid.startswith("SK"):
-            raise SmsConfigurationError("twilio_credentials_invalid_format")
-        if not messaging_service_sid and not from_number:
-            raise SmsConfigurationError("twilio_sender_missing")
-        if messaging_service_sid and not messaging_service_sid.startswith("MG"):
-            raise SmsConfigurationError("twilio_messaging_service_sid_invalid_format")
-        if from_number and not from_number.startswith("+"):
-            raise SmsConfigurationError("twilio_from_number_must_be_e164")
-        return cls(
-            account_sid=account_sid,
-            api_key_sid=api_key_sid,
-            api_key_secret=api_key_secret,
-            messaging_service_sid=messaging_service_sid,
-            from_number=from_number,
-            demo_citizen_ref=demo_citizen_ref,
-            demo_to_number=demo_to_number,
-        )
-
-
-def send_twilio_sms(settings: TwilioSettings, to_number: str, body: str) -> str:
-    url = f"https://api.twilio.com/2010-04-01/Accounts/{settings.account_sid}/Messages.json"
-    form = {"To": to_number, "Body": body}
-    if settings.messaging_service_sid:
-        form["MessagingServiceSid"] = settings.messaging_service_sid
-    elif settings.from_number:
-        form["From"] = settings.from_number
-
-    try:
-        response = httpx.post(
-            url,
-            data=form,
-            auth=(settings.api_key_sid, settings.api_key_secret),
-            timeout=8.0,
-        )
-        response.raise_for_status()
-        message_sid = response.json().get("sid")
-    except httpx.HTTPStatusError as error:
-        # Keep Twilio's numeric diagnostic only; the response body can contain PII.
-        try:
-            code = error.response.json().get("code")
-        except (ValueError, TypeError):
-            code = None
-        safe_code = f"twilio_http_{code}" if isinstance(code, int) else "twilio_send_failed"
-        raise RuntimeError(safe_code) from error
-    except (httpx.HTTPError, ValueError, TypeError) as error:
-        # Do not persist or log provider response bodies, which can contain PII.
-        raise RuntimeError("twilio_send_failed") from error
-    if not isinstance(message_sid, str) or not message_sid:
-        raise RuntimeError("twilio_invalid_response")
-    return message_sid
+logger = logging.getLogger(__name__)
 
 
 def dispatch_sms_notification(db: Session, notification: Notification) -> None:
-    """Send one queued demo SMS; the platform notification is independent."""
+    """Send one queued SMS; the platform notification remains independent."""
     if notification.channel != "sms" or notification.delivery_status != "queued":
         return
     try:
-        settings = TwilioSettings.from_environment()
-        identity_link = db.scalar(select(CitizenIdentityLink).where(
-            CitizenIdentityLink.subject_ref == notification.recipient_ref
-        ))
-        if identity_link is not None:
-            to_number = identity_link.phone_number
-        elif settings.demo_citizen_ref == notification.recipient_ref and settings.demo_to_number:
-            # Compatibility for the account preloaded in the local Keycloak realm.
-            to_number = settings.demo_to_number
+        provider = build_sms_provider()
+        for warning in message_character_warnings(notification.message):
+            logger.warning("SMS notification %s: %s", notification.id, warning)
+
+        result = provider.send(notification.message)
+        if result.status_group.upper() == "REJECTED":
+            notification.delivery_status = "failed"
+            notification.delivery_error = f"{result.status_group}:{result.status}"
+            logger.error(
+                "SMS provider rejected notification %s (messageId=%s, status=%s)",
+                notification.id,
+                result.message_id,
+                result.status,
+            )
         else:
-            raise SmsConfigurationError("twilio_demo_recipient_not_mapped")
-        notification.provider_message_id = send_twilio_sms(
-            settings,
-            to_number,
-            notification.message,
-        )
-        notification.delivery_status = "sent"
-        notification.delivery_error = None
+            notification.provider_message_id = result.message_id
+            notification.delivery_status = "sent"
+            notification.delivery_error = None
+            logger.info(
+                "SMS provider accepted notification %s (messageId=%s, status=%s)",
+                notification.id,
+                result.message_id,
+                result.status,
+            )
     except SmsConfigurationError as error:
         notification.delivery_status = "failed"
         notification.delivery_error = str(error)
-    except RuntimeError as error:
+        logger.error("SMS notification %s configuration error: %s", notification.id, error)
+    except SmsDeliveryError as error:
         notification.delivery_status = "failed"
-        notification.delivery_error = str(error)
+        notification.delivery_error = error.safe_code
+        logger.error(
+            "SMS notification %s failed (HTTP %s): %s",
+            notification.id,
+            error.status_code or "n/a",
+            error.detail or error.safe_code,
+        )
     db.commit()

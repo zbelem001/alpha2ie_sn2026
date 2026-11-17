@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
 from mock_registry.justice.app import create_app as create_justice
+from mock_registry.oni.app import create_app as create_oni
 from mock_registry.police.app import create_app as create_police
 from mock_registry.treasury.app import create_app as create_treasury
 from registries.civil_registry.app import create_app as create_civil
@@ -57,6 +58,11 @@ def transport() -> TestClient:
 @pytest.fixture
 def justice() -> TestClient:
     return TestClient(create_justice())
+
+
+@pytest.fixture
+def oni() -> TestClient:
+    return TestClient(create_oni())
 
 
 @pytest.fixture

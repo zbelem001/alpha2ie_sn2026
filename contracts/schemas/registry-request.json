@@ -5,6 +5,24 @@
   "description": "Corps transmis par le connecteur au service d'un registre : c'est le `payload` de RegistryConnector.query(organization, service, payload). Il est identique en appel direct et via X-Road. Statut : PROPOSITION à valider entre Personne 2 et Personne 3.",
   "type": "object",
   "required": ["subject"],
+  "anyOf": [
+    {
+      "properties": {
+        "subject": {
+          "anyOf": [
+            { "required": ["pivot_id"] },
+            { "required": ["last_name", "first_names", "birth_date"] }
+          ]
+        }
+      }
+    },
+    {
+      "required": ["parameters"],
+      "properties": {
+        "parameters": { "required": ["identifier_type", "document_identifier"] }
+      }
+    }
+  ],
   "additionalProperties": false,
   "properties": {
     "request_id": {
@@ -31,15 +49,11 @@
         "first_names": { "type": "string", "minLength": 1 },
         "birth_date": { "type": "string", "format": "date" },
         "birth_place": { "type": "string", "minLength": 1 }
-      },
-      "anyOf": [
-        { "required": ["pivot_id"] },
-        { "required": ["last_name", "first_names", "birth_date"] }
-      ]
+      }
     },
     "parameters": {
       "type": "object",
-      "description": "Paramètres propres à un service, ex. { \"document_type\": \"CNIB\" } pour loss-declaration."
+      "description": "Paramètres propres à un service. Une recherche par document utilise identifier_type et document_identifier ; ces valeurs sont réservées au registre concerné."
     }
   }
 }

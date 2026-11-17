@@ -26,6 +26,7 @@ erDiagram
     ADMINISTRATION ||--o{ PROCEDURE : owns
     PROCEDURE ||--o{ PROCEDURE_QUESTION : requires
     QUESTION ||--o{ PROCEDURE_QUESTION : answers
+    REGISTRY ||--o{ REGISTRY_SERVICE : offers
     PROCEDURE ||--o{ CASE : instantiates
     ADMINISTRATION ||--o{ CASE : requests
     CASE ||--o{ CONSENT : authorizes
@@ -35,6 +36,7 @@ erDiagram
     QUESTION ||--o{ REGISTRY_REQUEST : checks
     REGISTRY_REQUEST ||--o{ REQUEST_ATTEMPT : retries
     CASE ||--o{ AUDIT_EVENT : records
+    ADMINISTRATION ||--o{ ADMINISTRATION_AUDIT_EVENT : manages
     CASE ||--o{ NOTIFICATION : alerts
     KEYCLOAK_ACCOUNT ||--o| CITIZEN_IDENTITY_LINK : maps
 ```
@@ -44,19 +46,24 @@ erDiagram
 | Table | Rôle et champs essentiels |
 |---|---|
 | `administrations` | Demandeurs/fournisseurs : `id`, `code` unique, `name`, `active`. |
-| `registries` | Registres connectés : `id`, `administration_id`, `code`, `connector_config_ref`, `active`. Pas de secrets de connexion en clair ; garder les URL/configuration technique dans l’environnement ou un secret store. |
+| `registries` | Registres : `id`, `administration_id`, `code`, `name`, `base_url`, `connector_config_ref`, `active`, dernier résultat du test simulé. Aucun secret de connexion n’est stocké ici. |
+| `registry_services` | Services booléens déclarés par un registre : `registry_id`, `code`, `title`, `description`, `active`. Déclarer un service ne crée pas son connecteur. |
 | `questions` | Catalogue de réponses autorisées : `id`, `code` unique, `registry_id`, `service_code`, `response_key`, `description`, `active`. Pour le concours, `criminal-record` → `clean` reste un indicateur à revoir humainement. Pour le passeport adulte, ONI répond à `cnib-status` par `valid` et Justice expose `nationality` et `criminal-record-current` → `valid`, sans numéro CNIB ni contenu du bulletin. |
-| `permissions` | Autorisations d’appel : `requester_administration_id`, `question_id`, `active`, dates de validité. Contrainte unique sur demandeur + question. |
-| `procedures` | Catalogue des démarches : `id`, `code` unique, `owner_administration_id`, `title`, `active`, `config_version`. |
-| `procedure_questions` | Questions requises par démarche et ordre : `procedure_id`, `question_id`, `required`, `position`. Contrainte unique sur démarche + question. |
-| `cases` | Dossier d’une démarche : `id`, `procedure_id`, `requester_administration_id`, `subject_ref`, `status`, `created_at`, `updated_at`, `closed_at`. `subject_ref` est la référence pivot fictive fournie par le système d’identité et partagée avec les registres du prototype ; elle est indexée, mais pas unique, car un citoyen peut avoir plusieurs dossiers. Ce n’est pas un identifiant officiel. Pas de nom, date de naissance ou adresse. |
+| `permissions` | Autorisations d’appel : `requester_administration_id`, `question_id`, `status` (`not_requested`, `requested`, `approved`, `suspended`), `purpose`, `active`, dates de validité. Une demande reste inactive tant que la gouvernance n’a pas approuvé la convention. |
+| `procedures` | Catalogue des démarches : `id`, `code` unique, `owner_administration_id`, `title`, `purpose`, `consent_days`, `published`, `active`, `config_version`. Une démarche déjà utilisée par un dossier ne peut pas être éditée en place. |
+| `procedure_questions` | Questions requises par démarche et ordre : `procedure_id`, `question_id`, `required`, `position`, configuration d’affichage du document. Contrainte unique sur démarche + question. |
+| `administration_audit_events` | Historique des actions de la console : administration, acteur Keycloak, action, cible, détail expurgé des PIN et secrets, date UTC. |
+| `cases` | Dossier d’une démarche : `id`, `procedure_id`, `requester_administration_id`, `subject_ref`, `applicant_name` (nom d’affichage facultatif saisi par l’agent), `status`, `consent_channel` (`web` ou `assisted`), dates. `subject_ref` est la référence pivot fictive fournie par le système d’identité et partagée avec les registres du prototype ; elle est indexée, mais pas unique, car un citoyen peut avoir plusieurs dossiers. Ce n’est pas un identifiant officiel. Le nom n’est utilisé que pour l’affichage du dossier, sans date de naissance ni adresse. |
 | `consents` | Consentement : `id`, `case_id`, `subject_ref`, `status` (`granted`, `refused`, `revoked`, `expired`), `granted_at`, `revoked_at`, `expires_at`, `notice_version`, `channel`, `evidence_ref`. L’agent ne peut pas donner le consentement à la place du citoyen. |
 | `consent_questions` | Portée du consentement : `consent_id`, `question_id`. Cela garantit le consentement limité aux questions de la démarche. |
-| `registry_requests` | Vérification logique : `id`, `case_id`, `question_id`, `status`, `idempotency_key` unique, `attempt_count`, `minimal_result` JSONB nullable, `created_at`, `updated_at`. `minimal_result` ne contient que la réponse métier nécessaire, jamais la réponse brute. |
+| `consent_otp_challenges` | Défi temporaire du recueil assisté : `case_id`, `requested_by_sub`, `provider_pin_id` nullable, empreinte HMAC pour le mode simulé, empreinte du périmètre, nombre d’essais, état (`sent` ou `simulated`), expiration et date de consommation. En mode fournisseur, le PIN est généré/vérifié par le fournisseur ; en simulation, aucun PIN brut n’est conservé. |
+| `registration_otp_challenges` | Défi OTP avant inscription : `phone_number`, `provider_pin_id` nullable, empreinte HMAC en mode simulé, nombre d’essais, expiration et date de vérification. `phone_verified` reste faux après une validation simulée. La création du compte Keycloak reste séparée. |
+| `registry_requests` | Vérification logique : `id`, `case_id`, `question_id`, `status`, `idempotency_key` unique, `attempt_count`, `minimal_result` JSONB nullable, `lookup_identifier_type`, `lookup_identifier_ciphertext`, `created_at`, `updated_at`. L’identifiant de document est chiffré et uniquement présent pour l’appel autorisé ; jamais dans le journal ni le résultat métier. |
 | `request_attempts` | Tentative d’appel/réessai : `id`, `registry_request_id`, `attempt_number`, `status`, `started_at`, `finished_at`, `transport_id`, `error_code`. Contrainte unique sur requête + numéro de tentative. Aucun body brut de requête/réponse. |
 | `audit_events` | Journal métier append-only : `id`, `case_id`, `subject_ref`, `actor_type`, `actor_ref`, `requester_administration_id`, `registry_id`, `question_id`, `event_type`, `outcome`, `purpose`, `data_categories` JSONB, `occurred_at`, `correlation_id`, `previous_hash`, `event_hash`. Aucune valeur de registre. |
-| `notifications` | Alertes liées à un dossier : `recipient_ref`, canal (`platform` ou `sms`), texte de l’alerte, état de livraison, SID du message Twilio et code d’erreur non sensible. L’adresse téléphonique n’est pas copiée dans la notification ; le SMS utilise le numéro vérifié de `citizen_identity_links`, avec un numéro de secours pour le compte de démonstration préchargé. Le mode par défaut reste simulé. |
-| `citizen_identity_links` | Rattachement minimal du compte Keycloak au pivot : `principal_sub` unique, `subject_ref` unique, `phone_number` vérifié, `linked_at`. Le numéro est stocké ici uniquement pour adresser les SMS ; il n’est pas dupliqué dans les dossiers, journaux ou notifications. |
+| `notifications` | Alertes liées à un dossier : `recipient_ref`, canal (`platform` ou `sms`), texte de l’alerte, état de livraison, identifiant de message renvoyé par le fournisseur SMS et code d’erreur non sensible. L’adresse téléphonique n’est pas copiée dans la notification ; en mode d’essai, le fournisseur redirige tous les SMS vers `TEST_PHONE_NUMBER`. Le mode par défaut reste simulé. Les OTP de consentement sont suivis séparément dans `consent_otp_challenges`. |
+| `citizen_identity_links` | Rattachement du compte Keycloak à une référence interne : `principal_sub` unique, `subject_ref` unique (`CITIZEN:<UUID>` en création libre, ou une ancienne référence `ACTE:...`), `phone_number`, `linked_at`. Le numéro sert au routage SMS et n’est pas copié dans les dossiers, journaux ou notifications. |
+| `citizen_document_identifiers` | Références de documents déclarées par le citoyen : `principal_sub`, `subject_ref`, `identifier_type`, `registry_code`, `identifier_ciphertext`, `identifier_digest`, `created_at`. Les valeurs sont chiffrées par Fernet ; l’empreinte HMAC permet la recherche sans indexer la valeur en clair. Les types du prototype sont CNIB, acte de naissance, casier, nationalité, paiement et déclaration de perte. |
 
 Les notifications simulées peuvent être ajoutées après le flux principal ; elles ne sont pas requises pour stocker le consentement, les demandes et l’historique du MVP.
 
@@ -88,12 +95,13 @@ Chaque appel réel et chaque refus métier doit être visible dans `audit_events
 - `UNIQUE(procedure_questions.procedure_id, procedure_questions.question_id)`.
 - `UNIQUE(registry_requests.idempotency_key)` et `UNIQUE(request_attempts.registry_request_id, request_attempts.attempt_number)`.
 - `UNIQUE(citizen_identity_links.principal_sub)` et `UNIQUE(citizen_identity_links.subject_ref)` : un compte et une référence ne peuvent être liés qu’une seule fois.
+- `UNIQUE(citizen_document_identifiers.principal_sub, identifier_type)` et `UNIQUE(identifier_digest)` : un seul identifiant par type pour un compte, et une même valeur/type ne peut pas rattacher plusieurs comptes.
 - Index sur `cases(subject_ref, created_at)`, `cases(status, updated_at)`, `registry_requests(status, updated_at)` et `audit_events(subject_ref, occurred_at)`.
 - Clés étrangères avec `RESTRICT` pour les entités de configuration utilisées et `CASCADE` uniquement pour les tables d’association de portée (ex. `consent_questions`). Ne pas supprimer en cascade un dossier ou un événement d’audit.
 
 ## Hors du premier schéma
 
-Pas de fiche centrale `citizens` contenant les attributs d’état civil, pas de copie des registres et pas de stockage d’image CNIB, d’acte ou de casier. La gestion des comptes et sessions relève de Keycloak ; `citizen_identity_links` ne contient que le lien compte/référence et le numéro vérifié nécessaire au routage SMS. La durée de conservation de ce lien, comme celle des dossiers, consentements et journaux, doit être décidée avant l’usage de données réelles.
+Pas de fiche centrale `citizens` contenant les attributs d’état civil, pas de copie des registres et pas de stockage d’image CNIB, d’acte ou de casier. Les références sont facultatives, déclaratives et propres au jeu fictif de démonstration. `CITIZEN_IDENTIFIER_ENCRYPTION_KEY` doit être définie avant d’enregistrer une référence ; sa rotation demande un rechiffrement contrôlé. La durée de conservation de ce lien, des références, dossiers, consentements et journaux doit être décidée avant l’usage de données réelles.
 
 ## Mise en route locale
 
