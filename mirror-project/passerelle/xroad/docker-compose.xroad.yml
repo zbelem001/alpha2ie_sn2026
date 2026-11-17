@@ -1,9 +1,9 @@
 # Banc de test X-Road (profil « xroad »), réservé au développement — couche passerelle.
-# Inclus par compose.couches.yaml (architecture par couche).
+# Inclus par mirror-project/compose.yaml (architecture par couche).
 #
-#   docker compose -f compose.couches.yaml --profile xroad up -d                démarrer et configurer le banc
-#   docker compose -f compose.couches.yaml --profile xroad logs -f xroad-setup  suivre la configuration
-#   docker compose -f compose.couches.yaml --profile xroad run --rm xroad-setup reconfigurer à la main
+#   docker compose --profile xroad up -d                démarrer et configurer le banc
+#   docker compose --profile xroad logs -f xroad-setup  suivre la configuration
+#   docker compose --profile xroad run --rm xroad-setup reconfigurer à la main
 #
 # Topologie (détails : passerelle/xroad/README.md) :
 #   xroad-cs       serveur central de l'instance BF

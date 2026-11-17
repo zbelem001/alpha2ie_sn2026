@@ -1,5 +1,5 @@
 # Image commune aux six registres simulés ; le registre lancé est choisi par la
-# commande (voir infrastructure/docker-compose.couches.yml).
+# commande (voir infrastructure/docker-compose.yml).
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

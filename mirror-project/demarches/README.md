@@ -8,7 +8,7 @@ La carte du jury ne nomme pas cette couche : c'est l'orchestration des démarche
 
 ## Lancer et tester
 
-- Service `demarches` de `compose.couches.yaml` (port 8000), construit depuis la racine du dépôt ([Dockerfile](Dockerfile)).
+- Service `demarches` de `mirror-project/compose.yaml` (port 8000), construit depuis `mirror-project/` ([Dockerfile](Dockerfile)).
 - Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (28 tests).
 
 ## Spécification

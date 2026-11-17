@@ -15,7 +15,7 @@ Copie de `interoperability/registries` et `interoperability/mock_registry` (bran
 | Trésor (`mock_registry/treasury`) | `BF/GOV/TRESOR/PAIEMENTS` | 8105 | `payment-status` |
 | ONI (`mock_registry/oni`) | `BF/GOV/ONI/CNIB` | 8106 | `cnib-status` |
 
-Une seule image ([Dockerfile](Dockerfile)) pour les six registres ; le registre lancé est choisi par la commande dans `infrastructure/docker-compose.couches.yml`.
+Une seule image ([Dockerfile](Dockerfile)) pour les six registres ; le registre lancé est choisi par la commande dans `infrastructure/docker-compose.yml`.
 
 ## Spécification et tests
 

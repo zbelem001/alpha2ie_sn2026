@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "notification-response.json",
+  "title": "Résultat d'une demande d'envoi de notification",
+  "description": "Réponse de POST /notifications, et valeur renvoyée par NotificationClient côté backend. Statut : PROPOSITION à valider entre Personne 2 et Personne 3.",
+  "type": "object",
+  "required": ["notification_id", "status", "detail", "responded_at"],
+  "additionalProperties": false,
+  "properties": {
+    "notification_id": {
+      "type": ["string", "null"],
+      "description": "Identifiant reçu. Null seulement si la demande n'en contenait pas de lisible."
+    },
+    "status": {
+      "enum": ["sent", "failed", "invalid_request", "unavailable"],
+      "description": "sent : remis au destinataire simulé. failed : destinataire injoignable, le message n'est pas arrivé. invalid_request : demande refusée, à corriger, ne pas relancer telle quelle. unavailable : service de notifications injoignable ou réponse illisible (produit par le client) ; relancer plus tard avec le même notification_id."
+    },
+    "detail": {
+      "type": ["string", "null"],
+      "description": "Explication lisible, sans le contenu du message."
+    },
+    "responded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duplicate": {
+      "type": "boolean",
+      "description": "Vrai si ce notification_id avait déjà été traité : rien n'a été renvoyé, le résultat d'origine est rendu."
+    }
+  }
+}

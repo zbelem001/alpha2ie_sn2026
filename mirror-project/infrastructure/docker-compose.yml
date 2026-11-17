@@ -1,15 +1,15 @@
 # Architecture par couche (branche mirror-project) — Dites-le-nous une fois
 #
-# Copie de docker-compose.yml qui construit les dossiers de couche (registres/,
-# passerelle/, demarches/) au lieu de interoperability/ et backend/.
-# Depuis la racine du dépôt (compose.couches.yaml inclut ce fichier) :
-#   docker compose -f compose.couches.yaml up -d --build
+# Copie de infrastructure/docker-compose.yml (racine du dépôt) qui construit les
+# dossiers de couche (registres/, passerelle/, demarches/) du miroir.
+# Depuis mirror-project/ (compose.yaml inclut ce fichier) :
+#   docker compose up -d --build
 #
 # Mêmes ports que l'environnement actuel : arrêter l'un avant de lancer l'autre.
 #
 # Panne d'un registre (épreuve) :
-#   docker compose -f compose.couches.yaml stop justice-registry
-#   docker compose -f compose.couches.yaml start justice-registry
+#   docker compose stop justice-registry
+#   docker compose start justice-registry
 #
 # Notifications simulées : boîte d'envoi sur http://localhost:8107
 

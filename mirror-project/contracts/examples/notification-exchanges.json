@@ -1,0 +1,113 @@
+{
+  "description": "Exemples d'échanges avec le service de notifications simulé. Vérifiés par interoperability/tests/test_contracts.py.",
+  "sends": [
+    {
+      "title": "Demande de consentement par SMS (démo, étape « sans consentement »)",
+      "request": {
+        "notification_id": "DOS-2026-0042:consentement:1",
+        "channel": "sms",
+        "recipient": "22670000001",
+        "message": "Dossier DOS-2026-0042 : la Fonction publique demande à vérifier majorité, nationalité et casier. Répondez 1 pour OUI, 2 pour NON.",
+        "reference": "DOS-2026-0042",
+        "reply_choices": ["1", "2"]
+      },
+      "http_status": 201,
+      "response": {
+        "notification_id": "DOS-2026-0042:consentement:1",
+        "status": "sent",
+        "detail": "Remis au téléphone simulé.",
+        "responded_at": "2026-11-17T10:00:00Z",
+        "duplicate": false
+      }
+    },
+    {
+      "title": "Relance avec le même identifiant : rien n'est renvoyé",
+      "request": {
+        "notification_id": "DOS-2026-0042:consentement:1",
+        "channel": "sms",
+        "recipient": "22670000001",
+        "message": "Dossier DOS-2026-0042 : la Fonction publique demande à vérifier majorité, nationalité et casier. Répondez 1 pour OUI, 2 pour NON.",
+        "reference": "DOS-2026-0042",
+        "reply_choices": ["1", "2"]
+      },
+      "http_status": 200,
+      "response": {
+        "notification_id": "DOS-2026-0042:consentement:1",
+        "status": "sent",
+        "detail": "Remis au téléphone simulé.",
+        "responded_at": "2026-11-17T10:00:05Z",
+        "duplicate": true
+      }
+    },
+    {
+      "title": "Registre indisponible : le citoyen est prévenu par e-mail",
+      "request": {
+        "notification_id": "DOS-2026-0042:attente-justice",
+        "channel": "email",
+        "recipient": "awa.kabore@exemple.bf",
+        "subject": "Dossier DOS-2026-0042 en attente",
+        "message": "Un registre est momentanément indisponible. Votre demande est conservée et reprendra automatiquement.",
+        "reference": "DOS-2026-0042"
+      },
+      "http_status": 201,
+      "response": {
+        "notification_id": "DOS-2026-0042:attente-justice",
+        "status": "sent",
+        "detail": "Déposé dans la boîte de réception simulée.",
+        "responded_at": "2026-11-17T10:02:00Z",
+        "duplicate": false
+      }
+    },
+    {
+      "title": "Destinataire injoignable",
+      "request": {
+        "notification_id": "DOS-2026-0043:consentement:1",
+        "channel": "sms",
+        "recipient": "22670000099",
+        "message": "Dossier DOS-2026-0043 : répondez 1 pour OUI, 2 pour NON.",
+        "reference": "DOS-2026-0043",
+        "reply_choices": ["1", "2"]
+      },
+      "http_status": 201,
+      "response": {
+        "notification_id": "DOS-2026-0043:consentement:1",
+        "status": "failed",
+        "detail": "Destinataire injoignable (simulation) : message non remis.",
+        "responded_at": "2026-11-17T10:03:00Z",
+        "duplicate": false
+      }
+    },
+    {
+      "title": "Service de notifications en panne (réponse produite par NotificationClient)",
+      "request": {
+        "notification_id": "DOS-2026-0042:rappel:1",
+        "channel": "sms",
+        "recipient": "22670000001",
+        "message": "Rappel : dossier DOS-2026-0042 en attente de votre réponse. Répondez 1 pour OUI, 2 pour NON.",
+        "reference": "DOS-2026-0042",
+        "reply_choices": ["1", "2"]
+      },
+      "http_status": null,
+      "response": {
+        "notification_id": "DOS-2026-0042:rappel:1",
+        "status": "unavailable",
+        "detail": "Service de notifications injoignable",
+        "responded_at": "2026-11-17T10:04:00Z"
+      }
+    }
+  ],
+  "replies": [
+    {
+      "title": "Le citoyen répond « 1 » (OUI) : envoyé au webhook du backend et lisible par GET /replies",
+      "reply": {
+        "reply_id": "6f1c2a9e-4b7d-4c31-9a55-0d2e8f7b1c42",
+        "seq": 2,
+        "sender": "22670000001",
+        "text": "1",
+        "in_reply_to": "DOS-2026-0042:consentement:1",
+        "reference": "DOS-2026-0042",
+        "received_at": "2026-11-17T10:00:40Z"
+      }
+    }
+  ]
+}

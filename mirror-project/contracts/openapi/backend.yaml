@@ -1,0 +1,1058 @@
+openapi: 3.1.0
+info:
+  title: Dites-le-nous une fois — API métier
+  version: 0.1.0
+  description: >-
+    Contrat MVP pour catalogue, dossiers, consentement, vérifications et journal usager.
+    Les réponses brutes des registres ne sont jamais exposées ni conservées.
+servers:
+  - url: http://localhost:8000
+security:
+  - BearerAuth: []
+tags:
+  - name: auth
+  - name: procedures
+  - name: citizen
+  - name: cases
+  - name: consent
+  - name: notifications
+  - name: audit
+  - name: administration
+paths:
+  /v1/admin/config:
+    get:
+      tags: [administration]
+      summary: Lire la configuration de l’administration locale
+      description: Réservé au rôle local-admin, limité au code d’administration présent dans le jeton.
+      responses:
+        '200':
+          description: Catalogue local, agents, droits, registre et services déclarés
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/procedures/{code}:
+    put:
+      tags: [administration]
+      summary: Créer ou modifier une démarche locale
+      description: >-
+        La publication exige des droits d’échange validés. Une démarche déjà utilisée par un dossier
+        ne peut pas être modifiée afin de préserver son périmètre historique.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-z][a-z0-9_]{2,63}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, title, purpose, consent_days, published, checks]
+              properties:
+                code: { type: string }
+                title: { type: string, minLength: 3, maxLength: 200 }
+                purpose: { type: string, minLength: 5 }
+                consent_days: { type: integer, minimum: 1, maximum: 30 }
+                published: { type: boolean }
+                checks:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [question_code, required, document]
+                    properties:
+                      question_code: { type: string }
+                      required: { type: boolean }
+                      document: { type: object, required: [key, label, provider, hint] }
+      responses:
+        '200': { description: Démarche créée, enregistrée ou publiée }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/admin/procedures/{code}/active:
+    patch:
+      tags: [administration]
+      summary: Activer ou désactiver une démarche pour les nouveaux dossiers
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [active], properties: { active: { type: boolean } } }
+      responses:
+        '200': { description: État de publication mis à jour }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/rights/{question_code}/request:
+    post:
+      tags: [administration]
+      summary: Demander un droit d’échange
+      parameters:
+        - name: question_code
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [purpose], properties: { purpose: { type: string, minLength: 5 } } }
+      responses:
+        '200': { description: Demande en attente de validation par la gouvernance }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/rights/{question_code}/suspend:
+    post:
+      tags: [administration]
+      summary: Suspendre localement un droit d’échange validé
+      parameters:
+        - name: question_code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Droit suspendu pour les nouveaux contrôles }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/registry:
+    put:
+      tags: [administration]
+      summary: Enregistrer le nom et l’URL du registre local
+      description: L’URL est stockée sans secret et n’est pas contactée par cette route.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url]
+              properties:
+                name: { type: string, minLength: 3 }
+                url: { type: string, format: uri }
+      responses:
+        '200': { description: Configuration locale enregistrée }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/admin/registry/test:
+    post:
+      tags: [administration]
+      summary: Enregistrer un résultat de test simulé du registre
+      description: Aucune requête réseau vers l’URL saisie n’est effectuée.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { simulate_failure: { type: boolean, default: false } } }
+      responses:
+        '200': { description: Résultat du test simulé }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/services:
+    post:
+      tags: [administration]
+      summary: Déclarer un service fournisseur local
+      description: Déclare le service; son connecteur et son usage par des tiers nécessitent une implémentation et une convention.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, title, description]
+              properties:
+                code: { type: string, pattern: '^[a-z][a-z0-9-]{2,63}$' }
+                title: { type: string }
+                description: { type: string }
+      responses:
+        '201': { description: Service déclaré }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/services/{service_id}/active:
+    patch:
+      tags: [administration]
+      summary: Activer ou désactiver un service fournisseur déclaré
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [active], properties: { active: { type: boolean } } }
+      responses:
+        '200': { description: État du service mis à jour }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/admin/agents:
+    get:
+      tags: [administration]
+      summary: Lister les comptes agents de cette administration
+      responses:
+        '200': { description: Comptes agents Keycloak de l’administration }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/Unavailable' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    post:
+      tags: [administration]
+      summary: Créer un compte agent Keycloak
+      description: Le PIN est envoyé directement à Keycloak et n’est jamais conservé ni journalisé par l’API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone, pin]
+              properties:
+                name: { type: string }
+                phone: { type: string, description: Huit chiffres nationaux }
+                pin: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
+      responses:
+        '201': { description: Compte agent créé }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/Unavailable' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/admin/agents/{agent_id}/active:
+    patch:
+      tags: [administration]
+      summary: Suspendre ou réactiver un compte agent Keycloak
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [active], properties: { active: { type: boolean } } }
+      responses:
+        '200': { description: État du compte mis à jour }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/admin/agents/{agent_id}/pin:
+    put:
+      tags: [administration]
+      summary: Réinitialiser le PIN d’un compte agent Keycloak
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [pin], properties: { pin: { type: string, pattern: '^[0-9]{6}$', writeOnly: true } } }
+      responses:
+        '200': { description: PIN remplacé }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/admin/audit:
+    get:
+      tags: [administration, audit]
+      summary: Lire le journal des actions d’administration et des dossiers
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 160 }
+        - name: actor_role
+          in: query
+          schema: { type: string, enum: [local-admin, agent, citizen, system] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 200 }
+      responses:
+        '200': { description: Événements du périmètre administratif, triés du plus récent au plus ancien }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/auth/registration/otp:
+    post:
+      security: []
+      tags: [auth]
+      summary: Envoyer ou simuler un code avant la première inscription citoyenne
+      description: >-
+        Avec SMS_PROVIDER=simulated, aucun SMS n’est envoyé et le code de démonstration peut être
+        retourné si OTP_SIMULATION_EXPOSE_CODE=true. Après validation, phone_verified vaut true pour le parcours
+        de démonstration; verification_mode=simulation indique que la possession du téléphone n’a pas été prouvée.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              anyOf:
+                - required: [phone_number]
+                - required: [phone]
+              properties:
+                phone_number: { type: string, description: E.164 ou 8 chiffres BF }
+                phone: { type: string, description: Alias camelCase }
+      responses:
+        '202':
+          description: Code envoyé par SMS ou code simulé retourné
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [challenge_id, phone, expires_at, resend_after, mode, message]
+                properties:
+                  challenge_id: { type: string, format: uuid }
+                  challengeId: { type: string, format: uuid }
+                  phone: { type: string, description: Numéro masqué }
+                  expires_at: { type: string, format: date-time }
+                  expiresAt: { type: integer, format: int64, description: Temps Unix en millisecondes pour le frontend }
+                  resend_after: { type: string, format: date-time }
+                  resendAt: { type: integer, format: int64, description: Temps Unix en millisecondes pour le frontend }
+                  mode: { type: string, enum: [sms, simulation] }
+                  demo_code: { type: string, pattern: '^[0-9]{6}$', description: Présent uniquement en mode de démonstration local }
+                  code: { type: string, pattern: '^[0-9]{6}$', description: Alias frontend, uniquement en mode simulé }
+                  message: { type: string }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/Unavailable' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/auth/registration/otp/verify:
+    post:
+      security: []
+      tags: [auth]
+      summary: Vérifier le code OTP avant la création du compte citoyen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              allOf:
+                - anyOf:
+                    - required: [challenge_id]
+                    - required: [challengeId]
+                - required: [code]
+              properties:
+                challenge_id: { type: string, format: uuid }
+                challengeId: { type: string, format: uuid }
+                code: { type: string, pattern: '^[0-9]{6}$' }
+      responses:
+        '200':
+          description: Code OTP validé par SMS ou par simulation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [phone_verified, otp_validated, verification_mode, phone, verified_at]
+                properties:
+                  phone_verified: { type: boolean, const: true, description: true après validation OTP; verification_mode distingue la simulation }
+                  phoneVerified: { type: boolean, const: true }
+                  phoneVerificationSimulated: { type: boolean, description: true si aucun SMS réel n’a été envoyé }
+                  otp_validated: { type: boolean, const: true }
+                  otpValidated: { type: boolean, const: true }
+                  verification_mode: { type: string, enum: [sms, simulation] }
+                  verificationMode: { type: string, enum: [sms, simulation] }
+                  phone: { type: string, description: Numéro masqué }
+                  verified_at: { type: string, format: date-time }
+                  verifiedAt: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/Invalid' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/Expired' }
+        '502': { $ref: '#/components/responses/Unavailable' }
+  /health:
+    get:
+      security: []
+      tags: [system]
+      summary: Vérifier que l’API est disponible
+      responses:
+        '200':
+          description: API disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { const: ok }
+  /v1/procedures:
+    get:
+      tags: [procedures]
+      summary: Lister les démarches actives
+      responses:
+        '200':
+          description: Catalogue des démarches disponibles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Procedure' }
+  /v1/citizen/identity-link:
+    get:
+      tags: [citizen]
+      summary: Consulter le rattachement d’identité du citoyen connecté
+      responses:
+        '200':
+          description: État du rattachement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdentityLink' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [citizen]
+      summary: Rattacher la référence pivot au compte citoyen
+      description: >-
+        Nécessite un téléphone vérifié dans les claims Keycloak et la confirmation explicite
+        du citoyen. Le prototype vérifie que la référence existe dans le registre fictif, mais
+        cette déclaration ne prouve pas l’identité civile du titulaire.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IdentityLinkRequest' }
+      responses:
+        '201':
+          description: Référence rattachée au compte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdentityLink' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/citizen/identifiers:
+    get:
+      tags: [citizen]
+      summary: Consulter ses références de documents enregistrées
+      responses:
+        '200':
+          description: Références propres au compte citoyen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CitizenIdentifiers' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    put:
+      tags: [citizen]
+      summary: Enregistrer ou remplacer ses références facultatives
+      description: >-
+        La liste peut être vide. Les valeurs servent uniquement au jeu de données simulé ; elles sont
+        chiffrées en base et la confirmation ne constitue pas une vérification d’identité officielle.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirmed]
+              properties:
+                confirmed: { type: boolean, const: true }
+                identifiers:
+                  type: array
+                  maxItems: 8
+                  items: { $ref: '#/components/schemas/DocumentIdentifier' }
+      responses:
+        '200':
+          description: Compte rattaché et liste enregistrée
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [linked, subject_ref, identifier_types]
+                properties:
+                  linked: { type: boolean, const: true }
+                  subject_ref: { type: string, example: CITIZEN:DEMO-UUID }
+                  identifier_types: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/cases:
+    get:
+      tags: [cases]
+      summary: Lister les dossiers accessibles au compte connecté
+      description: >-
+        Les agents ne voient que les dossiers de leur administration ; les citoyens ne voient que
+        leurs propres dossiers. La liste est triée du plus récent au plus ancien.
+      parameters:
+        - name: case_status
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/CaseStatus' }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Dossiers visibles au compte connecté
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Case' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [cases]
+      summary: Ouvrir un dossier pour une démarche
+      description: Crée les vérifications prévues par la configuration de la démarche, sans appeler les registres.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              allOf:
+                - anyOf:
+                    - required: [procedure_code]
+                    - required: [procedureCode]
+                - anyOf:
+                    - required: [subject_ref]
+                    - required: [subjectRef]
+                    - required: [citizen_identifier]
+                    - required: [registry_identifiers]
+                      properties:
+                        registry_identifiers: { minItems: 1 }
+                    - required: [references]
+                      properties:
+                        references: { minProperties: 1 }
+                    - required: [phone_number]
+                    - required: [phone]
+              properties:
+                procedure_code: { type: string, example: concours_direct_preverification }
+                procedureCode: { type: string, example: concours_direct_preverification }
+                consent_channel: { type: string, enum: [assisted, web], default: web }
+                channel: { type: string, enum: [assisted, web] }
+                phone_number:
+                  type: string
+                  description: >-
+                    Numéro saisi par l’agent, accepté seulement s’il correspond au compte citoyen déjà lié.
+                    Huit chiffres BF ou format international.
+                phone: { type: string, description: Alias frontend de phone_number }
+                applicantName: { type: string, minLength: 1, maxLength: 100 }
+                subject_ref: { type: string, description: Identifiant pivot fictif du citoyen, example: ACTE:OUAGA:2004:01234 }
+                subjectRef: { type: string, description: Alias camelCase de subject_ref }
+                citizen_identifier: { $ref: '#/components/schemas/DocumentIdentifier' }
+                references:
+                  type: object
+                  description: Clés frontend cnib, birth, nationality, criminal, payment ou loss
+                  additionalProperties: { type: string, minLength: 4, maxLength: 80 }
+                registry_identifiers:
+                  type: array
+                  maxItems: 8
+                  minItems: 1
+                  description: Au plus un identifiant par type, appartenant au même citoyen, pour remplacer les valeurs enregistrées lors de la création du dossier.
+                  items: { $ref: '#/components/schemas/DocumentIdentifier' }
+      responses:
+        '201':
+          description: Dossier créé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Case' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/cases/{case_id}/consent/otp:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    post:
+      tags: [consent]
+      summary: Envoyer ou simuler le code d’accord assisté
+      description: >-
+        L’agent du dossier demande un code à usage unique lié au périmètre des vérifications.
+        Le code est valable cinq minutes, limité à cinq essais et consommé une seule fois. En mode
+        simulé, aucun SMS n’est envoyé et le code de démonstration peut être retourné par l’API.
+        En configuration Infobip d’essai, le SMS doit arriver au numéro du citoyen lié pour que
+        le code puisse établir son accord.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                resend: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Code envoyé par SMS ou code de démonstration retourné en mode simulé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsentOtpChallenge' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/Unavailable' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/cases/{case_id}/consent/request:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    post:
+      tags: [consent]
+      summary: Modifier le canal de recueil du consentement
+      description: >-
+        Réservé à l’agent affecté au dossier. La demande est réémise dans le canal choisi ; tout
+        code OTP assisté encore actif est invalidé. Un consentement déjà accordé doit être révoqué
+        par le citoyen avant tout changement de parcours.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [consent_channel]
+              properties:
+                consent_channel: { type: string, enum: [assisted, web] }
+      responses:
+        '200':
+          description: Dossier actualisé et nouvelle demande de consentement créée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Case' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/cases/{case_id}/consent/otp/verify:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    post:
+      tags: [consent]
+      summary: Vérifier le code reçu et enregistrer l’accord assisté
+      description: Le code correct est consommé une fois et crée un consentement limité aux questions du dossier.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code: { type: string, pattern: '^[0-9]{6}$' }
+      responses:
+        '200':
+          description: Consentement assisté enregistré
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Consent' }
+        '400': { $ref: '#/components/responses/Invalid' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/Expired' }
+  /v1/cases/{case_id}:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    get:
+      tags: [cases]
+      summary: Consulter un dossier et l’état de ses vérifications
+      responses:
+        '200':
+          description: Dossier
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Case' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/notifications:
+    get:
+      tags: [notifications]
+      summary: Lister les alertes de la plateforme du citoyen connecté
+      description: >-
+        Les alertes SMS ne sont pas exposées dans cette boîte de réception. En mode web, le SMS
+        invite le citoyen à se connecter ; en mode assisté, le SMS contient un code à usage unique.
+        Dans les deux cas le SMS n’est pas, à lui seul, un consentement.
+      responses:
+        '200':
+          description: Notifications destinées au citoyen connecté
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/notifications/{notification_id}/read:
+    parameters:
+      - name: notification_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [notifications]
+      summary: Marquer une alerte de la plateforme comme lue
+      responses:
+        '200':
+          description: Alerte marquée comme lue
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, read_at]
+                properties:
+                  id: { type: string, format: uuid }
+                  read_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/cases/{case_id}/consent:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    post:
+      tags: [consent]
+      summary: Enregistrer la réponse du citoyen au consentement groupé
+      description: >-
+        Le citoyen peut refuser depuis le portail quel que soit le canal. Un accord web est enregistré
+        ici ; un accord assisté ne peut être enregistré qu’après vérification du code SMS par la route dédiée.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision, question_codes, notice_version, channel]
+              properties:
+                decision: { type: string, enum: [granted, refused] }
+                question_codes: { type: array, minItems: 1, uniqueItems: true, items: { type: string } }
+                notice_version: { type: string }
+                channel: { type: string, enum: [web, assisted] }
+                expires_at:
+                  type: [string, 'null']
+                  format: date-time
+                  description: >-
+                    Optionnel. Par défaut, expiration dans 30 jours. Toute date explicite doit
+                    inclure un fuseau horaire et être comprise entre maintenant et 30 jours.
+      responses:
+        '201':
+          description: Consentement enregistré
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Consent' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [consent]
+      summary: Révoquer le consentement actif du dossier
+      responses:
+        '200':
+          description: Consentement révoqué ; les appels non encore envoyés seront bloqués
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Consent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/cases/{case_id}/checks:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    post:
+      tags: [cases]
+      summary: Exécuter ou relancer les vérifications autorisées
+      description: >-
+        Exige un consentement actif qui couvre les questions. Une indisponibilité laisse la
+        vérification en attente. Une relance réutilise la même vérification logique et crée une
+        nouvelle tentative. Le corps de réponse du registre n’est jamais retourné.
+      responses:
+        '200':
+          description: État des vérifications après traitement ou relance
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [case_id, status, checks]
+                properties:
+                  case_id: { type: string, format: uuid }
+                  status: { $ref: '#/components/schemas/CaseStatus' }
+                  checks:
+                    type: array
+                    items: { $ref: '#/components/schemas/Check' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/cases/{case_id}/journal:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    get:
+      tags: [audit]
+      summary: Lire le journal métier du dossier
+      responses:
+        '200':
+          description: Événements présentés pour l’usager
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuditEvent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CaseId:
+      name: case_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    Procedure:
+      type: object
+      required: [code, title, questions]
+      properties:
+        code: { type: string }
+        title: { type: string }
+        questions:
+          type: array
+          items:
+            type: object
+            required: [code, description, required]
+            properties:
+              code: { type: string }
+              description: { type: string }
+              required: { type: boolean }
+    IdentityLinkRequest:
+      type: object
+      additionalProperties: false
+      required: [subject_ref, confirmed]
+      properties:
+        subject_ref:
+          type: string
+          pattern: '^ACTE:[A-Z]+:[0-9]{4}:[0-9]{5}$'
+          example: ACTE:OUAGA:2004:01234
+        confirmed: { type: boolean, const: true }
+    IdentityLink:
+      type: object
+      required: [linked, subject_ref]
+      properties:
+        linked: { type: boolean }
+        subject_ref: { type: [string, 'null'] }
+    DocumentIdentifier:
+      type: object
+      additionalProperties: false
+      required: [identifier_type, value]
+      properties:
+        identifier_type:
+          type: string
+          enum: [cnib_number, birth_act_number, criminal_record_number, nationality_reference, payment_reference, loss_report_number]
+        value:
+          type: string
+          minLength: 4
+          maxLength: 80
+          pattern: '^[A-Za-z0-9][A-Za-z0-9./_-]*$'
+    CitizenIdentifiers:
+      type: object
+      required: [linked, subject_ref, identifiers]
+      properties:
+        linked: { type: boolean }
+        subject_ref: { type: [string, 'null'] }
+        identifiers:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/DocumentIdentifier'
+    CaseStatus:
+      type: string
+      enum: [received, in_progress, pending, completed, rejected, cancelled]
+    CheckStatus:
+      type: string
+      enum: [queued, pending, confirmed, rejected, ambiguous, not_found, unavailable, blocked, error]
+    Case:
+      type: object
+      required: [id, procedure_code, subject_ref, status, consent_channel, checks, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        reference: { type: string, description: Référence d’affichage du dossier }
+        procedure_code: { type: string }
+        procedureCode: { type: string }
+        createdAt: { type: string, format: date-time }
+        applicantName: { type: string }
+        phone: { type: string }
+        procedureTitle: { type: string }
+        procedurePurpose: { type: string }
+        procedureVersion: { type: integer }
+        consentDays: { type: integer }
+        channel: { type: string, enum: [assisted, web] }
+        authorizationId: { type: string }
+        subject_ref: { type: string }
+        status: { $ref: '#/components/schemas/CaseStatus' }
+        consent_channel: { type: string, enum: [assisted, web] }
+        checks:
+          type: array
+          items: { $ref: '#/components/schemas/Check' }
+        created_at: { type: string, format: date-time }
+    Notification:
+      type: object
+      required: [id, case_id, title, message, created_at, read_at]
+      properties:
+        id: { type: string, format: uuid }
+        case_id: { type: string, format: uuid }
+        title: { type: string }
+        message: { type: string }
+        created_at: { type: string, format: date-time }
+        read_at: { type: [string, 'null'], format: date-time }
+    Check:
+      type: object
+      required: [question_code, status]
+      properties:
+        question_code: { type: string }
+        questionCode: { type: string }
+        label: { type: string }
+        registry: { type: string }
+        document:
+          type: object
+          properties:
+            key: { type: string }
+            label: { type: string }
+            provider: { type: string }
+            hint: { type: string }
+        required: { type: boolean }
+        status: { $ref: '#/components/schemas/CheckStatus' }
+        result:
+          type: [boolean, 'null']
+          description: Résultat métier booléen minimisé uniquement ; jamais les données brutes du registre.
+        message: { type: [string, 'null'] }
+        attempt_count: { type: integer, minimum: 0 }
+        attemptCount: { type: integer, minimum: 0 }
+    Consent:
+      type: object
+      required: [id, case_id, status, question_codes, notice_version, channel]
+      properties:
+        id: { type: string, format: uuid }
+        case_id: { type: string, format: uuid }
+        status: { type: string, enum: [granted, refused, revoked, expired] }
+        question_codes: { type: array, items: { type: string } }
+        notice_version: { type: string }
+        channel: { type: string }
+        granted_at: { type: [string, 'null'], format: date-time }
+        revoked_at: { type: [string, 'null'], format: date-time }
+        expires_at: { type: [string, 'null'], format: date-time }
+    ConsentOtpChallenge:
+      type: object
+      required: [challenge_id, case_id, phone, expires_at, resend_after, delivery_status, mode, message]
+      properties:
+        challenge_id: { type: string, format: uuid }
+        challengeId: { type: string, format: uuid }
+        case_id: { type: string, format: uuid }
+        caseId: { type: string, format: uuid }
+        phone: { type: string, description: Numéro de livraison masqué, jamais le code OTP }
+        expires_at: { type: string, format: date-time }
+        expiresAt: { type: integer, format: int64 }
+        resend_after: { type: string, format: date-time }
+        resendAt: { type: integer, format: int64 }
+        delivery_status: { type: string, enum: [sent, simulated] }
+        mode: { type: string, enum: [sms, simulation] }
+        demo_code: { type: string, pattern: '^[0-9]{6}$', description: Présent uniquement en mode de démonstration local }
+        code: { type: string, pattern: '^[0-9]{6}$', description: Alias frontend, uniquement en mode simulé }
+        message: { type: string }
+    AuditEvent:
+      type: object
+      required: [id, occurred_at, event_type, purpose, outcome]
+      properties:
+        id: { type: string, format: uuid }
+        occurred_at: { type: string, format: date-time }
+        event_type: { type: string }
+        requester: { type: [string, 'null'] }
+        registry: { type: [string, 'null'] }
+        question_code: { type: [string, 'null'] }
+        purpose: { type: string }
+        outcome: { type: [string, 'null'] }
+        data_categories: { type: [array, 'null'], items: { type: string } }
+  responses:
+    NotFound:
+      description: Ressource inconnue
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Dossier déjà créé ou conflit d’état
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Consentement ou droit requis absent
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unavailable:
+      description: Registre de démonstration momentanément indisponible
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Limite temporaire d’envoi atteinte
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Expired:
+      description: Code expiré ou déjà consommé
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Jeton Keycloak absent, invalide ou expiré
+      headers:
+        WWW-Authenticate:
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Invalid:
+      description: Corps invalide ou question hors démarche
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Error:
+      description: Erreur métier
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [detail]
+            properties:
+              detail: { type: string }
