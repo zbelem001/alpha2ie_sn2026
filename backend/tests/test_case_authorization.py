@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 import connectors
-from app.api import CaseCreate, ConsentCreate, create_case, execute_checks, record_consent
+from app.api import CaseCreate, ConsentCreate, create_case, execute_checks, record_consent, revoke_consent
 from app.database.base import Base
 from app.database.models import (
     Administration,
+    AuditEvent,
     Case,
     Consent,
     Permission,
@@ -156,6 +157,97 @@ def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Sessi
     assert result["status"] == "completed"
     assert result["checks"][0]["status"] == "confirmed"
     assert result["checks"][0]["attempt_count"] == 1
+
+
+def test_only_the_case_citizen_can_record_consent(db: Session):
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    stranger = Principal("stranger-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:99999")
+    case = create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)
+
+    with pytest.raises(HTTPException) as error:
+        record_consent(
+            UUID(case["id"]),
+            ConsentCreate(decision="granted", question_codes=["passport_cnib_valid"],
+                          notice_version="demo-1", channel="web"),
+            stranger,
+            db,
+        )
+
+    assert error.value.status_code == 403
+    assert db.scalar(select(func.count()).select_from(Consent)) == 0
+
+
+@pytest.mark.parametrize(
+    "expires_at",
+    [
+        datetime.now(timezone.utc) - timedelta(seconds=1),
+        datetime.now(timezone.utc) + timedelta(days=31),
+        datetime.now(),
+    ],
+    ids=["past", "over-30-days", "timezone-missing"],
+)
+def test_consent_expiration_must_be_future_timezone_aware_and_within_30_days(db: Session, expires_at):
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    case = create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)
+
+    with pytest.raises(HTTPException) as error:
+        record_consent(
+            UUID(case["id"]),
+            ConsentCreate(decision="granted", question_codes=["passport_cnib_valid"],
+                          notice_version="demo-1", channel="web", expires_at=expires_at),
+            citizen,
+            db,
+        )
+
+    assert error.value.status_code == 422
+    assert db.scalar(select(func.count()).select_from(Consent)) == 0
+
+
+def test_citizen_can_revoke_consent_and_audit_hashes_form_a_chain(db: Session):
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    stranger = Principal("stranger-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:99999")
+    case = create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)
+    case_id = UUID(case["id"])
+    consent = record_consent(
+        case_id,
+        ConsentCreate(decision="granted", question_codes=["passport_cnib_valid"],
+                      notice_version="demo-1", channel="web"),
+        citizen,
+        db,
+    )
+    # SQLite drops timezone metadata; revoke checks status and ownership here.
+    db.get(Consent, UUID(consent["id"])).expires_at = None
+
+    with pytest.raises(HTTPException) as error:
+        revoke_consent(case_id, stranger, db)
+    assert error.value.status_code == 403
+
+    result = revoke_consent(case_id, citizen, db)
+
+    assert result["status"] == "revoked"
+    assert db.get(Consent, UUID(consent["id"])).status == "revoked"
+    with pytest.raises(HTTPException) as error:
+        execute_checks(case_id, agent, db)
+    assert error.value.status_code == 403
+    request = db.scalar(select(RegistryRequest).where(RegistryRequest.case_id == case_id))
+    assert request.status == "queued"
+
+    events = db.scalars(
+        select(AuditEvent).where(AuditEvent.case_id == case_id).order_by(AuditEvent.occurred_at)
+    ).all()
+    assert [event.event_type for event in events] == [
+        "case_created", "consent_recorded", "consent_revoked", "checks_blocked"
+    ]
+    assert events[0].previous_hash is None
+    for previous, current in zip(events, events[1:]):
+        assert current.previous_hash == previous.event_hash
+        assert current.event_hash
 
 
 @pytest.mark.parametrize(
