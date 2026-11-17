@@ -3,6 +3,7 @@
 Services :
 - nationality     : « burkinabè : oui/non », sans le mode d'acquisition
 - criminal-record : « casier vierge : oui/non », sans le détail des condamnations
+- criminal-record-current : « bulletin n° 3 en cours de validité : oui/non », sans le bulletin ni les condamnations
 Une personne inconnue de la Justice donne « not_found » : jamais « oui » par défaut.
 """
 
@@ -41,11 +42,21 @@ def create_app(records: list[Record] | None = None) -> FastAPI:
             return found
         return ServiceResult.ok({"clean": found["convictions"] == 0})
 
+    def criminal_record_current(request: RegistryRequest) -> ServiceResult:
+        found = resolve_single(records, request.subject)
+        if isinstance(found, ServiceResult):
+            return found
+        return ServiceResult.ok({"valid": bool(found["criminal_record_valid"])})
+
     definition = RegistryDefinition(
         name="Justice — nationalité et casier",
         organization=ORGANIZATION,
         description=__doc__ or "",
-        services={"nationality": nationality, "criminal-record": criminal_record},
+        services={
+            "nationality": nationality,
+            "criminal-record": criminal_record,
+            "criminal-record-current": criminal_record_current,
+        },
     )
     return create_registry_app(definition)
 

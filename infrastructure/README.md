@@ -14,10 +14,13 @@ docker compose ps
 |---|---|---|
 | `postgres` | Bases `keycloak` et `backend` (créées par `postgres/init/`) | 55432 |
 | `keycloak` | Identités, sessions, rôles | 8180 |
+| `keycloak-profile-init` | Initialise les attributs des comptes de démonstration après l’import du realm | aucun (tâche ponctuelle) |
 | `civil-registry`, `transport-registry` | Registres simulés | 8101, 8102 |
-| `justice-registry`, `police-registry`, `treasury-registry` | Registres fictifs | 8103, 8104, 8105 |
+| `justice-registry`, `police-registry`, `treasury-registry`, `oni-registry` | Registres fictifs | 8103, 8104, 8105, 8106 |
 
 Les ports 5432 et 8080 ne sont pas utilisés côté machine, car ils sont souvent déjà occupés.
+
+`keycloak-profile-init` est une tâche idempotente exécutée avant le backend. Elle déclare les claims `administration_code` et `citizen_ref` dans le profil Keycloak, puis les associe aux comptes fictifs. La version du realm utilisée ne permet pas de déclarer ces attributs directement dans son fichier d’import.
 
 Mémoire : environ 0,85 Go au total, dont environ 565 Mo pour Keycloak.
 

@@ -15,5 +15,5 @@ Services REST à déclarer sur `ss3` : chaque `POST /services/{service}` des reg
 Points d'attention :
 
 - La configuration initiale se fait en grande partie à la main. Chaque étape doit être notée ici, sous forme de script ou de procédure.
-- La machine de développement a 10 Go de RAM. Il faut vérifier tôt que les cinq conteneurs tiennent en même temps que le reste.
+- La machine de développement a 10 Go de RAM. Il faut vérifier tôt que les six registres simulés tiennent en même temps que le reste.
 - Plan de repli : si X-Road n'est pas prêt, `REGISTRY_CONNECTOR=direct` garde tout fonctionnel.

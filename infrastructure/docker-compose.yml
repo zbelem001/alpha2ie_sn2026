@@ -9,7 +9,7 @@
 
 name: dlnuf
 
-# Même Dockerfile pour les cinq registres. Pas de nom d'image commun : cinq
+# Même Dockerfile pour les six registres. Pas de nom d'image commun : six
 # constructions parallèles vers un même nom entrent en conflit. Les couches
 # sont partagées par le cache, chaque registre a seulement sa propre étiquette.
 x-registry: &registry
@@ -67,7 +67,21 @@ services:
       postgres:
         condition: service_healthy
 
-  # --- Registres simulés (une image, cinq registres) -----------------------------------
+  keycloak-profile-init:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "scripts.configure_keycloak"]
+    restart: "no"
+    environment:
+      KEYCLOAK_ADMIN_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-dev}
+    depends_on:
+      keycloak:
+        condition: service_started
+
+  # --- Registres simulés (une image, six registres) -----------------------------------
 
   civil-registry:
     <<: *registry
@@ -87,6 +101,12 @@ services:
     ports:
       - "8103:8000"
 
+  oni-registry:
+    <<: *registry
+    command: ["uvicorn", "mock_registry.oni.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8106:8000"
+
   police-registry:
     <<: *registry
     command: ["uvicorn", "mock_registry.police.app:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -99,24 +119,46 @@ services:
     ports:
       - "8105:8000"
 
-  # --- Applications (à activer quand backend/ et frontend/ existent) --------------------
-  #
-  # backend:                      # Personne 2
-  #   build: ../backend
-  #   environment:
-  #     DATABASE_URL: postgresql://${POSTGRES_USER:-dlnuf}:${POSTGRES_PASSWORD:-dlnuf-dev}@postgres:5432/backend
-  #     KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8180/realms/dlnuf}
-  #     KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/dlnuf/protocol/openid-connect/certs
-  #     KEYCLOAK_CLIENT_ID: dlnuf-api
-  #     REGISTRY_CONNECTOR: direct          # ou xroad (phase 3)
-  #     XROAD_CLIENT_ID: BF/GOV/ONI/CNIB
-  #   ports: ["8000:8000"]
-  #   depends_on:
-  #     postgres: { condition: service_healthy }
+  # --- Applications ----------------------------------------------------------------------
   #
   # frontend:                     # Personne 1
   #   build: ../frontend
   #   ports: ["3000:3000"]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dlnuf}:${POSTGRES_PASSWORD:-dlnuf-dev}@postgres:5432/backend
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8180/realms/dlnuf}
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/dlnuf/protocol/openid-connect/certs
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-dlnuf-api}
+      REGISTRY_CONNECTOR: ${REGISTRY_CONNECTOR:-direct}
+      REGISTRY_TIMEOUT_S: ${REGISTRY_TIMEOUT_S:-3}
+      XROAD_CLIENT_ID: ${XROAD_CLIENT_ID:-BF/GOV/ONI/CNIB}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      keycloak-profile-init:
+        condition: service_completed_successfully
+      civil-registry:
+        condition: service_healthy
+      justice-registry:
+        condition: service_healthy
+      oni-registry:
+        condition: service_healthy
 
 volumes:
   postgres-data:

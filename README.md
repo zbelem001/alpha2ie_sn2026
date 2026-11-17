@@ -10,7 +10,8 @@ Socle d’interopérabilité administrative : vérifications ciblées, consentem
 |---|---|
 | `interoperability/`, `infrastructure/` | Registres simulés, connecteurs et Docker Compose opérationnels (voir « Démarrer ») |
 | `contracts/` | Contrat backend ↔ registres proposé (`registry-request`, `registry-response`), à valider ; autres schémas réservés |
-| `frontend/`, `backend/` | Arborescence initiale, à initialiser |
+| `frontend/` | À initialiser par la Personne 1 |
+| `backend/` | API FastAPI, base PostgreSQL, Keycloak et catalogue de démonstration intégrés dans Compose |
 
 Les fichiers `.gitkeep` permettent à Git de conserver les dossiers réservés.
 
@@ -25,6 +26,8 @@ Les fichiers `.gitkeep` permettent à Git de conserver les dossiers réservés.
 | `contracts/` | Collectif | OpenAPI, schémas JSON et exemples partagés |
 | `docs/` | Collectif | Architecture, API, modèle de données et installation |
 
+Le catalogue de démonstration contient deux parcours : la **pré-vérification partielle d’une candidature à un concours direct** et la **pré-vérification d’une demande de passeport ordinaire**. Leurs contrôles et limites sont détaillés dans la [documentation de l’API](docs/api-documentation.md).
+
 ## Démarrer
 
 ```bash
@@ -38,8 +41,12 @@ docker compose up -d --build
 | Justice (nationalité, casier) | http://localhost:8103/docs |
 | Police (pertes) | http://localhost:8104/docs |
 | Trésor (paiements, simulé) | http://localhost:8105/docs |
+| ONI (statut CNIB simulé) | http://localhost:8106/docs |
 | Keycloak | http://localhost:8180 |
+| API métier FastAPI | http://localhost:8000/docs |
 | PostgreSQL | localhost:55432 |
+
+Le conteneur backend applique les migrations et charge le catalogue de démonstration au démarrage. Les comptes locaux d’essai sont décrits dans [la documentation API](docs/api-documentation.md).
 
 Pour changer les valeurs par défaut : `cp .env.example .env`, puis modifier `.env`.
 

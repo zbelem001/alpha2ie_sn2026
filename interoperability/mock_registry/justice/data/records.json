@@ -1,18 +1,165 @@
 [
-  { "pivot_id": "ACTE:OUAGA:2004:01234", "last_name": "KABORE", "first_names": "Awa", "birth_date": "2004-03-12", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:1979:00412", "last_name": "KABORE", "first_names": "Awa", "birth_date": "1979-08-02", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:1998:00456", "last_name": "SAWADOGO", "first_names": "Issa", "birth_date": "1998-07-23", "burkinabe": true, "acquisition": "filiation", "convictions": 0, "_scenario": "Né à Abidjan de parents burkinabè" },
-  { "pivot_id": "ACTE:OUAGA:2012:02210", "last_name": "OUEDRAOGO", "first_names": "Fatimata", "birth_date": "2012-05-04", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:2008:03175", "last_name": "ZONGO", "first_names": "Boukary", "birth_date": "2008-11-19", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:2008:00560", "last_name": "BAMBARA", "first_names": "Sali", "birth_date": "2008-02-29", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:1995:00321", "last_name": "TRAORE", "first_names": "Moussa", "birth_date": "1995-06-01", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:1995:00322", "last_name": "TRAORE", "first_names": "Moussa", "birth_date": "1995-06-01", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:1961:00087", "last_name": "NIKIEMA", "first_names": "Salif", "birth_date": "1961-02-14", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:1990:01502", "last_name": "OUÉDRAOGO", "first_names": "Aminata", "birth_date": "1990-09-30", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:1985:00789", "last_name": "MENSAH", "first_names": "Kofi", "birth_date": "1985-01-17", "burkinabe": true, "acquisition": "naturalization", "convictions": 0, "_scenario": "Nationalité acquise : la réponse reste « burkinabè : oui »" },
-  { "pivot_id": "ACTE:OUAGA:1992:01120", "last_name": "SOME", "first_names": "Adama", "birth_date": "1992-12-03", "burkinabe": true, "acquisition": "birth", "convictions": 1, "_scenario": "Casier avec condamnation" },
-  { "pivot_id": "ACTE:OUAGA:1997:00933", "last_name": "OUATTARA", "first_names": "Mariam", "birth_date": "1997-10-21", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:1988:00230", "last_name": "YAMEOGO", "first_names": "Paul", "birth_date": "1988-02-20", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:2001:01456", "last_name": "TAPSOBA", "first_names": "Rasmata", "birth_date": "2001-06-11", "burkinabe": true, "acquisition": "birth", "convictions": 0 },
-  { "pivot_id": "ACTE:OUAGA:1993:00777", "last_name": "ZOUNGRANA", "first_names": "Clarisse", "birth_date": "1993-03-27", "burkinabe": true, "acquisition": "birth", "convictions": 0 }
+  {
+    "pivot_id": "ACTE:OUAGA:2004:01234",
+    "last_name": "KABORE",
+    "first_names": "Awa",
+    "birth_date": "2004-03-12",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1979:00412",
+    "last_name": "KABORE",
+    "first_names": "Awa",
+    "birth_date": "1979-08-02",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1998:00456",
+    "last_name": "SAWADOGO",
+    "first_names": "Issa",
+    "birth_date": "1998-07-23",
+    "burkinabe": true,
+    "acquisition": "filiation",
+    "convictions": 0,
+    "_scenario": "Né à Abidjan de parents burkinabè",
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:2012:02210",
+    "last_name": "OUEDRAOGO",
+    "first_names": "Fatimata",
+    "birth_date": "2012-05-04",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:2008:03175",
+    "last_name": "ZONGO",
+    "first_names": "Boukary",
+    "birth_date": "2008-11-19",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:2008:00560",
+    "last_name": "BAMBARA",
+    "first_names": "Sali",
+    "birth_date": "2008-02-29",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1995:00321",
+    "last_name": "TRAORE",
+    "first_names": "Moussa",
+    "birth_date": "1995-06-01",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1995:00322",
+    "last_name": "TRAORE",
+    "first_names": "Moussa",
+    "birth_date": "1995-06-01",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1961:00087",
+    "last_name": "NIKIEMA",
+    "first_names": "Salif",
+    "birth_date": "1961-02-14",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1990:01502",
+    "last_name": "OUÉDRAOGO",
+    "first_names": "Aminata",
+    "birth_date": "1990-09-30",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1985:00789",
+    "last_name": "MENSAH",
+    "first_names": "Kofi",
+    "birth_date": "1985-01-17",
+    "burkinabe": true,
+    "acquisition": "naturalization",
+    "convictions": 0,
+    "_scenario": "Nationalité acquise : la réponse reste « burkinabè : oui »",
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1992:01120",
+    "last_name": "SOME",
+    "first_names": "Adama",
+    "birth_date": "1992-12-03",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 1,
+    "_scenario": "Casier avec condamnation",
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1997:00933",
+    "last_name": "OUATTARA",
+    "first_names": "Mariam",
+    "birth_date": "1997-10-21",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": false
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1988:00230",
+    "last_name": "YAMEOGO",
+    "first_names": "Paul",
+    "birth_date": "1988-02-20",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:2001:01456",
+    "last_name": "TAPSOBA",
+    "first_names": "Rasmata",
+    "birth_date": "2001-06-11",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1993:00777",
+    "last_name": "ZOUNGRANA",
+    "first_names": "Clarisse",
+    "birth_date": "1993-03-27",
+    "burkinabe": true,
+    "acquisition": "birth",
+    "convictions": 0,
+    "criminal_record_valid": true
+  }
 ]

@@ -56,7 +56,7 @@ paths:
               additionalProperties: false
               required: [procedure_code, subject_ref]
               properties:
-                procedure_code: { type: string, example: prise_de_service }
+                procedure_code: { type: string, example: concours_direct_preverification }
                 subject_ref: { type: string, description: Identifiant pivot fictif du citoyen, example: ACTE:OUAGA:2004:01234 }
       responses:
         '201':
@@ -103,7 +103,12 @@ paths:
                 question_codes: { type: array, minItems: 1, uniqueItems: true, items: { type: string } }
                 notice_version: { type: string }
                 channel: { type: string, enum: [in_person, sms, web, assisted] }
-                expires_at: { type: [string, 'null'], format: date-time }
+                expires_at:
+                  type: [string, 'null']
+                  format: date-time
+                  description: >-
+                    Optionnel. Par défaut, expiration dans 30 jours. Toute date explicite doit
+                    inclure un fuseau horaire et être comprise entre maintenant et 30 jours.
       responses:
         '201':
           description: Consentement enregistré

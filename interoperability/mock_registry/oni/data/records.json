@@ -1,0 +1,17 @@
+[
+  {
+    "pivot_id": "ACTE:OUAGA:2004:01234",
+    "valid": true,
+    "_scenario": "CNIB enregistrée et en cours de validité"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1998:00456",
+    "valid": true,
+    "_scenario": "CNIB enregistrée et en cours de validité"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1997:00933",
+    "valid": false,
+    "_scenario": "CNIB enregistrée mais non valide"
+  }
+]

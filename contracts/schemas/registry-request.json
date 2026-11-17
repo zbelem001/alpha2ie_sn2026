@@ -15,7 +15,7 @@
     "procedure": {
       "type": ["string", "null"],
       "maxLength": 64,
-      "description": "Démarche pour laquelle la donnée est demandée, ex. « cnib-application »."
+      "description": "Démarche pour laquelle la donnée est demandée, ex. « concours_direct_preverification »."
     },
     "subject": {
       "type": "object",

@@ -5,6 +5,8 @@
 > Document technique de référence : description de l'architecture, détail de chaque composant, flux, formats, sécurité, résilience, outils et déploiement.
 >
 > Version de travail du 16 novembre 2026. Le nom du projet n'est pas encore arrêté ; ce document parle du « socle ».
+>
+> **Mise à jour des parcours de démonstration :** la démarche CNIB décrite plus bas est un scénario d’architecture antérieur, non retenu pour le MVP actuel. Le backend expose `concours_direct_preverification` et `passeport_ordinaire_precheck`. Voir `docs/api-documentation.md` pour leurs périmètres et limites.
 
 ---
 

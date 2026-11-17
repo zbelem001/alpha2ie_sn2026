@@ -1,5 +1,5 @@
 """Routes métier MVP, protégées par des jetons Bearer Keycloak."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from uuid import UUID
@@ -230,9 +230,26 @@ def record_consent(
     if len(set(body.question_codes)) != len(body.question_codes) or not set(body.question_codes) <= allowed.keys():
         raise HTTPException(status_code=422, detail="Une ou plusieurs questions ne font pas partie de la démarche")
     now = datetime.now(timezone.utc)
+    expires_at = body.expires_at
+    if expires_at is not None:
+        if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+            raise HTTPException(status_code=422, detail="La date d’expiration doit inclure un fuseau horaire")
+        if expires_at <= now or expires_at > now + timedelta(days=30):
+            raise HTTPException(status_code=422, detail="Le consentement doit expirer dans les 30 prochains jours")
+    else:
+        expires_at = now + timedelta(days=30)
+
+    previous_grants = db.scalars(select(Consent).where(
+        Consent.case_id == case.id, Consent.status == "granted"
+    )).all()
+    for previous in previous_grants:
+        previous.status = "revoked"
+        previous.revoked_at = now
+
     consent = Consent(case_id=case.id, subject_ref=case.subject_ref, status=body.decision,
                       granted_at=now if body.decision == "granted" else None,
-                      expires_at=body.expires_at, notice_version=body.notice_version, channel=body.channel)
+                      expires_at=expires_at, notice_version=body.notice_version, channel=body.channel,
+                      created_at=now)
     db.add(consent)
     db.flush()
     for code in body.question_codes:
@@ -256,9 +273,10 @@ def revoke_consent(
     case = _case_or_404(db, case_id)
     if principal.citizen_ref != case.subject_ref:
         raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut révoquer son consentement")
-    consent = db.scalar(select(Consent).where(Consent.case_id == case.id, Consent.status == "granted")
+    consent = db.scalar(select(Consent).where(Consent.case_id == case.id)
                         .order_by(Consent.created_at.desc()))
-    if consent is None:
+    if (consent is None or consent.status != "granted" or
+            (consent.expires_at is not None and consent.expires_at <= datetime.now(timezone.utc))):
         raise HTTPException(status_code=404, detail="Aucun consentement actif")
     consent.status = "revoked"
     consent.revoked_at = datetime.now(timezone.utc)
@@ -278,19 +296,19 @@ def execute_checks(
     case = _case_or_404(db, case_id)
     _authorize_case_access(case, db, principal)
     now = datetime.now(timezone.utc)
-    consent = db.scalar(select(Consent).where(Consent.case_id == case.id, Consent.status == "granted")
+    consent = db.scalar(select(Consent).where(Consent.case_id == case.id)
                         .order_by(Consent.created_at.desc()))
     requests = db.scalars(select(RegistryRequest).where(RegistryRequest.case_id == case.id)).all()
     links = {link.question_id: link for link in db.scalars(
         select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == case.procedure_id)).all()}
     consent_ids = set()
-    if consent and (consent.expires_at is None or consent.expires_at > now):
+    if (consent and consent.status == "granted" and
+            (consent.expires_at is None or consent.expires_at > now)):
         consent_ids = set(db.scalars(select(ConsentQuestion.question_id).where(ConsentQuestion.consent_id == consent.id)).all())
     if consent is None or not consent_ids:
-        for request in requests:
-            request.status = "blocked"
         _add_event(db, case, "checks_blocked", "consentement absent ou expiré", outcome="blocked")
-        case.status = "pending"
+        if case.status in {"received", "in_progress", "pending"}:
+            case.status = "pending"
         db.commit()
         raise HTTPException(status_code=403, detail="Consentement citoyen actif requis")
 
@@ -298,7 +316,7 @@ def execute_checks(
 
     connector = build_connector()
     for request in requests:
-        if request.status in {"confirmed", "rejected", "not_found", "ambiguous", "blocked"}:
+        if request.status in {"confirmed", "rejected", "not_found", "ambiguous"}:
             continue
         question = db.get(Question, request.question_id)
         link = links[question.id]

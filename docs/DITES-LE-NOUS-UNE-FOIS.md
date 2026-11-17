@@ -12,7 +12,7 @@ Aujourd'hui, un citoyen court de guichet en guichet pour apporter des papiers (a
 
 **Notre idée :** les administrations s'échangent elles-mêmes l'information, de façon **sécurisée, consentie et traçable**, et ne transmettent que **le strict nécessaire**.
 
-Exemple : la Direction des transports demande « ce citoyen est-il majeur ? » et reçoit `majeur: true`. Pas de nom, pas d'adresse, pas de date de naissance, pas de dossier complet.
+Exemple de démonstration : le service demandeur vérifie le seuil minimum de 18 ans d’un candidat et reçoit `majeur: true`. Pas de nom, pas d'adresse, pas de date de naissance, pas de dossier complet. Ce contrôle ne vérifie pas les plafonds d’âge propres aux concours.
 
 **Phrase de pitch :**
 > « Nous ne faisons pas circuler les citoyens entre les guichets ; nous faisons circuler, de manière sécurisée, consentie et traçable, uniquement l'information nécessaire entre les administrations. »
@@ -26,7 +26,7 @@ Exemple : la Direction des transports demande « ce citoyen est-il majeur ? » e
 | **Ne transmettre que l'utile** | Une question précise, une réponse minimale (« majeur : oui ») |
 | **Montrer qui a consulté ses données** | Un écran lisible pour l'usager : qui, quoi, quand, pourquoi |
 | **Tenir quand un registre tombe en panne** | La demande est conservée, retentée, sans doublon |
-| **Données** | Registres **simulés fournis par le jury** (état civil, nationalité, casier), citoyens fictifs |
+| **Données** | Registres et citoyens **fictifs préparés par l’équipe** pour la démonstration ; ils suivent les contrats d’interopérabilité |
 | **Épreuve en direct** | Impossible à préparer : le système doit être **générique et configurable** |
 | **Bien commun** | Code sous **licence libre**, socle réutilisable par l'administration |
 
@@ -182,17 +182,45 @@ Une administration peut être **fournisseur, demandeur, ou les deux**.
 
 ## 9. Démarches : « une démarche = un fichier de configuration »
 
-C'est ce qui rend le socle **réutilisable** : le moteur est le même pour un permis, un concours ou une prise de service. Seule la liste des pièces change.
+C'est ce qui rend le socle **réutilisable** : le moteur est le même pour un permis, un concours ou une autre démarche. Seule la configuration des questions et des services autorisés change.
 
 ```yaml
-demarche: prise_de_service
+demarche: concours_direct_preverification
 administration: fonction_publique
-pieces_requises:
-  - question: est_majeur        # état civil
-  - question: est_burkinabe     # nationalité
-  - question: casier_vierge     # justice
-  - document: diplome           # hors registre, fourni par le citoyen
+questions:
+  - code: candidate_minimum_age       # seuil minimal uniquement
+    required: true
+  - code: candidate_nationality
+    required: true
+  - code: criminal_record_indicator   # indicateur facultatif, revue humaine
+    required: false
+documents_hors_registres:
+  - diplome                            # selon l’avis du concours
 ```
+
+Cette pré-vérification ne prononce pas l’admission. L’âge maximal, les exceptions et les pièces exigées doivent être configurés à partir de l’avis du concours ciblé. L’indicateur de casier ne doit pas être interprété comme « casier vierge = admissible ».
+
+Autre parcours actif du catalogue :
+
+```yaml
+demarche: passeport_ordinaire_precheck
+administration: direction_immigration_police_frontieres
+questions:
+  - code: passport_cnib_valid        # ONI : vérification automatique
+    required: true
+  - code: passport_birth_act_found    # état civil
+    required: true
+  - code: passport_nationality       # Justice : certificat de nationalité
+    required: true
+  - code: passport_criminal_record_current # Justice : bulletin valide
+    required: true
+  - code: passport_fiscal_stamp_paid  # Trésor simulé, requis
+    required: true
+verification_manuelle:
+  - photos_et_pieces_physiques
+```
+
+La page de la Police nationale pour les passeports adultes mentionne une CNIB, un acte de naissance, un certificat de nationalité, un casier judiciaire en cours de validité, des photos, un timbre et un justificatif de profession. Le prototype simule la vérification de la CNIB par l’ONI, de l’acte par l’état civil, de la nationalité et de la validité du bulletin par Justice ; les photos et pièces physiques restent examinées par l’administration.
 
 ### Qui déclenche une démarche ?
 **Toujours le citoyen est à l'origine** : pas de dossier ouvert = pas de requête possible. La plateforme ne dit jamais « cette personne pourrait vous intéresser » (ce serait de la surveillance).

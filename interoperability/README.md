@@ -32,6 +32,8 @@ Chaque registre expose les mêmes routes :
 | `BF/GOV/TRANSPORT/PERMIS` | 8102 | `driving-licence` | `valid`, catégories et échéance seulement si le permis est valide |
 | `BF/GOV/JUSTICE/REGISTRES` | 8103 | `nationality` | `burkinabe` : oui/non, sans le mode d'acquisition |
 | | | `criminal-record` | `clean` : oui/non, sans le détail |
+| | | `criminal-record-current` | `valid` : oui/non, bulletin en cours de validité, sans condamnations |
+| `BF/GOV/ONI/CNIB` | 8106 | `cnib-status` | `valid` : oui/non, sans numéro ni dates de validité |
 | `BF/GOV/POLICE/PERTES` | 8104 | `loss-declaration` | `declared`, référence du procès-verbal (`parameters.document_type`, CNIB par défaut) |
 | `BF/GOV/TRESOR/PAIEMENTS` | 8105 | `payment-status` | `paid`, référence (exige `procedure`) |
 

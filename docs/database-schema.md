@@ -4,7 +4,7 @@
 
 PostgreSQL est déjà préparé par le lot infrastructure : `infrastructure/postgres/init/01-create-databases.sh` crée une base `backend` et une base `keycloak`. Le backend utilise uniquement la base `backend`. La personne 2 définit et implémente son schéma, ses migrations et son accès depuis FastAPI ; la personne 3 fournit le service PostgreSQL dans Compose.
 
-Ce modèle couvre le scénario générique de démonstration décrit dans `docs/DITES-LE-NOUS-UNE-FOIS.md` : une démarche, un consentement lié à des questions, des requêtes ciblées vers les registres simulés, les tentatives et le journal consultable par le citoyen.
+Ce modèle couvre les scénarios de démonstration `concours_direct_preverification` et `passeport_ordinaire_precheck` : des pré-vérifications limitées, un consentement lié aux questions, des requêtes ciblées vers les registres simulés, les tentatives et le journal consultable par le citoyen. Les données des registres de démonstration sont fictives et produites par l’équipe.
 
 ## Principes
 
@@ -43,7 +43,7 @@ erDiagram
 |---|---|
 | `administrations` | Demandeurs/fournisseurs : `id`, `code` unique, `name`, `active`. |
 | `registries` | Registres connectés : `id`, `administration_id`, `code`, `connector_config_ref`, `active`. Pas de secrets de connexion en clair ; garder les URL/configuration technique dans l’environnement ou un secret store. |
-| `questions` | Catalogue de réponses autorisées : `id`, `code` unique, `registry_id`, `service_code`, `response_key`, `description`, `active`. Exemples : `is-adult` → `adult`, `nationality` → `burkinabe`, `criminal-record` → `clean`. |
+| `questions` | Catalogue de réponses autorisées : `id`, `code` unique, `registry_id`, `service_code`, `response_key`, `description`, `active`. Pour le concours, `criminal-record` → `clean` reste un indicateur à revoir humainement. Pour le passeport adulte, ONI répond à `cnib-status` par `valid` et Justice expose `nationality` et `criminal-record-current` → `valid`, sans numéro CNIB ni contenu du bulletin. |
 | `permissions` | Autorisations d’appel : `requester_administration_id`, `question_id`, `active`, dates de validité. Contrainte unique sur demandeur + question. |
 | `procedures` | Catalogue des démarches : `id`, `code` unique, `owner_administration_id`, `title`, `active`, `config_version`. |
 | `procedure_questions` | Questions requises par démarche et ordre : `procedure_id`, `question_id`, `required`, `position`. Contrainte unique sur démarche + question. |

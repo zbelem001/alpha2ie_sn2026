@@ -2,12 +2,52 @@
   "description": "Exemples d'échanges avec les registres. Chaque entrée : appel RegistryConnector.query(organization, service, payload) et réponse attendue. Ces exemples sont vérifiés par interoperability/tests/test_contracts.py.",
   "examples": [
     {
+      "name": "Passeport : l’ONI confirme une CNIB valide sans divulguer numéro ni dates",
+      "organization": "BF/GOV/ONI/CNIB",
+      "service": "cnib-status",
+      "payload": {
+        "request_id": "8a7b6c5d-0000-4000-8000-000000000005",
+        "procedure": "passeport_ordinaire_precheck",
+        "subject": { "pivot_id": "ACTE:OUAGA:2004:01234" }
+      },
+      "response": {
+        "request_id": "8a7b6c5d-0000-4000-8000-000000000005",
+        "organization": "BF/GOV/ONI/CNIB",
+        "service": "cnib-status",
+        "status": "ok",
+        "data": { "valid": true },
+        "message": null,
+        "responded_at": "2026-11-16T10:47:00Z",
+        "transport_id": null
+      }
+    },
+    {
+      "name": "Passeport adulte : Justice confirme un bulletin de casier en cours de validité",
+      "organization": "BF/GOV/JUSTICE/REGISTRES",
+      "service": "criminal-record-current",
+      "payload": {
+        "request_id": "8a7b6c5d-0000-4000-8000-000000000006",
+        "procedure": "passeport_ordinaire_precheck",
+        "subject": { "pivot_id": "ACTE:OUAGA:2004:01234" }
+      },
+      "response": {
+        "request_id": "8a7b6c5d-0000-4000-8000-000000000006",
+        "organization": "BF/GOV/JUSTICE/REGISTRES",
+        "service": "criminal-record-current",
+        "status": "ok",
+        "data": { "valid": true },
+        "message": null,
+        "responded_at": "2026-11-16T10:48:00Z",
+        "transport_id": null
+      }
+    },
+    {
       "name": "Identité trouvée (Awa, née au Burkina)",
       "organization": "BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL",
       "service": "identity",
       "payload": {
         "request_id": "3f1c9a2e-7b41-4c0e-9d5a-1e2f3a4b5c6d",
-        "procedure": "cnib-application",
+        "procedure": "concours_direct_preverification",
         "subject": { "pivot_id": "ACTE:OUAGA:2004:01234" }
       },
       "response": {
@@ -37,7 +77,7 @@
       "service": "is-adult",
       "payload": {
         "request_id": "8a7b6c5d-0000-4000-8000-000000000001",
-        "procedure": "concours-fonction-publique",
+        "procedure": "concours_direct_preverification",
         "subject": { "pivot_id": "ACTE:OUAGA:2012:02210" }
       },
       "response": {
@@ -57,7 +97,7 @@
       "service": "identity",
       "payload": {
         "request_id": "8a7b6c5d-0000-4000-8000-000000000002",
-        "procedure": "cnib-application",
+        "procedure": "concours_direct_preverification",
         "subject": { "last_name": "TRAORE", "first_names": "Moussa", "birth_date": "1995-06-01" }
       },
       "response": {
@@ -77,7 +117,7 @@
       "service": "nationality",
       "payload": {
         "request_id": "8a7b6c5d-0000-4000-8000-000000000003",
-        "procedure": "cnib-application",
+        "procedure": "concours_direct_preverification",
         "subject": { "pivot_id": "ACTE:OUAGA:1998:00456" }
       },
       "response": {
@@ -97,7 +137,7 @@
       "service": "criminal-record",
       "payload": {
         "request_id": "8a7b6c5d-0000-4000-8000-000000000004",
-        "procedure": "cnib-application",
+        "procedure": "concours_direct_preverification",
         "subject": { "pivot_id": "ACTE:OUAGA:2004:01234" }
       },
       "response": {

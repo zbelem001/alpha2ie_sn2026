@@ -24,6 +24,7 @@ connectors = ["*.yaml"]
 "mock_registry.justice" = ["data/*.json"]
 "mock_registry.police" = ["data/*.json"]
 "mock_registry.treasury" = ["data/*.json"]
+"mock_registry.oni" = ["data/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

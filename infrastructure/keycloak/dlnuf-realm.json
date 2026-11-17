@@ -116,6 +116,17 @@
       "realmRoles": ["agent"]
     },
     {
+      "username": "agent-passeport-demo",
+      "firstName": "Agent Passeport",
+      "lastName": "Demo",
+      "email": "agent-passeport-demo@example.test",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": { "administration_code": ["BF/GOV/DIPF/PASSEPORTS"] },
+      "credentials": [{ "type": "password", "value": "PassportDemo-2026!", "temporary": false }],
+      "realmRoles": ["agent"]
+    },
+    {
       "username": "citoyen-demo",
       "firstName": "Citoyen",
       "lastName": "Demo",
