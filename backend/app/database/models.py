@@ -202,3 +202,21 @@ class AuditEvent(Base):
     correlation_id: Mapped[str | None] = mapped_column(String(160))
     previous_hash: Mapped[str | None] = mapped_column(String(64))
     event_hash: Mapped[str | None] = mapped_column(String(64))
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    __table_args__ = (
+        CheckConstraint("channel IN ('platform','sms')", name="ck_notifications_channel"),
+        CheckConstraint("delivery_status IN ('delivered','simulated','failed')", name="ck_notifications_delivery_status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    case_id: Mapped[UUID] = mapped_column(ForeignKey("cases.id", ondelete="RESTRICT"), index=True)
+    recipient_ref: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    channel: Mapped[str] = mapped_column(String(16), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    delivery_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

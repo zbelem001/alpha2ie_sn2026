@@ -16,6 +16,7 @@ from app.database.models import (
     Case,
     Consent,
     ConsentQuestion,
+    Notification,
     Permission,
     Procedure,
     ProcedureQuestion,
@@ -41,7 +42,7 @@ class ConsentCreate(BaseModel):
     decision: str = Field(pattern="^(granted|refused)$")
     question_codes: list[str] = Field(min_length=1)
     notice_version: str
-    channel: str = Field(pattern="^(in_person|sms|web|assisted)$")
+    channel: str = Field(pattern="^(in_person|web|assisted)$")
     expires_at: datetime | None = None
 
 
@@ -202,6 +203,23 @@ def create_case(
                                idempotency_key=f"{case.id}:{question.code}"))
     _add_event(db, case, "case_created", procedure.code, outcome="received", actor_type="agent",
                actor_ref=requester.code)
+    db.flush()
+    notification_title = "Consentement requis"
+    notification_message = (
+        "Une demande de consentement vous attend pour votre démarche. "
+        "Connectez-vous à la plateforme pour la consulter et donner votre réponse."
+    )
+    for channel, delivery_status in (("platform", "delivered"), ("sms", "simulated")):
+        db.add(Notification(
+            case_id=case.id,
+            recipient_ref=case.subject_ref,
+            channel=channel,
+            title=notification_title,
+            message=notification_message,
+            delivery_status=delivery_status,
+        ))
+    _add_event(db, case, "consent_requested", procedure.code, outcome="notification_created",
+               actor_type="system")
     db.commit()
     db.refresh(case)
     return _serialize_case(db, case)
@@ -216,6 +234,57 @@ def get_case(
     case = _case_or_404(db, case_id)
     _authorize_case_access(case, db, principal)
     return _serialize_case(db, case)
+
+
+@router.get("/notifications")
+def list_notifications(
+    principal: Principal = Depends(require_role("citizen")),
+    db: Session = Depends(get_db),
+):
+    if not principal.citizen_ref:
+        raise HTTPException(status_code=403, detail="Jeton citoyen sans référence citoyen")
+    notifications = db.scalars(
+        select(Notification)
+        .where(
+            Notification.recipient_ref == principal.citizen_ref,
+            Notification.channel == "platform",
+        )
+        .order_by(Notification.created_at.desc())
+    ).all()
+    return [
+        {
+            "id": str(notification.id),
+            "case_id": str(notification.case_id),
+            "title": notification.title,
+            "message": notification.message,
+            "created_at": notification.created_at,
+            "read_at": notification.read_at,
+        }
+        for notification in notifications
+    ]
+
+
+@router.post("/notifications/{notification_id}/read")
+def mark_notification_read(
+    notification_id: UUID,
+    principal: Principal = Depends(require_role("citizen")),
+    db: Session = Depends(get_db),
+):
+    if not principal.citizen_ref:
+        raise HTTPException(status_code=403, detail="Jeton citoyen sans référence citoyen")
+    notification = db.scalar(
+        select(Notification).where(
+            Notification.id == notification_id,
+            Notification.recipient_ref == principal.citizen_ref,
+            Notification.channel == "platform",
+        )
+    )
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Notification introuvable")
+    if notification.read_at is None:
+        notification.read_at = datetime.now(timezone.utc)
+        db.commit()
+    return {"id": str(notification.id), "read_at": notification.read_at}
 
 
 @router.post("/cases/{case_id}/consent", status_code=status.HTTP_201_CREATED)

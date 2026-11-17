@@ -3,18 +3,29 @@ from uuid import UUID
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 import connectors
-from app.api import CaseCreate, ConsentCreate, create_case, execute_checks, record_consent, revoke_consent
+from app.api import (
+    CaseCreate,
+    ConsentCreate,
+    create_case,
+    execute_checks,
+    list_notifications,
+    mark_notification_read,
+    record_consent,
+    revoke_consent,
+)
 from app.database.base import Base
 from app.database.models import (
     Administration,
     AuditEvent,
     Case,
     Consent,
+    Notification,
     Permission,
     Procedure,
     ProcedureQuestion,
@@ -104,6 +115,48 @@ def test_agent_can_open_its_own_administrations_procedure(db: Session):
     assert result["procedure_code"] == procedure.code
     assert result["status"] == "received"
     assert db.scalar(select(func.count()).select_from(Case)) == 1
+
+
+def test_case_creation_notifies_citizen_and_keeps_sms_simulated(db: Session):
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    case = create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)
+    case_id = UUID(case["id"])
+
+    notifications = db.scalars(
+        select(Notification).where(Notification.case_id == case_id).order_by(Notification.channel)
+    ).all()
+    assert [(item.channel, item.delivery_status) for item in notifications] == [
+        ("platform", "delivered"), ("sms", "simulated")
+    ]
+    assert all(item.recipient_ref == citizen.citizen_ref for item in notifications)
+    assert all("Connectez-vous à la plateforme" in item.message for item in notifications)
+    assert all("consentement" in item.message for item in notifications)
+
+    visible = list_notifications(citizen, db)
+    assert len(visible) == 1
+    assert visible[0]["case_id"] == str(case_id)
+    assert visible[0]["read_at"] is None
+
+    stranger = Principal("other-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:99999")
+    assert list_notifications(stranger, db) == []
+    with pytest.raises(HTTPException) as error:
+        mark_notification_read(UUID(visible[0]["id"]), stranger, db)
+    assert error.value.status_code == 404
+
+    marked = mark_notification_read(UUID(visible[0]["id"]), citizen, db)
+    assert marked["read_at"] is not None
+
+
+def test_sms_cannot_be_recorded_as_consent_channel():
+    with pytest.raises(ValidationError):
+        ConsentCreate(
+            decision="granted",
+            question_codes=["passport_cnib_valid"],
+            notice_version="demo-1",
+            channel="sms",
+        )
 
 
 def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Session, monkeypatch):
@@ -242,7 +295,7 @@ def test_citizen_can_revoke_consent_and_audit_hashes_form_a_chain(db: Session):
         select(AuditEvent).where(AuditEvent.case_id == case_id).order_by(AuditEvent.occurred_at)
     ).all()
     assert [event.event_type for event in events] == [
-        "case_created", "consent_recorded", "consent_revoked", "checks_blocked"
+        "case_created", "consent_requested", "consent_recorded", "consent_revoked", "checks_blocked"
     ]
     assert events[0].previous_hash is None
     for previous, current in zip(events, events[1:]):

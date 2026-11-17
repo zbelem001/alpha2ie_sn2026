@@ -13,6 +13,7 @@ tags:
   - name: procedures
   - name: cases
   - name: consent
+  - name: notifications
   - name: audit
 paths:
   /health:
@@ -83,6 +84,46 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/notifications:
+    get:
+      tags: [notifications]
+      summary: Lister les alertes de la plateforme du citoyen connecté
+      description: >-
+        Les alertes SMS ne sont pas exposées dans cette boîte de réception. Le canal SMS est simulé
+        et invite le citoyen à se connecter ; il ne vaut jamais consentement.
+      responses:
+        '200':
+          description: Notifications destinées au citoyen connecté
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/notifications/{notification_id}/read:
+    parameters:
+      - name: notification_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [notifications]
+      summary: Marquer une alerte de la plateforme comme lue
+      responses:
+        '200':
+          description: Alerte marquée comme lue
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, read_at]
+                properties:
+                  id: { type: string, format: uuid }
+                  read_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/cases/{case_id}/consent:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -102,7 +143,7 @@ paths:
                 decision: { type: string, enum: [granted, refused] }
                 question_codes: { type: array, minItems: 1, uniqueItems: true, items: { type: string } }
                 notice_version: { type: string }
-                channel: { type: string, enum: [in_person, sms, web, assisted] }
+                channel: { type: string, enum: [in_person, web, assisted] }
                 expires_at:
                   type: [string, 'null']
                   format: date-time
@@ -221,6 +262,16 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Check' }
         created_at: { type: string, format: date-time }
+    Notification:
+      type: object
+      required: [id, case_id, title, message, created_at, read_at]
+      properties:
+        id: { type: string, format: uuid }
+        case_id: { type: string, format: uuid }
+        title: { type: string }
+        message: { type: string }
+        created_at: { type: string, format: date-time }
+        read_at: { type: [string, 'null'], format: date-time }
     Check:
       type: object
       required: [question_code, status]

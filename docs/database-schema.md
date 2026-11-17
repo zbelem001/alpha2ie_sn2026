@@ -35,6 +35,7 @@ erDiagram
     QUESTION ||--o{ REGISTRY_REQUEST : checks
     REGISTRY_REQUEST ||--o{ REQUEST_ATTEMPT : retries
     CASE ||--o{ AUDIT_EVENT : records
+    CASE ||--o{ NOTIFICATION : alerts
 ```
 
 ### Tables MVP
@@ -53,6 +54,7 @@ erDiagram
 | `registry_requests` | Vérification logique : `id`, `case_id`, `question_id`, `status`, `idempotency_key` unique, `attempt_count`, `minimal_result` JSONB nullable, `created_at`, `updated_at`. `minimal_result` ne contient que la réponse métier nécessaire, jamais la réponse brute. |
 | `request_attempts` | Tentative d’appel/réessai : `id`, `registry_request_id`, `attempt_number`, `status`, `started_at`, `finished_at`, `transport_id`, `error_code`. Contrainte unique sur requête + numéro de tentative. Aucun body brut de requête/réponse. |
 | `audit_events` | Journal métier append-only : `id`, `case_id`, `subject_ref`, `actor_type`, `actor_ref`, `requester_administration_id`, `registry_id`, `question_id`, `event_type`, `outcome`, `purpose`, `data_categories` JSONB, `occurred_at`, `correlation_id`, `previous_hash`, `event_hash`. Aucune valeur de registre. |
+| `notifications` | Alertes liées à un dossier : `recipient_ref`, canal (`platform` ou `sms`), texte de l’alerte, état de livraison et date de lecture. L’adresse téléphonique n’est pas copiée dans la notification ; le SMS est simulé dans ce MVP. |
 
 Les notifications simulées peuvent être ajoutées après le flux principal ; elles ne sont pas requises pour stocker le consentement, les demandes et l’historique du MVP.
 

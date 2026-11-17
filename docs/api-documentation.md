@@ -9,6 +9,9 @@ Le contrat OpenAPI partagé est `contracts/openapi/backend.yaml`. Toutes les rou
 5. `GET /v1/cases/{case_id}` — consulter l’état global et par vérification.
 6. `GET /v1/cases/{case_id}/journal` — fournir les événements métier lisibles par l’usager.
 7. `DELETE /v1/cases/{case_id}/consent` — révoquer le consentement actif et bloquer les appels non encore envoyés.
+8. `GET /v1/notifications` et `POST /v1/notifications/{notification_id}/read` — consulter et marquer comme lue une alerte de la plateforme destinée au citoyen connecté.
+
+À l’ouverture d’un dossier, le backend crée une alerte plateforme et une entrée SMS simulée demandant au citoyen de se connecter pour examiner le consentement. Le SMS simulé n’est pas envoyé à un numéro réel et ne vaut jamais consentement. Le citoyen doit accepter ou refuser depuis la plateforme. L’authentification téléphone + PIN et le rattachement du numéro vérifié à `citizen_ref` restent à intégrer.
 
 Les réponses des registres suivent `contracts/schemas/registry-response.json`. L’API métier n’expose jamais le corps brut d’une réponse. Une indisponibilité laisse la vérification relançable ; la relance incrémente le compteur de tentative sans créer une nouvelle vérification logique. La demande est revendiquée atomiquement avant l’appel au registre, ce qui empêche deux exécutions concurrentes d’envoyer le même contrôle. Une revendication restée `pending` est considérée abandonnée après 60 secondes et peut alors être reprise ; l’ancienne tentative est clôturée avant la nouvelle.
 
