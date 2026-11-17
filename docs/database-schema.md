@@ -48,7 +48,7 @@ erDiagram
 | `permissions` | Autorisations d’appel : `requester_administration_id`, `question_id`, `active`, dates de validité. Contrainte unique sur demandeur + question. |
 | `procedures` | Catalogue des démarches : `id`, `code` unique, `owner_administration_id`, `title`, `active`, `config_version`. |
 | `procedure_questions` | Questions requises par démarche et ordre : `procedure_id`, `question_id`, `required`, `position`. Contrainte unique sur démarche + question. |
-| `cases` | Dossier d’une démarche : `id`, `procedure_id`, `requester_administration_id`, `subject_ref`, `status`, `created_at`, `updated_at`, `closed_at`. `subject_ref` est l’identifiant fictif/pivot fourni par le système d’identité ; pas de nom, date de naissance ou adresse. |
+| `cases` | Dossier d’une démarche : `id`, `procedure_id`, `requester_administration_id`, `subject_ref`, `status`, `created_at`, `updated_at`, `closed_at`. `subject_ref` est la référence pivot fictive fournie par le système d’identité et partagée avec les registres du prototype ; elle est indexée, mais pas unique, car un citoyen peut avoir plusieurs dossiers. Ce n’est pas un identifiant officiel. Pas de nom, date de naissance ou adresse. |
 | `consents` | Consentement : `id`, `case_id`, `subject_ref`, `status` (`granted`, `refused`, `revoked`, `expired`), `granted_at`, `revoked_at`, `expires_at`, `notice_version`, `channel`, `evidence_ref`. L’agent ne peut pas donner le consentement à la place du citoyen. |
 | `consent_questions` | Portée du consentement : `consent_id`, `question_id`. Cela garantit le consentement limité aux questions de la démarche. |
 | `registry_requests` | Vérification logique : `id`, `case_id`, `question_id`, `status`, `idempotency_key` unique, `attempt_count`, `minimal_result` JSONB nullable, `created_at`, `updated_at`. `minimal_result` ne contient que la réponse métier nécessaire, jamais la réponse brute. |
@@ -104,4 +104,4 @@ DATABASE_URL=postgresql+psycopg://dlnuf:dlnuf-dev@localhost:55432/backend .venv/
 DATABASE_URL=postgresql+psycopg://dlnuf:dlnuf-dev@localhost:55432/backend REGISTRY_ROUTES_FILE=../interoperability/connectors/routing.local.yaml .venv/bin/uvicorn app.main:app --reload
 ```
 
-L’URL locale vise le port publié par Compose. Dans un futur conteneur backend, utiliser le nom de service `postgres` et le port interne `5432`. L’API expose actuellement `GET /health`; les dépôts et endpoints métier seront branchés ensuite sur `SessionLocal` / `get_db`.
+L’URL locale vise le port publié par Compose. Dans le conteneur backend, utiliser le nom de service `postgres` et le port interne `5432`. L’API expose `GET /health` et ses routes métier `/v1` via FastAPI, avec les sessions SQLAlchemy fournies par `SessionLocal` / `get_db`.
