@@ -88,6 +88,7 @@ QUESTION_DEFINITIONS = [
 DEMO_PROCEDURES = [
     {
         "code": "concours_direct_preverification",
+        "config_version": 1,
         "owner": "BF/GOV/FONCTION-PUBLIQUE",
         "title": "Pré-vérification partielle d’une candidature à un concours direct",
         "questions": [
@@ -98,6 +99,7 @@ DEMO_PROCEDURES = [
     },
     {
         "code": "passeport_ordinaire_precheck",
+        "config_version": 1,
         "owner": "BF/GOV/DIPF/PASSEPORTS",
         "title": "Pré-vérification d’une demande de passeport ordinaire (majeur)",
         "questions": [
@@ -161,13 +163,13 @@ def main() -> None:
                     code=definition["code"],
                     owner_administration_id=requester_id,
                     title=definition["title"],
-                    config_version=1,
+                    config_version=definition.get("config_version", 1),
                 )
                 db.add(procedure)
             else:
                 procedure.owner_administration_id = requester_id
                 procedure.title = definition["title"]
-                procedure.config_version = max(procedure.config_version, 1)
+                procedure.config_version = definition.get("config_version", procedure.config_version)
                 procedure.active = True
             db.flush()
 

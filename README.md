@@ -80,6 +80,7 @@ Statuts : `ok`, `not_found`, `ambiguous`, `refused`, `unavailable`, `invalid_req
 - [Variante : socle sans X-Road](docs/architecture-socle.md)
 - [Contrats API](docs/api-documentation.md)
 - [Modèle de données](docs/database-schema.md)
+- [Guide d’ajout d’une démarche](docs/guide-ajout-demarche.md)
 - [Installation](docs/installation.md)
 
 ## Licence

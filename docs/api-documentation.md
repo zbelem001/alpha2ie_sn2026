@@ -16,6 +16,8 @@ Un nouveau choix du citoyen remplace tout accord précédent pour le dossier : u
 
 Le catalogue de démonstration expose deux parcours :
 
+Le processus d’ajout d’un parcours au catalogue est décrit dans le [guide d’ajout d’une démarche](guide-ajout-demarche.md).
+
 - `concours_direct_preverification` contrôle le seuil minimum de 18 ans et la nationalité ; l’indicateur de casier est facultatif et doit être examiné par un agent. Le scénario ne vérifie pas le plafond d’âge, les dérogations ni les conditions propres à un concours donné. Les pièces et critères exacts restent ceux de l’avis officiel du concours concerné, conformément aux [conditions générales publiées par le ministère](https://www.fonction-publique.gov.bf/accueil/actualites/details?cHash=c95e568d76f3c9794f1783abc745a4c7&tx_news_pi1%5Baction%5D=detail&tx_news_pi1%5Bcontroller%5D=News&tx_news_pi1%5Bnews%5D=2273) et à l'[avis du concours ciblé](https://www.fonction-publique.gov.bf/fileadmin/user_upload/storage/fichiers/WW_A36-_CD_SF_2025_CONCOURS_MFPTPS.pdf).
 - `passeport_ordinaire_precheck` couvre le dossier d’un demandeur majeur : vérifie la CNIB via le registre ONI simulé, retrouve l’acte d’état civil, vérifie la nationalité et la disponibilité d’un bulletin de casier en cours de validité auprès de Justice, puis vérifie le paiement du timbre fiscal requis via le Trésor simulé. Le bulletin est vérifié pour sa validité, pas pour l’absence de condamnation. Photos, justificatif de profession, dépôt physique et décision restent à l’administration. La composition est celle de la [Police nationale, autorité de délivrance](https://police.gov.bf/index.php/infos-utiles/passeport). Les registres ONI/Justice et paiements de ce prototype sont simulés ; aucun service réel n’est interrogé.
 
