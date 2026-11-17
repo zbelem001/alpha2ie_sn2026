@@ -7,6 +7,11 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.database.connection import get_db
+from app.database.models import CitizenIdentityLink
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -17,6 +22,8 @@ class Principal:
     roles: frozenset[str]
     administration_code: str | None
     citizen_ref: str | None
+    phone_number: str | None = None
+    phone_number_verified: bool = False
 
 
 @lru_cache(maxsize=1)
@@ -30,6 +37,7 @@ def _jwk_client() -> PyJWKClient:
 
 def get_current_principal(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
 ) -> Principal:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
@@ -56,11 +64,21 @@ def get_current_principal(
         realm_roles = claims.get("realm_access", {}).get("roles", [])
         if not isinstance(realm_roles, list):
             raise jwt.InvalidTokenError("rôles invalides")
+        subject = claims.get("sub") or claims["jti"]
+        citizen_ref = claims.get("citizen_ref")
+        if "citizen" in realm_roles and not citizen_ref:
+            link = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.principal_sub == subject))
+            citizen_ref = link.subject_ref if link else None
+        phone_number = claims.get("phone_number")
+        if phone_number is not None and not isinstance(phone_number, str):
+            raise jwt.InvalidTokenError("numéro de téléphone invalide")
         return Principal(
-            subject=claims.get("sub") or claims["jti"],
+            subject=subject,
             roles=frozenset(role for role in realm_roles if isinstance(role, str)),
             administration_code=claims.get("administration_code"),
-            citizen_ref=claims.get("citizen_ref"),
+            citizen_ref=citizen_ref,
+            phone_number=phone_number,
+            phone_number_verified=claims.get("phone_number_verified") is True,
         )
     except (jwt.PyJWTError, jwt.PyJWKClientError, ValueError, TypeError) as exc:
         raise HTTPException(

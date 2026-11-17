@@ -17,12 +17,20 @@ ADMIN_PASSWORD = os.environ["KEYCLOAK_ADMIN_PASSWORD"]
 DEMO_ATTRIBUTES = {
     "agent-demo": {"administration_code": ["BF/GOV/FONCTION-PUBLIQUE"]},
     "agent-passeport-demo": {"administration_code": ["BF/GOV/DIPF/PASSEPORTS"]},
-    "citoyen-demo": {"citizen_ref": ["ACTE:OUAGA:2004:01234"]},
+    "citoyen-demo": {},
 }
+demo_phone = os.getenv("CITIZEN_DEMO_PHONE", "").strip()
+if demo_phone:
+    DEMO_ATTRIBUTES["citoyen-demo"].update({
+        "phone_number": [demo_phone],
+        "phone_number_verified": ["true"],
+    })
 
 PROFILE_ATTRIBUTES = {
     "administration_code": "Code de l’administration",
     "citizen_ref": "Référence citoyen",
+    "phone_number": "Numéro de téléphone vérifié",
+    "phone_number_verified": "Téléphone vérifié",
 }
 
 

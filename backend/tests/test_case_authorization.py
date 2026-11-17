@@ -12,8 +12,10 @@ import connectors
 from app.api import (
     CaseCreate,
     ConsentCreate,
+    IdentityLinkCreate,
     create_case,
     execute_checks,
+    link_citizen_identity,
     list_notifications,
     mark_notification_read,
     record_consent,
@@ -24,6 +26,7 @@ from app.database.models import (
     Administration,
     AuditEvent,
     Case,
+    CitizenIdentityLink,
     Consent,
     Notification,
     Permission,
@@ -161,6 +164,12 @@ def test_case_creation_dispatches_twilio_for_configured_demo_citizen(db: Session
     monkeypatch.setenv("TWILIO_MESSAGING_SERVICE_SID", "MG" + "3" * 32)
     monkeypatch.setenv("TWILIO_DEMO_CITIZEN_REF", citizen.citizen_ref)
     monkeypatch.setenv("TWILIO_DEMO_TO", "+22670000000")
+    db.add(CitizenIdentityLink(
+        principal_sub=citizen.subject,
+        subject_ref=citizen.citizen_ref,
+        phone_number="+22670000001",
+    ))
+    db.commit()
     sent = {}
 
     def fake_send(settings, to_number, body):
@@ -176,8 +185,44 @@ def test_case_creation_dispatches_twilio_for_configured_demo_citizen(db: Session
     assert sms.delivery_status == "sent"
     assert sms.provider_message_id == "SM" + "4" * 32
     assert sms.delivery_error is None
-    assert sent["to"] == "+22670000000"
+    assert sent["to"] == "+22670000001"
     assert "Connectez-vous à la plateforme" in sent["body"]
+
+
+def test_citizen_can_link_confirmed_reference_with_verified_phone(db: Session, monkeypatch):
+    citizen = Principal(
+        "citizen-sub", frozenset({"citizen"}), None, None,
+        phone_number="+22670000099", phone_number_verified=True,
+    )
+
+    class IdentityConnector:
+        def query(self, organization, service, payload):
+            assert organization == "BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL"
+            assert service == "identity"
+            return {"status": "ok", "data": {"pivot_id": payload["subject"]["pivot_id"]}}
+
+    monkeypatch.setattr(connectors, "build_connector", lambda: IdentityConnector())
+    result = link_citizen_identity(
+        IdentityLinkCreate(subject_ref="acte:ouaga:2004:01234", confirmed=True),
+        citizen,
+        db,
+    )
+
+    assert result == {"linked": True, "subject_ref": "ACTE:OUAGA:2004:01234"}
+    stored = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.principal_sub == citizen.subject))
+    assert stored.subject_ref == "ACTE:OUAGA:2004:01234"
+    assert stored.phone_number == "+22670000099"
+
+
+def test_citizen_identity_link_requires_confirmation_and_verified_phone(db: Session):
+    unverified = Principal("citizen-sub", frozenset({"citizen"}), None, None, "+22670000099", False)
+    with pytest.raises(HTTPException) as unchecked:
+        link_citizen_identity(IdentityLinkCreate(subject_ref="ACTE:OUAGA:2004:01234", confirmed=False), unverified, db)
+    assert unchecked.value.status_code == 422
+
+    with pytest.raises(HTTPException) as no_verified_phone:
+        link_citizen_identity(IdentityLinkCreate(subject_ref="ACTE:OUAGA:2004:01234", confirmed=True), unverified, db)
+    assert no_verified_phone.value.status_code == 403
 
 
 def test_sms_cannot_be_recorded_as_consent_channel():

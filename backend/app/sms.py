@@ -5,9 +5,10 @@ import os
 from dataclasses import dataclass
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.database.models import Notification
+from app.database.models import CitizenIdentityLink, Notification
 
 
 class SmsConfigurationError(RuntimeError):
@@ -21,8 +22,8 @@ class TwilioSettings:
     api_key_secret: str
     messaging_service_sid: str | None
     from_number: str | None
-    demo_citizen_ref: str
-    demo_to_number: str
+    demo_citizen_ref: str | None
+    demo_to_number: str | None
 
     @classmethod
     def from_environment(cls) -> "TwilioSettings":
@@ -35,10 +36,14 @@ class TwilioSettings:
         demo_to_number = os.getenv("TWILIO_DEMO_TO", "").strip()
         if not all((account_sid, api_key_sid, api_key_secret)):
             raise SmsConfigurationError("twilio_credentials_missing")
+        if not account_sid.startswith("AC") or not api_key_sid.startswith("SK"):
+            raise SmsConfigurationError("twilio_credentials_invalid_format")
         if not messaging_service_sid and not from_number:
             raise SmsConfigurationError("twilio_sender_missing")
-        if not demo_citizen_ref or not demo_to_number:
-            raise SmsConfigurationError("twilio_demo_recipient_missing")
+        if messaging_service_sid and not messaging_service_sid.startswith("MG"):
+            raise SmsConfigurationError("twilio_messaging_service_sid_invalid_format")
+        if from_number and not from_number.startswith("+"):
+            raise SmsConfigurationError("twilio_from_number_must_be_e164")
         return cls(
             account_sid=account_sid,
             api_key_sid=api_key_sid,
@@ -67,6 +72,14 @@ def send_twilio_sms(settings: TwilioSettings, to_number: str, body: str) -> str:
         )
         response.raise_for_status()
         message_sid = response.json().get("sid")
+    except httpx.HTTPStatusError as error:
+        # Keep Twilio's numeric diagnostic only; the response body can contain PII.
+        try:
+            code = error.response.json().get("code")
+        except (ValueError, TypeError):
+            code = None
+        safe_code = f"twilio_http_{code}" if isinstance(code, int) else "twilio_send_failed"
+        raise RuntimeError(safe_code) from error
     except (httpx.HTTPError, ValueError, TypeError) as error:
         # Do not persist or log provider response bodies, which can contain PII.
         raise RuntimeError("twilio_send_failed") from error
@@ -81,11 +94,19 @@ def dispatch_sms_notification(db: Session, notification: Notification) -> None:
         return
     try:
         settings = TwilioSettings.from_environment()
-        if notification.recipient_ref != settings.demo_citizen_ref:
+        identity_link = db.scalar(select(CitizenIdentityLink).where(
+            CitizenIdentityLink.subject_ref == notification.recipient_ref
+        ))
+        if identity_link is not None:
+            to_number = identity_link.phone_number
+        elif settings.demo_citizen_ref == notification.recipient_ref and settings.demo_to_number:
+            # Compatibility for the account preloaded in the local Keycloak realm.
+            to_number = settings.demo_to_number
+        else:
             raise SmsConfigurationError("twilio_demo_recipient_not_mapped")
         notification.provider_message_id = send_twilio_sms(
             settings,
-            settings.demo_to_number,
+            to_number,
             notification.message,
         )
         notification.delivery_status = "sent"

@@ -50,6 +50,40 @@
       ]
     },
     {
+      "name": "citizen-phone-number",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "phone_number",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "phone_number",
+            "claim.name": "phone_number",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "phone_number_verified",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "phone_number_verified",
+            "claim.name": "phone_number_verified",
+            "jsonType.label": "boolean",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
       "name": "backend-audience",
       "protocol": "openid-connect",
       "protocolMappers": [
@@ -100,7 +134,7 @@
       "serviceAccountsEnabled": false,
       "redirectUris": ["http://localhost:3000/*", "http://localhost:8000/*"],
       "webOrigins": ["http://localhost:3000", "http://localhost:8000"],
-      "defaultClientScopes": ["administration-code", "citizen-ref", "backend-audience", "application-roles"]
+      "defaultClientScopes": ["administration-code", "citizen-ref", "citizen-phone-number", "backend-audience", "application-roles"]
     }
   ],
   "users": [
@@ -133,7 +167,7 @@
       "email": "citoyen-demo@example.test",
       "enabled": true,
       "emailVerified": true,
-      "attributes": { "citizen_ref": ["ACTE:OUAGA:2004:01234"] },
+      "attributes": {},
       "credentials": [{ "type": "password", "value": "CitoyenDemo-2026!", "temporary": false }],
       "realmRoles": ["citizen"]
     }

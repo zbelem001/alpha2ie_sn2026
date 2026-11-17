@@ -3,11 +3,13 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -15,6 +17,7 @@ from app.database.models import (
     Administration,
     AuditEvent,
     Case,
+    CitizenIdentityLink,
     Consent,
     ConsentQuestion,
     Notification,
@@ -46,6 +49,12 @@ class ConsentCreate(BaseModel):
     notice_version: str
     channel: str = Field(pattern="^(in_person|web|assisted)$")
     expires_at: datetime | None = None
+
+
+class IdentityLinkCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    subject_ref: str = Field(min_length=1, max_length=160)
+    confirmed: bool
 
 
 def _add_event(
@@ -175,6 +184,80 @@ def list_procedures(
             ],
         })
     return result
+
+
+@router.get("/citizen/identity-link")
+def get_citizen_identity_link(
+    principal: Principal = Depends(require_role("citizen")),
+    db: Session = Depends(get_db),
+):
+    link = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.principal_sub == principal.subject))
+    subject_ref = link.subject_ref if link else principal.citizen_ref
+    # A token claim alone does not establish the verified phone-to-reference
+    # route needed for notifications; POST records that association explicitly.
+    return {"linked": link is not None, "subject_ref": subject_ref}
+
+
+@router.post("/citizen/identity-link", status_code=status.HTTP_201_CREATED)
+def link_citizen_identity(
+    body: IdentityLinkCreate,
+    principal: Principal = Depends(require_role("citizen")),
+    db: Session = Depends(get_db),
+):
+    subject_ref = body.subject_ref.strip().upper()
+    if not body.confirmed:
+        raise HTTPException(status_code=422, detail="Veuillez confirmer la référence saisie")
+    if not re.fullmatch(r"ACTE:[A-Z]+:[0-9]{4}:[0-9]{5}", subject_ref):
+        raise HTTPException(status_code=422, detail="La référence doit respecter le format ACTE:VILLE:AAAA:NNNNN")
+    if not principal.phone_number or not principal.phone_number_verified:
+        raise HTTPException(status_code=403, detail="Un numéro de téléphone vérifié est requis avant le rattachement")
+    if not re.fullmatch(r"\+[1-9][0-9]{7,14}", principal.phone_number):
+        raise HTTPException(status_code=422, detail="Le numéro vérifié doit être au format international, par exemple +226XXXXXXXX")
+    if principal.citizen_ref and principal.citizen_ref != subject_ref:
+        raise HTTPException(status_code=409, detail="Une autre référence est déjà associée à ce compte")
+
+    by_account = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.principal_sub == principal.subject))
+    by_reference = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.subject_ref == subject_ref))
+    if by_account:
+        if by_account.subject_ref != subject_ref:
+            raise HTTPException(status_code=409, detail="Une autre référence est déjà associée à ce compte")
+        if by_account.phone_number != principal.phone_number:
+            by_account.phone_number = principal.phone_number
+            db.commit()
+        return {"linked": True, "subject_ref": subject_ref}
+    if by_reference and by_reference.principal_sub != principal.subject:
+        raise HTTPException(status_code=409, detail="Cette référence est déjà associée à un autre compte")
+
+    from connectors import build_connector
+
+    try:
+        identity_reply = build_connector().query(
+            "BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL",
+            "identity",
+            {"procedure": "citizen_identity_link", "subject": {"pivot_id": subject_ref}},
+        )
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Le registre de démonstration est indisponible") from error
+    identity_status = identity_reply.get("status")
+    if identity_status == "not_found":
+        raise HTTPException(status_code=404, detail="Référence absente du jeu de données de démonstration")
+    if identity_status == "ambiguous":
+        raise HTTPException(status_code=409, detail="Référence ambiguë dans le jeu de données de démonstration")
+    if identity_status != "ok" or not isinstance(identity_reply.get("data"), dict) or identity_reply["data"].get("pivot_id") != subject_ref:
+        raise HTTPException(status_code=422, detail="La référence n’a pas pu être validée dans le jeu de données")
+
+    link = CitizenIdentityLink(
+        principal_sub=principal.subject,
+        subject_ref=subject_ref,
+        phone_number=principal.phone_number,
+    )
+    db.add(link)
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Cette référence ou ce compte vient d’être associé") from error
+    return {"linked": True, "subject_ref": subject_ref}
 
 
 @router.post("/cases", status_code=status.HTTP_201_CREATED)

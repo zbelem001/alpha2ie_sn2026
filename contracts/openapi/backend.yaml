@@ -11,6 +11,7 @@ security:
   - BearerAuth: []
 tags:
   - name: procedures
+  - name: citizen
   - name: cases
   - name: consent
   - name: notifications
@@ -43,6 +44,42 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Procedure' }
+  /v1/citizen/identity-link:
+    get:
+      tags: [citizen]
+      summary: Consulter le rattachement d’identité du citoyen connecté
+      responses:
+        '200':
+          description: État du rattachement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdentityLink' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [citizen]
+      summary: Rattacher la référence pivot au compte citoyen
+      description: >-
+        Nécessite un téléphone vérifié dans les claims Keycloak et la confirmation explicite
+        du citoyen. Le prototype vérifie que la référence existe dans le registre fictif, mais
+        cette déclaration ne prouve pas l’identité civile du titulaire.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IdentityLinkRequest' }
+      responses:
+        '201':
+          description: Référence rattachée au compte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdentityLink' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /v1/cases:
     post:
       tags: [cases]
@@ -244,6 +281,22 @@ components:
               code: { type: string }
               description: { type: string }
               required: { type: boolean }
+    IdentityLinkRequest:
+      type: object
+      additionalProperties: false
+      required: [subject_ref, confirmed]
+      properties:
+        subject_ref:
+          type: string
+          pattern: '^ACTE:[A-Z]+:[0-9]{4}:[0-9]{5}$'
+          example: ACTE:OUAGA:2004:01234
+        confirmed: { type: boolean, const: true }
+    IdentityLink:
+      type: object
+      required: [linked, subject_ref]
+      properties:
+        linked: { type: boolean }
+        subject_ref: { type: [string, 'null'] }
     CaseStatus:
       type: string
       enum: [received, in_progress, pending, completed, rejected, cancelled]
@@ -323,6 +376,11 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
       description: Consentement ou droit requis absent
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unavailable:
+      description: Registre de démonstration momentanément indisponible
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

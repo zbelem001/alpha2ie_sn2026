@@ -3,15 +3,18 @@
 Le contrat OpenAPI partagé est `contracts/openapi/backend.yaml`. Toutes les routes métier exigent un jeton Bearer émis par Keycloak. Les rôles `agent` et `citizen` sont contrôlés ; l’agent est limité à son administration et le citoyen à ses propres dossiers. Le contrat fixe le premier flux MVP :
 
 1. `GET /v1/procedures` — afficher le catalogue de démarches/questionnaires.
-2. `POST /v1/cases` — créer un dossier et ses vérifications prévues, sans appeler les registres.
-3. `POST /v1/cases/{case_id}/consent` — enregistrer le consentement groupé, limité aux questions du dossier.
-4. `POST /v1/cases/{case_id}/checks` — vérifier droits et consentement, appeler les connecteurs et enregistrer les résultats minimisés ; le même endpoint permet une reprise.
-5. `GET /v1/cases/{case_id}` — consulter l’état global et par vérification.
-6. `GET /v1/cases/{case_id}/journal` — fournir les événements métier lisibles par l’usager.
-7. `DELETE /v1/cases/{case_id}/consent` — révoquer le consentement actif et bloquer les appels non encore envoyés.
-8. `GET /v1/notifications` et `POST /v1/notifications/{notification_id}/read` — consulter et marquer comme lue une alerte de la plateforme destinée au citoyen connecté.
+2. `GET /v1/citizen/identity-link` et `POST /v1/citizen/identity-link` — consulter ou créer le rattachement de la référence pivot du citoyen connecté.
+3. `POST /v1/cases` — créer un dossier et ses vérifications prévues, sans appeler les registres.
+4. `POST /v1/cases/{case_id}/consent` — enregistrer le consentement groupé, limité aux questions du dossier.
+5. `POST /v1/cases/{case_id}/checks` — vérifier droits et consentement, appeler les connecteurs et enregistrer les résultats minimisés ; le même endpoint permet une reprise.
+6. `GET /v1/cases/{case_id}` — consulter l’état global et par vérification.
+7. `GET /v1/cases/{case_id}/journal` — fournir les événements métier lisibles par l’usager.
+8. `DELETE /v1/cases/{case_id}/consent` — révoquer le consentement actif et bloquer les appels non encore envoyés.
+9. `GET /v1/notifications` et `POST /v1/notifications/{notification_id}/read` — consulter et marquer comme lue une alerte de la plateforme destinée au citoyen connecté.
 
-À l’ouverture d’un dossier, le backend crée une alerte plateforme et une entrée SMS demandant au citoyen de se connecter pour examiner le consentement. Le canal SMS reste simulé par défaut. Pour la démo Twilio, définir `SMS_PROVIDER=twilio`, les variables Twilio dans le `.env` local et le numéro de test vérifié associé à `TWILIO_DEMO_CITIZEN_REF`. Cette configuration ne cible qu’un seul citoyen de démonstration; aucun numéro n’est conservé en base. Le SMS ne vaut jamais consentement : le citoyen doit accepter ou refuser depuis la plateforme. Le compte utilisateur téléphone + PIN et le rattachement généralisé des numéros vérifiés à `citizen_ref` restent à intégrer.
+Au premier accès avec un compte citoyen, `POST /v1/citizen/identity-link` reçoit `subject_ref` et `confirmed: true`. L’API exige un claim `phone_number` au format international et `phone_number_verified: true` dans le jeton Keycloak, vérifie le format de la référence et qu’elle existe dans le registre fictif d’état civil, puis associe une seule référence à un seul compte. La case à cocher confirme la saisie, mais ne prouve pas l’identité du titulaire ; le parcours est réservé au jeu de données de démonstration. La référence et le numéro vérifié sont conservés dans `citizen_identity_links` pour les autorisations et l’envoi SMS.
+
+À l’ouverture d’un dossier, le backend crée une alerte plateforme et une entrée SMS demandant au citoyen de se connecter pour examiner le consentement. Le canal SMS reste simulé par défaut. Pour la démo Twilio, définir `SMS_PROVIDER=twilio` et les variables Twilio dans le `.env` local. Un numéro vérifié lié au compte est utilisé ; `TWILIO_DEMO_CITIZEN_REF` et `TWILIO_DEMO_TO` restent un routage de secours pour le compte préchargé. Le SMS ne vaut jamais consentement : le citoyen doit accepter ou refuser depuis la plateforme. La création réelle de comptes par téléphone + PIN dans Keycloak reste à intégrer ; l’interface actuelle utilise encore son mode de démonstration local.
 
 Les réponses des registres suivent `contracts/schemas/registry-response.json`. L’API métier n’expose jamais le corps brut d’une réponse. Une indisponibilité laisse la vérification relançable ; la relance incrémente le compteur de tentative sans créer une nouvelle vérification logique. La demande est revendiquée atomiquement avant l’appel au registre, ce qui empêche deux exécutions concurrentes d’envoyer le même contrôle. Une revendication restée `pending` est considérée abandonnée après 60 secondes et peut alors être reprise ; l’ancienne tentative est clôturée avant la nouvelle.
 
@@ -28,7 +31,7 @@ Le parcours concours interroge également Justice sur un indicateur de casier. C
 
 Pour les deux parcours, `completed` signifie que les contrôles requis configurés ont abouti ; ce n’est pas une décision d’admission ou de délivrance.
 
-Le realm `dlnuf` est importé par Docker Compose à partir de `infrastructure/keycloak/dlnuf-realm.json`. L’API vérifie la signature RS256 via le JWKS Keycloak, l’émetteur, l’audience, l’expiration et le client autorisé (`azp`). Comptes locaux de démonstration : `agent-demo` / `AgentDemo-2026!` (agent Fonction publique), `agent-passeport-demo` / `PassportDemo-2026!` (agent Direction de l’Immigration et de la Police des Frontières) et `citoyen-demo` / `CitoyenDemo-2026!` (rôle citoyen, identifiant fictif `ACTE:OUAGA:2004:01234`). Ces identifiants sont réservés à l’environnement local ; les mots de passe doivent être remplacés avant tout déploiement partagé.
+Le realm `dlnuf` est importé par Docker Compose à partir de `infrastructure/keycloak/dlnuf-realm.json`. L’API vérifie la signature RS256 via le JWKS Keycloak, l’émetteur, l’audience, l’expiration et le client autorisé (`azp`). Comptes locaux de démonstration : `agent-demo` / `AgentDemo-2026!` (agent Fonction publique), `agent-passeport-demo` / `PassportDemo-2026!` (agent Direction de l’Immigration et de la Police des Frontières) et `citoyen-demo` / `CitoyenDemo-2026!` (rôle citoyen, référence à rattacher à la première connexion). Ces identifiants sont réservés à l’environnement local ; les mots de passe doivent être remplacés avant tout déploiement partagé.
 
 Pour obtenir un jeton de démonstration :
 

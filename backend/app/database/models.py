@@ -103,7 +103,7 @@ class Case(Base):
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     procedure_id: Mapped[UUID] = mapped_column(ForeignKey("procedures.id", ondelete="RESTRICT"))
     requester_administration_id: Mapped[UUID] = mapped_column(ForeignKey("administrations.id", ondelete="RESTRICT"))
-    subject_ref: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    subject_ref: Mapped[str] = mapped_column(String(160), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="received")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -225,3 +225,18 @@ class Notification(Base):
     delivery_error: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CitizenIdentityLink(Base):
+    """Demo mapping from a Keycloak account and verified phone to a citizen pivot."""
+    __tablename__ = "citizen_identity_links"
+    __table_args__ = (
+        UniqueConstraint("principal_sub", name="uq_citizen_identity_links_principal_sub"),
+        UniqueConstraint("subject_ref", name="uq_citizen_identity_links_subject_ref"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    principal_sub: Mapped[str] = mapped_column(String(160), nullable=False)
+    subject_ref: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    phone_number: Mapped[str] = mapped_column(String(24), nullable=False)
+    linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
