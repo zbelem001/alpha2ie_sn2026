@@ -17,14 +17,14 @@ ADMIN_PASSWORD = os.environ["KEYCLOAK_ADMIN_PASSWORD"]
 DEMO_ATTRIBUTES = {
     "agent-demo": {"administration_code": ["BF/GOV/FONCTION-PUBLIQUE"]},
     "agent-passeport-demo": {"administration_code": ["BF/GOV/DIPF/PASSEPORTS"]},
-    "citoyen-demo": {},
+    "citoyen-demo": {"phone_number_verified": ["false"]},
 }
 demo_phone = os.getenv("CITIZEN_DEMO_PHONE", "").strip()
+demo_phone_verified = os.getenv("CITIZEN_DEMO_PHONE_VERIFIED", "false").strip().lower() == "true"
 if demo_phone:
-    DEMO_ATTRIBUTES["citoyen-demo"].update({
-        "phone_number": [demo_phone],
-        "phone_number_verified": ["true"],
-    })
+    DEMO_ATTRIBUTES["citoyen-demo"]["phone_number"] = [demo_phone]
+if demo_phone and demo_phone_verified:
+    DEMO_ATTRIBUTES["citoyen-demo"]["phone_number_verified"] = ["true"]
 
 PROFILE_ATTRIBUTES = {
     "administration_code": "Code de l’administration",
@@ -86,6 +86,8 @@ def configure(token: str) -> None:
         user = users[0]
         user_attributes = user.get("attributes") or {}
         user["attributes"] = user_attributes
+        if username == "citoyen-demo" and not demo_phone:
+            user_attributes.pop("phone_number", None)
         user_attributes.update(claims)
         request_json(f"/admin/realms/dlnuf/users/{user['id']}", token, method="PUT", body=user)
 

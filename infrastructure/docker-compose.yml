@@ -78,6 +78,7 @@ services:
       KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-dev}
       CITIZEN_DEMO_PHONE: ${TWILIO_DEMO_TO:-}
+      CITIZEN_DEMO_PHONE_VERIFIED: ${CITIZEN_DEMO_PHONE_VERIFIED:-false}
     depends_on:
       keycloak:
         condition: service_started
