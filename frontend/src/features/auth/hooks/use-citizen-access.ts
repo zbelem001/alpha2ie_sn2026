@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { authenticateDemoAccount, createDemoCitizen, demoAccountExists } from "@/features/auth/mocks/login";
 import { REGISTRATION_DEMO } from "@/features/auth/mocks/registration";
 import { setDemoCitizenPhone } from "@/lib/demo-authorizations";
+import { setDemoStaff } from "@/lib/demo-administration";
 
 type Step = "phone" | "pin" | "otp" | "setup";
 
@@ -113,8 +114,9 @@ export function useCitizenAccess() {
           return;
         }
         if (role === "agent") destination = "/guichet";
+        if (role === "local-admin") destination = "/administration";
       }
-      if (destination === "/usager") setDemoCitizenPhone(phone);
+      if (destination === "/usager") { setDemoCitizenPhone(phone); setDemoStaff(null); }
       setPin("");
       setConfirmation("");
       setPhone("");

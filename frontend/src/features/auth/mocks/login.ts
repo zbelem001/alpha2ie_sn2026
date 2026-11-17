@@ -1,51 +1,47 @@
-// Simulation locale uniquement. À remplacer par le backend / Keycloak.
-// Le PIN n'est jamais conservé en clair ; ces profils ne créent aucune session serveur.
-const DEMO_CITIZEN = { phone: "11111111", pin: "0000" } as const;
-const DEMO_AGENT = { phone: "22222222", pin: "1234" } as const;
-export type DemoRole = "citizen" | "agent";
-const storageKey = (phone: string) => `dlnuf:demo:citizen:${phone.replace(/\s/g, "")}`;
+// Simulation locale uniquement. L'accès réel doit être contrôlé par Keycloak / le backend.
+import { appendAdminAudit, getDemoAdministration, setDemoStaff } from "@/lib/demo-administration";
+import { hashDemoPin, verifyDemoPin, type DemoPin } from "@/lib/demo-pin";
 
-type DemoProfile = { salt: string; verifier: string };
+const CITIZEN = { phone: "11111111", pin: "0000" };
+const ADMIN = { phone: "99999999", pin: "1234" };
+export type DemoRole = "citizen" | "agent" | "local-admin";
+const key = (phone: string) => "dlnuf:demo:citizen:" + phone.replace(/\s/g, "");
 
-function readProfile(phone: string): DemoProfile | null {
-  const raw = localStorage.getItem(storageKey(phone));
+function readProfile(phone: string): DemoPin | null {
+  const raw = localStorage.getItem(key(phone));
   if (!raw) return null;
-  const profile = JSON.parse(raw) as DemoProfile;
-  if (!/^[a-f0-9]{32}$/.test(profile.salt) || !/^[a-f0-9]{64}$/.test(profile.verifier)) {
-    throw new Error("Profil de démonstration invalide");
-  }
+  const profile = JSON.parse(raw) as DemoPin;
+  if (!/^[a-f0-9]{32}$/.test(profile.salt) || !/^[a-f0-9]{64}$/.test(profile.verifier)) throw new Error("Profil de démonstration invalide");
   return profile;
 }
-
-async function derivePin(pin: string, salt: Uint8Array<ArrayBuffer>) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" }, key, 256);
-  return Array.from(new Uint8Array(bits), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 export async function demoAccountExists(phone: string) {
   const normalized = phone.replace(/\s/g, "");
-  return normalized === DEMO_AGENT.phone || normalized === DEMO_CITIZEN.phone || readProfile(normalized) !== null;
+  return normalized === ADMIN.phone || getDemoAdministration().agents.some((agent) => agent.phone === normalized) || normalized === CITIZEN.phone || readProfile(normalized) !== null;
 }
-
 export async function createDemoCitizen(phone: string, pin: string) {
-  if (phone.replace(/\s/g, "") === DEMO_AGENT.phone) throw new Error("Ce numéro est réservé au compte agent de démonstration.");
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const profile: DemoProfile = {
-    salt: Array.from(salt, (byte) => byte.toString(16).padStart(2, "0")).join(""),
-    verifier: await derivePin(pin, salt),
-  };
-  localStorage.setItem(storageKey(phone), JSON.stringify(profile));
+  const normalized = phone.replace(/\s/g, "");
+  if (normalized === ADMIN.phone || getDemoAdministration().agents.some((agent) => agent.phone === normalized)) throw new Error("Ce numéro appartient à un compte de l’administration.");
+  localStorage.setItem(key(normalized), JSON.stringify(await hashDemoPin(pin)));
 }
-
 export async function authenticateDemoAccount(phone: string, pin: string): Promise<DemoRole | null> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  // Le compte agent préconfiguré ne peut pas être remplacé par un profil citoyen local.
-  if (phone.replace(/\s/g, "") === DEMO_AGENT.phone) return pin === DEMO_AGENT.pin ? "agent" : null;
-  const profile = readProfile(phone);
-  if (profile) {
-    const salt = Uint8Array.from(profile.salt.match(/../g)!, (byte) => parseInt(byte, 16));
-    return await derivePin(pin, salt) === profile.verifier ? "citizen" : null;
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const normalized = phone.replace(/\s/g, "");
+  if (normalized === ADMIN.phone) {
+    const actor = { name: "Administrateur local", role: "local-admin" };
+    if (pin !== ADMIN.pin) { appendAdminAudit("Connexion administrateur refusée", "Console locale", "Identifiants incorrects", actor); return null; }
+    setDemoStaff({ id: "seed-admin", name: actor.name, phone: normalized, role: "local-admin" });
+    appendAdminAudit("Connexion administrateur", "Console locale", "", actor);
+    return "local-admin";
   }
-  return phone.replace(/\s/g, "") === DEMO_CITIZEN.phone && pin === DEMO_CITIZEN.pin ? "citizen" : null;
+  const agent = getDemoAdministration().agents.find((item) => item.phone === normalized);
+  if (agent) {
+    const valid = agent.active && (agent.credentials ? await verifyDemoPin(pin, agent.credentials) : agent.id === "seed-agent" && pin === "1234");
+    if (!valid) { appendAdminAudit("Connexion agent refusée", agent.name, agent.active ? "Identifiants incorrects" : "Compte suspendu", { name: agent.name, role: "agent" }); return null; }
+    setDemoStaff({ id: agent.id, name: agent.name, phone: agent.phone, role: "agent" });
+    appendAdminAudit("Connexion agent", "Guichet", "", { name: agent.name, role: "agent" });
+    return "agent";
+  }
+  const profile = readProfile(normalized);
+  if (profile) return await verifyDemoPin(pin, profile) ? "citizen" : null;
+  return normalized === CITIZEN.phone && pin === CITIZEN.pin ? "citizen" : null;
 }

@@ -1,10 +1,11 @@
 export type CheckStatus = "queued" | "confirmed" | "rejected" | "ambiguous" | "not_found" | "unavailable" | "blocked" | "error";
 export type CaseStatus = "received" | "pending" | "completed" | "rejected";
 export type ConsentChannel = "assisted" | "web";
-export type AgentCheck = { questionCode: string; label: string; registry: string; status: CheckStatus; result: boolean | null; attemptCount: number };
+export type AgentCheck = { questionCode: string; label: string; registry: string; required: boolean; status: CheckStatus; result: boolean | null; attemptCount: number };
 export type AgentCase = {
   id: string; reference: string; procedureCode: string; subjectRef: string; createdAt: string;
   citizenId: string; phone: string;
+  procedureTitle: string; procedurePurpose: string; procedureVersion: number; consentDays: number;
   channel: ConsentChannel; status: CaseStatus; authorizationId: string;
   checks: AgentCheck[];
 };

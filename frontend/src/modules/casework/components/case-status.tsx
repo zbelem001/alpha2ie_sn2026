@@ -1,9 +1,9 @@
 "use client";
 
-import type { AgentCase } from "@/features/agent/types/cases";
+import type { AgentCase } from "@/modules/casework/types/cases";
 import { useBrowserClock } from "@/lib/use-browser-clock";
 import type { DemoAuthorization } from "@/lib/demo-authorizations";
-import styles from "@/features/agent/styles/workspace.module.css";
+import styles from "@/modules/casework/styles/workspace.module.css";
 
 export function caseLabel(item: AgentCase, authorization?: DemoAuthorization, now = 0) {
   if (authorization?.status === "refused") return "Accord refusé";

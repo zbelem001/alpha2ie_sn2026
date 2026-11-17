@@ -1,5 +1,6 @@
 // Contrat d'échange local commun aux deux espaces, sans dépendance vers leur UI.
 // Simulation uniquement : le backend doit vérifier l'identité, la preuve et les droits.
+import { appendAdminAudit } from "@/lib/demo-administration";
 export type DemoAuthorization = {
   id: string;
   caseId: string;
@@ -9,6 +10,7 @@ export type DemoAuthorization = {
   purpose: string;
   checks: string[];
   duration: string;
+  validityDays?: number;
   channel: "assisted" | "web";
   status: "pending" | "granted" | "refused";
   requestedAt: string;
@@ -43,7 +45,9 @@ export function answerAuthorization(id: string, decision: "granted" | "refused",
   const item = readAuthorizations().find((entry) => entry.id === id);
   if (!item || item.phone !== phone || item.status !== "pending") throw new Error("Cette demande n’est plus disponible.");
   const now = Date.now();
-  putAuthorization({ ...item, channel, status: decision, decidedAt: new Date(now).toISOString(), expiresAt: decision === "granted" ? new Date(now + 30 * 86400_000).toISOString() : undefined });
+  const days = Math.min(30, Math.max(1, item.validityDays ?? 30));
+  putAuthorization({ ...item, channel, status: decision, decidedAt: new Date(now).toISOString(), expiresAt: decision === "granted" ? new Date(now + days * 86400_000).toISOString() : undefined });
+  appendAdminAudit(decision === "granted" ? "Accord citoyen donné" : "Accord citoyen refusé", item.caseId, channel === "assisted" ? "Recueil assisté au guichet" : "Réponse sur le portail citoyen", { name: "Citoyen concerné", role: "citizen" });
 }
 export function subscribeAuthorizations(callback: () => void) {
   const onStorage = (event: StorageEvent) => { if (event.key === KEY || event.key === null) callback(); };

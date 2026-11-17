@@ -28,7 +28,7 @@ const eslintConfig = defineConfig([
   ...nextTs,
   ...spaceBoundaries,
   {
-    files: ["src/components/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}"],
+    files: ["src/components/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}", "src/modules/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [{

@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { subscribeAuthorizations } from "@/lib/demo-authorizations";
 import { useDemoAuthorizations } from "@/lib/use-demo-authorizations";
-import { agentCaseService } from "@/features/agent/services/agent-cases";
-import type { AgentCase, AssistedChallenge, ConsentChannel } from "@/features/agent/types/cases";
+import { appendAdminAudit } from "@/lib/demo-administration";
+import { agentCaseService } from "@/modules/casework/services/agent-cases";
+import type { AgentCase, AssistedChallenge, ConsentChannel } from "@/modules/casework/types/cases";
 
 export function useAgentWorkspace() {
   const [cases, setCases] = useState<AgentCase[]>([]);
@@ -45,7 +46,9 @@ export function useAgentWorkspace() {
     void load();
     const unsubscribe = subscribeAuthorizations(() => { void load(); });
     window.addEventListener("focus", load);
-    return () => { active = false; unsubscribe(); window.removeEventListener("focus", load); };
+    window.addEventListener("dlnuf-demo-cases", load);
+    window.addEventListener("storage", load);
+    return () => { active = false; unsubscribe(); window.removeEventListener("focus", load); window.removeEventListener("dlnuf-demo-cases", load); window.removeEventListener("storage", load); };
   }, []);
 
   async function task(name: string, action: () => Promise<void>) {
@@ -55,7 +58,7 @@ export function useAgentWorkspace() {
     catch (cause) { setError(cause instanceof Error ? cause.message : "Cette action n’a pas abouti. Réessayez."); }
     finally { setBusy(""); }
   }
-  function openCase(id: string, section?: "consent" | "checks") { setSelectedId(id); setSelectedSection(section); setChallenge(null); setError(""); setView("case"); }
+  function openCase(id: string, section?: "consent" | "checks") { appendAdminAudit("Dossier consulté", id); setSelectedId(id); setSelectedSection(section); setChallenge(null); setError(""); setView("case"); }
   function showList() { setError(""); setView("list"); setChallenge(null); }
   function showNew() { setError(""); setView("new"); setChallenge(null); }
   async function create(citizenId: string, phone: string, procedureCode: string, channel: ConsentChannel) {

@@ -2,10 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Search } from "lucide-react";
-import { agentCaseService } from "@/features/agent/services/agent-cases";
-import { demoCitizens, passportProcedure } from "@/features/agent/mocks/catalogue";
-import type { ConsentChannel, DemoCitizen } from "@/features/agent/types/cases";
-import styles from "@/features/agent/styles/workspace.module.css";
+import { agentCaseService } from "@/modules/casework/services/agent-cases";
+import { demoCitizens, passportProcedure } from "@/modules/casework/mocks/catalogue";
+import type { ConsentChannel, DemoCitizen } from "@/modules/casework/types/cases";
+import styles from "@/modules/casework/styles/workspace.module.css";
+import { useDemoAdministration } from "@/lib/use-demo-administration";
 
 export function NewCaseForm({ busy, onCreate }: { busy: boolean; onCreate: (citizenId: string, phone: string, procedure: string, channel: ConsentChannel) => Promise<void> }) {
   const [citizenId, setCitizenId] = useState("");
@@ -14,6 +15,10 @@ export function NewCaseForm({ busy, onCreate }: { busy: boolean; onCreate: (citi
   const [searching, setSearching] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [channel, setChannel] = useState<ConsentChannel>("assisted");
+  const configuration = useDemoAdministration();
+  const procedures = configuration.procedures.filter((procedure) => procedure.active && procedure.published);
+  const [procedureCode, setProcedureCode] = useState(passportProcedure.code);
+  const selectedProcedure = procedures.find((procedure) => procedure.code === procedureCode) ?? procedures[0];
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy || searching) return;
@@ -23,7 +28,10 @@ export function NewCaseForm({ busy, onCreate }: { busy: boolean; onCreate: (citi
     if (!/^\d{8}$/.test(normalizedPhone)) next.phone = "Entrez un numéro de téléphone à 8 chiffres.";
     setErrors(next);
     if (Object.keys(next).length) return;
-    if (citizen) { await onCreate(citizen.uniqueId, normalizedPhone, passportProcedure.code, channel); return; }
+    if (citizen) {
+      if (!selectedProcedure) { setErrors({ procedure: "Aucune démarche active n’est disponible. Contactez votre administrateur." }); return; }
+      await onCreate(citizen.uniqueId, normalizedPhone, selectedProcedure.code, channel); return;
+    }
     setSearching(true);
     try {
       const found = await agentCaseService.identify(citizenId.trim());
@@ -61,7 +69,8 @@ export function NewCaseForm({ busy, onCreate }: { busy: boolean; onCreate: (citi
       <div className={styles.formSection}>
         <div className={styles.sectionTitle}><span>02</span><h2>Choisir la démarche</h2></div>
         <label className={styles.label} htmlFor="procedure">Démarche de votre administration</label>
-        <select className={styles.input} id="procedure" name="procedure_code" value={passportProcedure.code} disabled={busy} onChange={() => {}}><option value={passportProcedure.code}>{passportProcedure.title}</option></select>
+        <select className={styles.input} id="procedure" name="procedure_code" value={selectedProcedure?.code ?? ""} disabled={busy || procedures.length === 0} onChange={(e) => { setProcedureCode(e.target.value); setErrors({}); }}>{procedures.length ? procedures.map((procedure) => <option key={procedure.code} value={procedure.code}>{procedure.title}</option>) : <option value="">Aucune démarche active</option>}</select>
+        {errors.procedure && <p className={styles.errorText} role="alert">{errors.procedure}</p>}
         <p className={styles.hint}>Seules les démarches de votre administration sont proposées.</p>
       </div>
       <fieldset className={styles.formSection} disabled={busy}>
@@ -69,7 +78,7 @@ export function NewCaseForm({ busy, onCreate }: { busy: boolean; onCreate: (citi
         <label className={styles.radio}><input type="radio" name="channel" value="assisted" checked={channel === "assisted"} onChange={() => setChannel("assisted")} /><span><strong>Sur place, au guichet</strong><span>Le citoyen communique le code d’accord reçu sur son téléphone.</span></span></label>
         <label className={styles.radio}><input type="radio" name="channel" value="web" checked={channel === "web"} onChange={() => setChannel("web")} /><span><strong>À distance</strong><span>Le citoyen accepte ou refuse depuis son espace personnel.</span></span></label>
       </fieldset>
-      <div className={styles.formBottom}><p>Ouvrir le dossier prépare les vérifications. Aucun registre n’est encore consulté.</p><button className={styles.primary} type="submit" disabled={busy}>{busy ? "Ouverture…" : "Ouvrir le dossier"}</button></div>
+      <div className={styles.formBottom}><p>Ouvrir le dossier prépare les vérifications. Aucun registre n’est encore consulté.</p><button className={styles.primary} type="submit" disabled={busy || !selectedProcedure}>{busy ? "Ouverture…" : "Ouvrir le dossier"}</button></div>
     </>}
     <details className={styles.demoTools}><summary>Identifiants de démonstration</summary><ul>{demoCitizens.map((item) => <li key={item.uniqueId}><button type="button" disabled={busy || searching} onClick={() => { setCitizenId(item.uniqueId); setPhone(item.phone); setCitizen(null); setErrors({}); }}>{item.uniqueId} · {item.phone.match(/.{1,2}/g)?.join(" ")}</button><span>{item.scenario === "normal" ? "Parcours standard" : item.scenario === "unavailable" ? "Justice indisponible au premier essai" : "Identité à examiner"}</span></li>)}</ul></details>
   </form>;

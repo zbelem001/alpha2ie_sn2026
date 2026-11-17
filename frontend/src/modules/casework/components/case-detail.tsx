@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { CheckCircle2, Clock3, Send, ShieldCheck } from "lucide-react";
-import { passportProcedure } from "@/features/agent/mocks/catalogue";
-import { CaseStatusBadge } from "@/features/agent/components/case-status";
-import type { AgentCase, AssistedChallenge, CheckStatus, ConsentChannel } from "@/features/agent/types/cases";
+import { CaseStatusBadge } from "@/modules/casework/components/case-status";
+import type { AgentCase, AssistedChallenge, CheckStatus, ConsentChannel } from "@/modules/casework/types/cases";
 import type { DemoAuthorization } from "@/lib/demo-authorizations";
 import { useBrowserClock } from "@/lib/use-browser-clock";
-import styles from "@/features/agent/styles/workspace.module.css";
+import styles from "@/modules/casework/styles/workspace.module.css";
 
 const checkLabels: Record<CheckStatus, string> = { queued: "Non lancé", confirmed: "Oui", rejected: "Non", ambiguous: "Identité ambiguë", not_found: "Introuvable", unavailable: "Indisponible", blocked: "Accès bloqué", error: "À reprendre" };
 
@@ -34,12 +33,13 @@ export function CaseDetail({ item, authorization, challenge, busy, focusSection,
   async function submit(e: FormEvent) { e.preventDefault(); if (!busy) await onVerifyCode(code); }
 
   return <>
-    <div className={styles.caseOverview}><div><span className={styles.smallLabel}>Dossier {item.reference}</span><h2>{passportProcedure.title}</h2><p>Identifiant citoyen : {item.citizenId} · Téléphone : {item.phone.match(/.{1,2}/g)?.join(" ")}</p></div><CaseStatusBadge item={item} authorization={authorization} /></div>
+    <div className={styles.caseOverview}><div><span className={styles.smallLabel}>Dossier {item.reference} · démarche v{item.procedureVersion}</span><h2>{item.procedureTitle}</h2><p>Identifiant citoyen : {item.citizenId} · Téléphone : {item.phone.match(/.{1,2}/g)?.join(" ")}</p></div><CaseStatusBadge item={item} authorization={authorization} /></div>
     <div className={styles.detailGrid}>
       <section className={styles.consentPanel} aria-labelledby="consent-title">
         <div className={styles.panelTitle}><ShieldCheck size={19} aria-hidden="true" /><h3 id="consent-title" tabIndex={-1}>Accord du citoyen</h3></div>
-        {consentGranted ? <><p className={styles.granted}><CheckCircle2 size={18} aria-hidden="true" /> Accord reçu {authorization?.channel === "assisted" ? "au guichet" : "depuis le portail citoyen"}</p><p className={styles.hint}>Limité aux vérifications de ce dossier, pour 30 jours.</p></> : consentRefused ? <><p className={styles.refused}>Le citoyen a refusé cette demande.</p><p className={styles.hint}>Aucune consultation ne peut être lancée pour ce dossier.</p></> : consentExpired ? <><p className={styles.refused}>L’accord a expiré.</p><p className={styles.hint}>Un nouvel accord est nécessaire avant de poursuivre.</p>{item.status !== "completed" && <button className={styles.secondary} type="button" disabled={Boolean(busy)} onClick={() => onChangeChannel(item.channel)}>Demander un nouvel accord</button>}</> : <>
-          <p className={styles.hint}>L’accord porte sur les cinq vérifications de ce dossier. L’agent accompagne le citoyen ; il ne répond pas à sa place.</p>
+        <p className={styles.hint}>{item.procedurePurpose}</p>
+        {consentGranted ? <><p className={styles.granted}><CheckCircle2 size={18} aria-hidden="true" /> Accord reçu {authorization?.channel === "assisted" ? "au guichet" : "depuis le portail citoyen"}</p><p className={styles.hint}>Limité aux vérifications de ce dossier, pour {item.consentDays} jours.</p></> : consentRefused ? <><p className={styles.refused}>Le citoyen a refusé cette demande.</p><p className={styles.hint}>Aucune consultation ne peut être lancée pour ce dossier.</p></> : consentExpired ? <><p className={styles.refused}>L’accord a expiré.</p><p className={styles.hint}>Un nouvel accord est nécessaire avant de poursuivre.</p>{item.status !== "completed" && <button className={styles.secondary} type="button" disabled={Boolean(busy)} onClick={() => onChangeChannel(item.channel)}>Demander un nouvel accord</button>}</> : <>
+          <p className={styles.hint}>L’accord porte sur les {item.checks.length} vérifications de ce dossier. L’agent accompagne le citoyen ; il ne répond pas à sa place.</p>
           {item.channel === "assisted" ? <>
             <p className={styles.channelLabel}>Sur place, au guichet</p>
             {!challenge ? <><p className={styles.hint}>Expliquez les vérifications au citoyen, puis adressez le code à son numéro de contact associé.</p><button className={styles.primary} type="button" disabled={Boolean(busy)} onClick={() => onSendCode()}><Send size={16} aria-hidden="true" />{busy === "code" ? "Envoi…" : "Envoyer le code d’accord"}</button></> : <>
@@ -63,7 +63,7 @@ export function CaseDetail({ item, authorization, challenge, busy, focusSection,
 
       <section className={styles.checkPanel} aria-labelledby="checks-title">
         <div className={styles.panelTitle}><h3 id="checks-title" tabIndex={-1}>Vérifications du dossier</h3><span>{item.checks.filter((check) => check.status === "confirmed").length} / {item.checks.length}</span></div>
-        <ul className={styles.checks}>{item.checks.map((check) => <li key={check.questionCode}><div><strong>{check.label}</strong><span>{check.registry}{check.attemptCount > 0 ? ` · ${check.attemptCount} tentative${check.attemptCount > 1 ? "s" : ""}` : ""}</span></div><span className={`${styles.checkResult} ${check.status === "confirmed" ? styles.success : ["rejected", "blocked", "error"].includes(check.status) ? styles.danger : styles.waiting}`}>{checkLabels[check.status]}</span></li>)}</ul>
+        <ul className={styles.checks}>{item.checks.map((check) => <li key={check.questionCode}><div><strong>{check.label}</strong><span>{check.registry}{check.required ? "" : " \u00b7 Facultatif"}{check.attemptCount > 0 ? ` · ${check.attemptCount} tentative${check.attemptCount > 1 ? "s" : ""}` : ""}</span></div><span className={`${styles.checkResult} ${check.status === "confirmed" ? styles.success : ["rejected", "blocked", "error"].includes(check.status) ? styles.danger : styles.waiting}`}>{checkLabels[check.status]}</span></li>)}</ul>
         {hasUnavailable && <p className={styles.pendingNote}>Le dossier est conservé. Une reprise automatique est prévue ; vous pouvez aussi réessayer maintenant.</p>}
         {item.checks.some((check) => ["ambiguous", "not_found"].includes(check.status)) && <p className={styles.pendingNote}>Une identité ambiguë ou introuvable nécessite un examen humain. Ce résultat ne signifie pas « non ».</p>}
         {item.status === "completed" ? <p className={styles.completion}><CheckCircle2 size={18} aria-hidden="true" /> Vérifications terminées. L’examen des pièces physiques et la décision de délivrance restent à l’administration.</p> : <div className={styles.checkActions}><button className={styles.primary} type="button" disabled={Boolean(busy) || !canRun} onClick={onRunChecks}>{busy === "checks" || busy === "auto" ? "Vérifications…" : hasUnavailable ? "Reprendre les vérifications" : "Lancer les vérifications"}</button>{!consentGranted && <p className={styles.hint}>Accord citoyen requis avant tout appel aux registres.</p>}</div>}

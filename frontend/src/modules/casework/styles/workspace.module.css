@@ -40,7 +40,7 @@
 .tableReference:hover { text-decoration: underline; text-underline-offset: 4px; }
 .citizenId { color: #40523a; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .phoneCell { color: #758369; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.tableProcedure { display: block; max-width: 110px; line-height: 1.7; color: #67775b; }
+.tableProcedure { display: block; max-width: 150px; line-height: 1.7; color: #67775b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .channelTag { color: #6e7f62; white-space: nowrap; }
 .tableDate { display: grid; gap: 6px; font-size: 11px; color: #55694b; white-space: nowrap; }
 .tableDate > span { color: #929d86; }

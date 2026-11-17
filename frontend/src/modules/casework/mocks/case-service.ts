@@ -1,7 +1,8 @@
 import { answerAuthorization, putAuthorization, readAuthorizations } from "@/lib/demo-authorizations";
 import { recordDemoConsultations } from "@/lib/demo-consultations";
-import { agentDemo, demoCitizens, newChecks, passportProcedure } from "@/features/agent/mocks/catalogue";
-import type { AgentCase, AgentCaseService, AssistedChallenge, ConsentChannel } from "@/features/agent/types/cases";
+import { appendAdminAudit, DEFAULT_PROCEDURE, getDemoAdministration, questionIsAllowed } from "@/lib/demo-administration";
+import { agentDemo, demoCitizens, newChecks, passportProcedure } from "@/modules/casework/mocks/catalogue";
+import type { AgentCase, AgentCaseService, AssistedChallenge, ConsentChannel } from "@/modules/casework/types/cases";
 
 const KEY = "dlnuf:demo:agent-cases:v1";
 const challenges = new Map<string, AssistedChallenge>();
@@ -12,14 +13,19 @@ function readCases(): AgentCase[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item.id === "string" && item.procedureCode === passportProcedure.code && Array.isArray(item.checks)).map((item: AgentCase) => ({ ...item,
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item.id === "string" && typeof item.procedureCode === "string" && Array.isArray(item.checks)).map((item: AgentCase) => ({ ...item,
       citizenId: item.citizenId ?? citizenFor(item.subjectRef).uniqueId,
       phone: item.phone ?? citizenFor(item.subjectRef).phone,
+      procedureTitle: item.procedureTitle ?? passportProcedure.title,
+      procedurePurpose: item.procedurePurpose ?? DEFAULT_PROCEDURE.purpose,
+      procedureVersion: item.procedureVersion ?? 1, consentDays: item.consentDays ?? 30,
+      checks: item.checks.map((check) => ({ ...check, required: check.required ?? true })),
     })) : [];
   } catch { return []; }
 }
 function saveCase(item: AgentCase) {
   localStorage.setItem(KEY, JSON.stringify([item, ...readCases().filter((entry) => entry.id !== item.id)]));
+  window.dispatchEvent(new Event("dlnuf-demo-cases"));
   return item;
 }
 function getCase(id: string) {
@@ -49,8 +55,8 @@ function publishRequest(item: AgentCase, channel: ConsentChannel) {
   if (previous && previous.status !== "pending") throw new Error("Le citoyen a déjà répondu à cette demande.");
   const citizen = citizenFor(item.subjectRef);
   putAuthorization({ id: item.authorizationId, caseId: item.id, subjectRef: item.subjectRef, phone: citizen.phone,
-    organization: agentDemo.administration, purpose: "votre demande de passeport", checks: item.checks.map((check) => check.label),
-    duration: "30 jours", channel, status: "pending", requestedAt: previous?.requestedAt ?? new Date().toISOString() });
+    organization: agentDemo.administration, purpose: "votre démarche « " + item.procedureTitle + " »", checks: item.checks.map((check) => check.label),
+    duration: item.consentDays + " jours", validityDays: item.consentDays, channel, status: "pending", requestedAt: previous?.requestedAt ?? new Date().toISOString() });
 }
 
 export const demoAgentCaseService: AgentCaseService = {
@@ -58,7 +64,9 @@ export const demoAgentCaseService: AgentCaseService = {
   async identify(subjectRef) { await wait(); return citizenFor(subjectRef); },
   async create(citizenId, phone, procedureCode, channel) {
     await wait();
-    if (procedureCode !== passportProcedure.code || passportProcedure.owner !== agentDemo.administrationCode) throw new Error("Cette démarche n’appartient pas à votre administration.");
+    const procedure = getDemoAdministration().procedures.find((entry) => entry.code === procedureCode && entry.active && entry.published);
+    if (!procedure) throw new Error("Cette démarche n’est pas disponible dans votre administration.");
+    if (procedure.checks.some((check) => !questionIsAllowed(check.questionCode))) throw new Error("Les droits d’échange requis ne sont pas tous actifs pour cette démarche.");
     const citizen = citizenFor(citizenId);
     const normalizedPhone = phone.replace(/\s/g, "");
     if (!/^\d{8}$/.test(normalizedPhone)) throw new Error("Le numéro de téléphone doit contenir 8 chiffres.");
@@ -67,10 +75,13 @@ export const demoAgentCaseService: AgentCaseService = {
     const duplicate = readCases().find((item) => item.subjectRef === subjectRef && item.procedureCode === procedureCode && item.status !== "completed" && getAuthorization(item)?.status !== "refused");
     if (duplicate) return duplicate;
     const id = crypto.randomUUID();
-    const item: AgentCase = { id, reference: `PAS-${new Date().getUTCFullYear()}-${id.slice(0, 6).toUpperCase()}`, procedureCode,
-      subjectRef, citizenId: citizen.uniqueId, phone: normalizedPhone, createdAt: new Date().toISOString(), channel, status: "received", authorizationId: `consent-${id}`, checks: newChecks() };
+    const item: AgentCase = { id, reference: `${procedureCode === DEFAULT_PROCEDURE.code ? "PAS" : "DOS"}-${new Date().getUTCFullYear()}-${id.slice(0, 6).toUpperCase()}`, procedureCode,
+      procedureTitle: procedure.title, procedurePurpose: procedure.purpose, procedureVersion: procedure.version, consentDays: procedure.consentDays,
+      subjectRef, citizenId: citizen.uniqueId, phone: normalizedPhone, createdAt: new Date().toISOString(), channel, status: "received", authorizationId: `consent-${id}`, checks: newChecks(procedure) };
     publishRequest(item, channel);
-    return saveCase(item);
+    saveCase(item);
+    appendAdminAudit("Dossier ouvert", item.reference, item.procedureTitle + " · " + (channel === "assisted" ? "accord au guichet" : "accord à distance"));
+    return item;
   },
   async requestConsent(id, channel) {
     await wait();
@@ -81,6 +92,7 @@ export const demoAgentCaseService: AgentCaseService = {
     }
     publishRequest(item, channel);
     challenges.delete(id);
+    appendAdminAudit("Mode de consentement modifié", item.reference, channel === "assisted" ? "Au guichet" : "À distance");
     return saveCase({ ...item, channel });
   },
   async sendCode(id, resend = false) {
@@ -96,6 +108,7 @@ export const demoAgentCaseService: AgentCaseService = {
       expiresAt: Date.now() + 5 * 60_000, resendAt: Date.now() + 30_000,
       message: `${agentDemo.service} — dossier ${item.reference}. Ce code vaut accord pour : ${item.checks.map((check) => check.label.toLowerCase()).join(", ")}. Valable 5 minutes. Communiquez-le uniquement si vous acceptez ces vérifications.` };
     challenges.set(id, challenge);
+    appendAdminAudit(resend ? "Code d’accord renvoyé" : "Code d’accord demandé", item.reference, "SMS simulé, sans conserver le code dans le journal");
     return challenge;
   },
   async verifyCode(id, code) {
@@ -104,31 +117,35 @@ export const demoAgentCaseService: AgentCaseService = {
     const challenge = challenges.get(id);
     if (!challenge || item.channel !== "assisted") throw new Error("Demandez d’abord un code pour ce dossier.");
     if (Date.now() >= challenge.expiresAt) { challenges.delete(id); throw new Error("Ce code a expiré. Demandez un nouveau code."); }
-    if (code !== challenge.code) throw new Error("Code incorrect. Vérifiez le code communiqué par le citoyen.");
+    if (code !== challenge.code) { appendAdminAudit("Code d’accord incorrect", item.reference); throw new Error("Code incorrect. Vérifiez le code communiqué par le citoyen."); }
     answerAuthorization(item.authorizationId, "granted", challenge.phone, "assisted");
     challenges.delete(id);
+    appendAdminAudit("Accord recueilli au guichet", item.reference, "Preuve de démonstration validée");
   },
   async runChecks(id) {
     await wait();
     const item = getCase(id);
     const authorization = getAuthorization(item);
-    if (!authorization || authorization.status !== "granted" || !authorization.expiresAt || new Date(authorization.expiresAt).getTime() <= Date.now()) throw new Error("Un accord citoyen valide est nécessaire avant toute vérification.");
+    if (!authorization || authorization.status !== "granted" || !authorization.expiresAt || new Date(authorization.expiresAt).getTime() <= Date.now()) { appendAdminAudit("Vérifications bloquées", item.reference, "Accord absent, refusé ou expiré"); throw new Error("Un accord citoyen valide est nécessaire avant toute vérification."); }
     const citizen = citizenFor(item.subjectRef);
     const checks = item.checks.map((check) => {
       // Les vérifications déjà terminées ne sont pas rejouées lors d'une reprise.
       if (["confirmed", "rejected", "ambiguous", "not_found"].includes(check.status)) return check;
+      if (!questionIsAllowed(check.questionCode)) return { ...check, status: "blocked" as const, result: null };
       const attemptCount = check.attemptCount + 1;
       if (citizen.scenario === "unavailable" && check.registry === "Justice" && attemptCount === 1) return { ...check, status: "unavailable" as const, result: null, attemptCount };
       if (citizen.scenario === "ambiguous" && check.questionCode === "passport_nationality") return { ...check, status: "ambiguous" as const, result: null, attemptCount };
       return { ...check, status: "confirmed" as const, result: true, attemptCount };
     });
-    const updated = saveCase({ ...item, checks, status: checks.every((check) => check.status === "confirmed") ? "completed" : "pending" });
+    const required = checks.filter((check) => check.required);
+    const updated = saveCase({ ...item, checks, status: required.some((check) => check.status === "rejected") ? "rejected" : required.length > 0 && required.every((check) => check.status === "confirmed") ? "completed" : "pending" });
     recordDemoConsultations(checks.filter((check, index) => check.attemptCount > item.checks[index].attemptCount).map((check) => ({
       id: `${item.id}:${check.questionCode}:${check.attemptCount}`, caseId: item.id, phone: citizen.phone,
       dateTime: new Date().toISOString(), organization: agentDemo.administration, information: check.label,
-      purpose: "Demande de passeport ordinaire", source: check.registry,
+      purpose: item.procedurePurpose, source: check.registry,
       basis: authorization.channel === "assisted" ? "Votre accord au guichet" : "Votre accord sur le portail", outcome: check.status,
     })));
+    appendAdminAudit("Vérifications exécutées", item.reference, checks.filter((check, index) => check.attemptCount > item.checks[index].attemptCount).length + " contrôle(s) tenté(s) · " + (updated.status === "completed" ? "contrôles requis terminés" : "dossier à reprendre ou examiner"));
     return updated;
   },
 };

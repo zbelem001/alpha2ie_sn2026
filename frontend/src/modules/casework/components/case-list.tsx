@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { Eye, ListChecks, MessageSquare, Search } from "lucide-react";
-import type { AgentCase } from "@/features/agent/types/cases";
+import type { AgentCase } from "@/modules/casework/types/cases";
 import type { DemoAuthorization } from "@/lib/demo-authorizations";
-import { CaseStatusBadge, caseLabel } from "@/features/agent/components/case-status";
+import { CaseStatusBadge, caseLabel } from "@/modules/casework/components/case-status";
 import { useBrowserClock } from "@/lib/use-browser-clock";
-import styles from "@/features/agent/styles/workspace.module.css";
+import styles from "@/modules/casework/styles/workspace.module.css";
 
 export function CaseList({ cases, authorizations, loading, onOpen }: {
   cases: AgentCase[]; authorizations: DemoAuthorization[]; loading: boolean;
@@ -36,7 +36,7 @@ export function CaseList({ cases, authorizations, loading, onOpen }: {
     <p className={styles.listCount} aria-live="polite">{loading ? "Chargement des demandes…" : visible.length + " demande" + (visible.length === 1 ? "" : "s")}</p>
     <div className={styles.tableScroll} role="region" aria-label="Tableau des demandes, défilement horizontal disponible" tabIndex={0}>
       <table className={styles.requestsTable}>
-        <caption className={styles.srOnly}>Demandes du guichet passeports</caption>
+        <caption className={styles.srOnly}>Demandes de l’administration</caption>
         <thead><tr><th scope="col">Dossier</th><th scope="col">Identifiant citoyen</th><th scope="col">Téléphone</th><th scope="col">Démarche</th><th scope="col">Accord</th><th scope="col">État</th><th scope="col">Créé le</th><th scope="col" className={styles.actionsHeading}>Actions</th></tr></thead>
         <tbody>
           {loading ? <tr><td colSpan={8} className={styles.tableEmpty}>Chargement…</td></tr> : visible.length === 0 ? <tr><td colSpan={8} className={styles.tableEmpty}><strong>{cases.length === 0 ? "Aucune demande enregistrée" : "Aucune demande correspondante"}</strong><p>{cases.length === 0 ? "Ouvrez le dossier d’un citoyen pour commencer." : "Modifiez votre recherche ou le filtre."}</p></td></tr> :
@@ -49,7 +49,7 @@ export function CaseList({ cases, authorizations, loading, onOpen }: {
                 <td><button type="button" className={styles.tableReference} onClick={() => onOpen(item.id)} aria-label={"Ouvrir le dossier " + item.reference}>{item.reference}</button></td>
                 <td className={styles.citizenId}>{item.citizenId}</td>
                 <td className={styles.phoneCell}>{item.phone.match(/.{1,2}/g)?.join(" ")}</td>
-                <td><span className={styles.tableProcedure}>Passeport ordinaire</span></td>
+                <td><span className={styles.tableProcedure} title={item.procedureTitle}>{item.procedureTitle}</span></td>
                 <td><span className={styles.channelTag}>{item.channel === "assisted" ? "Au guichet" : "À distance"}</span></td>
                 <td><CaseStatusBadge item={item} authorization={authorization} /></td>
                 <td><time className={styles.tableDate} dateTime={item.createdAt}>{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "Africa/Ouagadougou" }).format(new Date(item.createdAt))}<span>{new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Ouagadougou" }).format(new Date(item.createdAt))}</span></time></td>
