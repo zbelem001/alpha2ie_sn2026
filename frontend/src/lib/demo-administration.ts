@@ -1,3 +1,4 @@
+import { documentForQuestion, DOCUMENT_TYPES, type DocumentRequirement } from "@/lib/document-references";
 import { hashDemoPin, type DemoPin } from "@/lib/demo-pin";
 
 export const LOCAL_ORGANIZATION = { code: "BF/GOV/DIPF/PASSEPORTS", name: "Direction de l’Immigration et de la Police des Frontières", service: "Guichet passeports" };
@@ -9,7 +10,7 @@ export const LOCAL_QUESTIONS = [
   { code: "passport_fiscal_stamp_paid", label: "Timbre fiscal payé", provider: "Trésor", service: "payment-status" },
   { code: "loss_declared", label: "Perte du document déclarée", provider: "Police", service: "loss-declaration" },
 ];
-export type LocalProcedure = { code: string; title: string; purpose: string; version: number; active: boolean; published: boolean; consentDays: number; checks: { questionCode: string; required: boolean }[] };
+export type LocalProcedure = { code: string; title: string; purpose: string; version: number; active: boolean; published: boolean; consentDays: number; checks: { questionCode: string; required: boolean; document?: DocumentRequirement }[] };
 export type LocalAgent = { id: string; name: string; phone: string; active: boolean; createdAt: string; credentials?: DemoPin };
 export type ExchangeRight = { questionCode: string; status: "approved" | "requested" | "suspended" | "not_requested"; purpose?: string; requestedAt?: string };
 export type OfferedService = { id: string; code: string; title: string; description: string; active: boolean };
@@ -28,7 +29,7 @@ const STAFF_KEY = "dlnuf:demo:staff";
 export function administrationSnapshot() { return localStorage.getItem(KEY) ?? DEFAULT_SNAPSHOT; }
 export function administrationServerSnapshot() { return DEFAULT_SNAPSHOT; }
 export function parseAdministration(raw: string): LocalAdministration {
-  try { const data = JSON.parse(raw); if (Array.isArray(data.procedures) && Array.isArray(data.agents) && Array.isArray(data.rights) && data.registry && Array.isArray(data.offeredServices)) return data; } catch { /* Repli sur les données fictives initiales. */ }
+  try { const data = JSON.parse(raw); if (Array.isArray(data.procedures) && Array.isArray(data.agents) && Array.isArray(data.rights) && data.registry && Array.isArray(data.offeredServices)) return { ...data, procedures: data.procedures.map((p: LocalProcedure) => ({ ...p, checks: p.checks.map((c) => ({ ...c, document: c.document ?? documentForQuestion(c.questionCode) })) })) }; } catch { /* Repli sur les données fictives initiales. */ }
   return JSON.parse(DEFAULT_SNAPSHOT);
 }
 export function getDemoAdministration() { return parseAdministration(administrationSnapshot()); }
@@ -64,6 +65,7 @@ export function saveLocalProcedure(input: LocalProcedure) {
   if (!Number.isInteger(input.consentDays) || input.consentDays < 1 || input.consentDays > 30) throw new Error("La durée de l’accord doit être comprise entre 1 et 30 jours dans cette démonstration.");
   if (!input.checks.length || !input.checks.some((check) => check.required) || new Set(input.checks.map((check) => check.questionCode)).size !== input.checks.length || input.checks.some((check) => !LOCAL_QUESTIONS.some((question) => question.code === check.questionCode))) throw new Error("Choisissez des vérifications distinctes, dont au moins une obligatoire.");
   if (input.published && input.checks.some((check) => !questionIsAllowed(check.questionCode))) throw new Error("Publication impossible : certains droits d’échange ne sont pas validés. Enregistrez un brouillon.");
+  if (input.checks.some((c) => !c.document || !DOCUMENT_TYPES.some((d) => d.key === c.document?.key && d.provider === documentForQuestion(c.questionCode).provider) || !c.document.label.trim())) throw new Error("Document de recherche requis pour chaque verification.");
   const previous = config.procedures.find((item) => item.code === input.code);
   const procedure = { ...input, title: input.title.trim(), purpose: input.purpose.trim(), version: previous ? previous.version + 1 : 1 };
   config.procedures = [procedure, ...config.procedures.filter((item) => item.code !== procedure.code)];

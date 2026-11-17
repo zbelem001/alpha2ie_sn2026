@@ -1,5 +1,6 @@
 .page { min-height: 100svh; color: #263439; background: #fcfcfa; }
 .header { display: flex; align-items: center; gap: 25px; padding: 20px 32px; border-bottom: 1px solid #e0e5dc; background: #fff; }
+.header { background-color: #fbfefc; background-image: linear-gradient(90deg, rgb(255 255 255 / 35%), #fff 180px), url("/header-relief.svg"); background-repeat: no-repeat; background-position: center, left -26px top -64px; background-size: cover, 220px 155px; }
 .brand { display: flex; align-items: center; gap: 13px; color: #1b2a6b; text-decoration: none; }
 .brand img { object-fit: contain; }
 .brand > span { display: grid; gap: 6px; }
@@ -71,11 +72,13 @@ textarea.input { resize: vertical; line-height: 1.7; }
 .fieldset legend { margin-bottom: 16px; font-size: 15px; font-weight: 600; }
 .questionChoices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
 .questionChoices > label { display: flex; align-items: flex-start; gap: 11px; padding: 15px 0; border-bottom: 1px solid #edf0e6; cursor: pointer; }
-.questionChoices input, .inlineCheck input, .orderedChecks input { width: 17px; height: 17px; flex-shrink: 0; accent-color: #63824b; }
+.questionChoices input, .inlineCheck input, .orderedChecks input[type="checkbox"] { width: 17px; height: 17px; flex-shrink: 0; accent-color: #63824b; }
 .questionChoices span { display: grid; gap: 7px; }
 .questionChoices strong { font-size: 12px; font-weight: 550; line-height: 1.7; }
 .questionChoices small { color: #9ba585; font-size: 10px; line-height: 1.6; }
 .orderedChecks { margin: 28px 0; }
+.documentConfig { flex: 1.5; min-width: 0; display: grid; gap: 10px; }
+.documentConfig label { display: grid; gap: 6px; }
 .orderedChecks ol { list-style: none; padding: 0; margin: 0 0 16px; }
 .orderedChecks li { display: flex; align-items: center; gap: 17px; padding: 13px 0; border-bottom: 1px solid #e7eddd; font-size: 12px; }
 .orderedChecks li > span { flex: 1; line-height: 1.7; }
@@ -131,8 +134,13 @@ textarea.input { resize: vertical; line-height: 1.7; }
   .orderedChecks li { flex-wrap: wrap; gap: 12px; }
   .orderedChecks li > span { flex-basis: 100%; }
   .orderedChecks li > label { margin-right: auto; }
+  .orderedChecks .documentConfig { flex-basis: 100%; order: 3; }
   .filters { flex-direction: column; }
   .filters select { max-width: none; }
   .editorHeading { align-items: flex-start; }
   .editorHeading h2 { font-size: 17px; line-height: 1.6; }
+}
+
+@media (max-width: 700px) {
+  .header { background-image: linear-gradient(90deg, rgb(255 255 255 / 40%), #fff 105px), url("/header-relief.svg"); background-position: center, left -23px top -48px; background-size: cover, 150px 106px; }
 }

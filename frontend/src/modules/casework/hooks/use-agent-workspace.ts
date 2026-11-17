@@ -1,4 +1,5 @@
 "use client";
+import type { DocumentReferences } from "@/lib/document-references";
 
 import { useCallback, useEffect, useState } from "react";
 import { subscribeAuthorizations } from "@/lib/demo-authorizations";
@@ -61,9 +62,9 @@ export function useAgentWorkspace() {
   function openCase(id: string, section?: "consent" | "checks") { appendAdminAudit("Dossier consulté", id); setSelectedId(id); setSelectedSection(section); setChallenge(null); setError(""); setView("case"); }
   function showList() { setError(""); setView("list"); setChallenge(null); }
   function showNew() { setError(""); setView("new"); setChallenge(null); }
-  async function create(citizenId: string, phone: string, procedureCode: string, channel: ConsentChannel) {
+  async function create(applicantName: string, phone: string, procedureCode: string, channel: ConsentChannel, references: DocumentReferences) {
     await task("create", async () => {
-      const item = await agentCaseService.create(citizenId, phone, procedureCode, channel);
+      const item = await agentCaseService.create(applicantName, phone, procedureCode, channel, references);
       openCase(item.id);
     });
   }
@@ -84,5 +85,5 @@ export function useAgentWorkspace() {
     await task("checks", async () => { await agentCaseService.runChecks(selectedId); });
   }
   return { cases, view, loading, busy, error, challenge, selectedSection, selected: cases.find((item) => item.id === selectedId),
-    showList, showNew, openCase, create, sendCode, verifyCode, changeChannel, runChecks };
+    showList, showNew, openCase, create, sendCode, verifyCode, changeChannel, runChecks, clearChallenge: () => setChallenge(null) };
 }

@@ -26,13 +26,7 @@ export type CitizenHomeData = {
 export const citizenHomeDemo: CitizenHomeData = {
   firstName: "Awa",
   phone: "11111111",
-  pendingRequest: {
-    id: "consent-demo-01",
-    organization: "Office national d’identification",
-    purpose: "votre carte nationale d’identité",
-    checks: ["Confirmer votre identité", "Confirmer votre nationalité burkinabè"],
-    duration: "30 jours",
-  },
+  pendingRequest: null,
   consultations: [
     {
       id: "consultation-01",

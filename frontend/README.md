@@ -1,108 +1,69 @@
 # Frontend — Dites-le-nous une fois
 
-Next.js, React, TypeScript et Tailwind CSS. Références : [interfaces](../docs/interfaces%283%29.md) et [organisation du dépôt](../docs/organisation_equipe_architecture_repository.md).
+Next.js, React, TypeScript et CSS Modules. Références : [interfaces](../docs/interfaces%283%29.md), [architecture](../docs/organisation_equipe_architecture_repository.md) et [ajout d’une démarche](../docs/guide-ajout-demarche.md).
 
 ## Démarrer et vérifier
 
-Depuis `frontend/` :
+Depuis `frontend/` : `npm ci`, `npm run dev`, `npm run lint`, `npm run build`. Sous PowerShell, utiliser `npm.cmd` si les scripts PowerShell sont bloqués.
 
-```bash
-npm ci
-npm run dev
-npm run lint
-npm run build
-```
+Application : http://localhost:3000.
 
-Application : http://localhost:3000. Sous PowerShell, utiliser `npm.cmd` si `npm.ps1` est bloqué. La compilation télécharge actuellement les polices Geist depuis Google Fonts.
-
-## Espaces indépendants
-
-| Groupe de routes | Dossier métier | URL prévue | Contenu |
-|---|---|---|---|
-| `app/(auth)/` | `features/auth/` | `/` | Accès unique par numéro ; `/inscription` redirige vers `/` |
-| `app/(citizen)/usager/` | `features/citizen/` | `/usager` | Historique des consultations ; demande d’accord uniquement lorsqu’elle est en attente |
-| `app/(agent)/guichet/` | `features/agent/` | `/guichet` | Identification, ouverture et suivi des dossiers, accord au guichet ou à distance, vérifications |
-| `app/(trust-center)/centrale/` | `features/trust-center/` | `/centrale/...` | Conventions, état du réseau, contestations |
-| `app/(administration)/administration/` | `features/administration/` | `/administration/...` | Registres locaux, services, conventions, journal |
-
-L’espace centrale reste réservé pour les futurs écrans. Le citoyen, le guichet agent et la console locale `/administration` sont implémentés avec des données fictives et des échanges locaux, sans connexion au backend. Les groupes entre parenthèses organisent le code sans apparaître dans les URL ; les préfixes explicites évitent les collisions entre écrans.
-
-## Organisation du code
-
-- `app/` : routes et layouts. Les `page.tsx` composent les écrans métier.
-- `app/globals.css` : thème, variables et styles de base uniquement.
-- `features/<espace>/screens/` : écrans propres à cet espace.
-- `features/<espace>/components/` : composants spécifiques.
-- `features/<espace>/hooks/` : état et logique d'interaction.
-- `features/<espace>/mocks/` : simulations isolées.
-- `features/<espace>/styles/` : styles limités à cet espace.
-- `components/shared/` : éléments communs, dont le bandeau Flash info.
-- `components/ui/` : primitives UI génériques.
-- `styles/` : styles des éléments communs.
-- `lib/` : utilitaires indépendants des espaces.
-- `modules/casework/` : dossiers, consentement et vérifications partagés par le guichet agent et la console locale.
-
-L'authentification et la console disposent de leurs composants propres. L'adaptateur des dossiers est dans `modules/casework/services/agent-cases.ts`, ses modèles dans `modules/casework/types/`. Les échanges de démonstration entre espaces passent par `lib/demo-authorizations.ts`, `lib/demo-consultations.ts` et `lib/demo-administration.ts` ; aucun espace n'importe le code métier d'un autre.
-
-## Ajouter un écran sans mélanger les espaces
-
-1. Créer l'écran et ses composants dans `features/<espace>/`.
-2. Créer un `page.tsx` léger dans le groupe de routes correspondant.
-3. Ajouter le layout et les styles propres à cet espace : CSS Modules ou sélecteurs limités à son conteneur. L'authentification utilise `.auth-space`.
-4. Partager uniquement les briques génériques dans `components/shared`, `components/ui` ou `lib`.
-
-ESLint interdit les imports entre espaces et les dépendances des briques partagées vers un espace. Les fonctionnalités ne doivent pas importer les routes de `app/`. Vérification : `npm run lint`.
-
-Cette séparation ne remplace pas le contrôle d'accès : les permissions devront être validées côté serveur lors de l'intégration Keycloak/backend.
-
-## Guichet agent de démonstration
-
-Depuis l'entrée http://localhost:3000, saisir **22222222**, puis **1234** : ce compte de démonstration ouvre `/guichet`. Le profil représente le guichet passeports de la DIPF. La démarche initiale est `passeport_ordinaire_precheck`. Les démarches publiées et actives de la console locale deviennent également disponibles dans cette simulation.
-
-1. « Nouveau dossier » : saisir l'identifiant unique du citoyen et son téléphone national à huit chiffres. La recherche retrouve le profil fictif et vérifie que le téléphone saisi lui correspond avant d'autoriser l'ouverture du dossier.
-2. Choisir la réponse au guichet ou à distance, puis ouvrir le dossier. Aucun registre n'est interrogé à cette étape. Un dossier actif existant est réutilisé pour éviter un doublon.
-3. Sur place : envoyer un code, puis saisir celui communiqué par le citoyen. Le volet « SMS de démonstration » contient le code propre à ce dossier et le texte décrivant les vérifications autorisées. Le code expire après cinq minutes ; le renvoi est limité à une fois toutes les trente secondes. Ce n'est pas le PIN personnel du citoyen.
-4. À distance : se connecter à l'espace citoyen dans un autre onglet du même navigateur. La réponse acceptée ou refusée remonte au guichet. Pour Awa, utiliser `11111111 / 0000`. Les autres numéros passent par la première connexion.
-5. Lancer les vérifications après l'accord. Les résultats sont minimisés ; une indisponibilité et une identité ambiguë ne deviennent jamais un « non ». Les appels tentés apparaissent aussi dans l'historique du citoyen correspondant.
-
-| Identifiant unique fictif | Contact | Scénario |
+| Espace | Connexion de démonstration | Route |
 |---|---|---|
-| `BF-00000001` | `11111111` | Parcours standard |
-| `BF-00000002` | `44444444` | Justice indisponible au premier essai, puis reprise |
-| `BF-00000003` | `33333333` | Nationalité ambiguë, examen humain nécessaire |
+| Citoyen | 11111111 / 0000 | /usager |
+| Agent | 22222222 / 1234 | /guichet |
+| Administrateur local | 99999999 / 1234 | /administration |
 
-Ces identifiants posent l'hypothèse d'un identifiant citoyen unique partagé. Ils sont fictifs, sans valeur officielle. L'adaptateur frontend les associe aux anciens pivots d'acte des jeux de données ; les contrats partagés et le backend ne sont pas modifiés. Les anciens dossiers stockés dans le navigateur restent lisibles.
+Un nouveau numéro national à huit chiffres passe par l’OTP fictif 123456, puis définit son PIN. Le PIN est mémorisé sous forme d’empreinte PBKDF2 avec sel. Aucun SMS réel ni session serveur n’est créé. Les comptes agents ajoutés dans la console utilisent la connexion habituelle ; la suspension refuse les connexions futures.
 
-La liste du guichet est un tableau : dossier, identifiant citoyen, téléphone, démarche, mode d'accord, état, date de création et actions. Les icônes de détail et de traitement apparaissent au survol ou au focus clavier ; elles restent visibles sur écran tactile et sur petit écran. Le tableau peut défiler horizontalement sans élargir la page. Les raccourcis ouvrent la section concernée sans lancer automatiquement de consultation.
+## Références propres à chaque registre
 
-En cas d'indisponibilité, le guichet ouvert tente une reprise après quinze secondes ; une reprise manuelle est aussi possible. Les vérifications terminées ne sont pas rejouées. Un accord expiré ou refusé bloque les nouvelles consultations. « Vérifications terminées » ne signifie pas que le passeport est délivré : les pièces physiques et la décision restent à l'administration.
+Il n’existe plus d’identifiant citoyen universel dans le frontend. Le numéro de téléphone sert à adresser une demande d’accord, pas à retrouver un document. Une référence de dossier reste un identifiant interne de suivi, sans valeur de pivot interadministrations.
 
-Les dossiers, accords et métadonnées de consultation sont persistés dans le stockage local de ce navigateur ; le contexte citoyen est propre à chaque onglet. Les codes temporaires restent en mémoire et doivent être redemandés après un rechargement. Les échanges entre appareils ne sont pas implémentés. Il n'existe ni contrôle d'accès réel ni journal infalsifiable dans cette simulation.
+L’administrateur associe chaque contrôle à un document du fournisseur concerné et précise l’aide à la saisie. Exemples : numéro de CNIB, référence d’acte de naissance (numéro, année et centre si nécessaires), certificat de nationalité, bulletin de casier, timbre fiscal ou déclaration de perte. Les libellés et exemples ne constituent pas des formats officiels validés. Les contrôles qui concernent le même document ne demandent sa référence qu’une fois.
 
-Pour l'intégration : utiliser l'API décrite dans `docs/api-documentation.md` avec des jetons Keycloak adaptés à chaque rôle. Le backend actuel exige le rôle citoyen pour répondre au consentement : le recueil d'un accord assisté par code nécessite un endpoint de preuve dédié, et ne doit pas être remplacé par un appel avec le jeton agent. Aucun contrat ni endpoint backend n'a été modifié ici.
+Au guichet :
 
-## Console locale de démonstration
+1. Choisir la démarche, saisir le téléphone et éventuellement le nom.
+2. Sur place, demander et saisir uniquement les références configurées pour cette démarche avant d’ouvrir le dossier.
+3. Envoyer un code d’accord valable cinq minutes, limité aux vérifications et références de cette demande. Toute modification des références invalide ce code. Le renvoi habituel reste limité à trente secondes.
+4. Saisir le code communiqué par le citoyen, puis lancer les vérifications.
+5. À distance, les références peuvent être complétées par le citoyen avant sa réponse.
 
-Depuis l’entrée habituelle, **99999999 / 1234** ouvre `/administration`. Le menu propose :
+Dans le portail citoyen, l’icône de profil dans l’en-tête ouvre l’écran dédié `/usager/profil`, qui permet de conserver facultativement ses références, de les modifier ou de les effacer en vidant les champs. Dans une demande d’accord, seules les références nécessaires apparaissent : les références déjà renseignées par l’agent sont prioritaires, puis celles du profil. Le citoyen peut les corriger, compléter les manquantes et choisir de les conserver dans son profil. Donner l’accord enregistre les références de la demande ; refuser ne nécessite aucune référence.
 
-- Vue d’ensemble : dossiers enregistrés, démarches actives, agents et droits en attente.
-- Dossiers : toutes les fonctions du guichet, avec le même stockage et les mêmes contrôles de consentement.
-- Démarches : finalité, sélection et ordre des contrôles, caractère obligatoire ou facultatif, durée de l’accord (1 à 30 jours), brouillon, publication et désactivation. Au moins un contrôle doit être obligatoire. Tous les contrôles obligatoires doivent être confirmés ; une réponse facultative ne décide pas seule du résultat.
-- Droits d’échange : consulter les droits fictifs initiaux, suspendre localement un droit ou demander un accès. Une demande reste en attente : l’administrateur local ne peut pas l’approuver lui-même.
-- Registre et services : enregistrer une URL HTTP(S), simuler un test réussi ou indisponible, déclarer et activer/désactiver des services à réponse booléenne. Aucun appel au registre n’est effectué.
-- Comptes agents : créer un compte national à huit chiffres avec PIN, suspendre/réactiver et réinitialiser le PIN. Les nouveaux comptes ouvrent `/guichet` depuis la connexion habituelle ; un compte suspendu est refusé. Seuls un sel et une empreinte PBKDF2 sont stockés pour les PIN définis.
-- Historique des actions : date, acteur, rôle, action, cible et détail, avec recherche et filtre. Les ouvertures/consultations de dossiers, accords, vérifications et changements de configuration sont enregistrés sans PIN ni code SMS.
+Le consentement porte sur un instantané des références. Elles ne peuvent plus être modifiées après la réponse. Changer le profil ne modifie pas les accords déjà donnés. Les vérifications sont bloquées sans références complètes, droit d’échange actif et accord valide. Les résultats et leurs reprises restent minimisés, et apparaissent dans l’historique citoyen sans recopier les numéros des documents.
 
-Une publication exige des droits d’échange validés. Chaque dossier conserve sa version, sa finalité, ses contrôles et sa durée d’accord : modifier une démarche ne modifie pas les dossiers existants. Suspendre un droit bloque les nouvelles consultations correspondantes.
+Les anciens dossiers locaux restent lisibles. Les anciens accords sans références documentaires sur les dossiers non terminés repassent en attente de saisie et d’accord. Les anciens pivots ne sont pas utilisés pour retrouver les documents.
 
-La configuration et le journal sont locaux au navigateur, modifiables et effaçables. Les routes restent des aperçus publics ; le rôle stocké par onglet sert à illustrer l’acteur des actions, sans constituer une autorisation serveur. La suspension d’un agent refuse ses futures connexions sans révoquer une session serveur, qui n’existe pas ici. Keycloak, les permissions, les conventions, les comptes, la publication des règles et le journal fiable devront être reliés aux services backend. Les nouvelles démarches et les nouveaux services de cette démonstration ne modifient pas le catalogue backend ; les règles proposées restent des contrôles booléens ordonnés, sans moteur de script arbitraire.
+## Console locale
 
-## Accès citoyen actuel
+Menu : vue d’ensemble, dossiers, démarches, droits d’échange, registre et services, comptes agents, historique.
 
-L'écran initial affiche uniquement le numéro national à huit chiffres et « Continuer ».
+- Démarches : finalité, sélection et ordre des contrôles, document de recherche, aide à la saisie, caractère obligatoire ou facultatif, durée de l’accord (1 à 30 jours), brouillon et publication. Au moins un contrôle doit être obligatoire. Tous les contrôles obligatoires doivent être confirmés.
+- Droits : demande d’accès ou suspension locale ; une demande reste en attente de validation par la gouvernance, sans auto-approbation.
+- Registre : URL HTTP(S) sans secrets et test simulé de disponibilité. Services fournisseurs à réponse booléenne.
+- Agents : création, suspension, réactivation et réinitialisation du PIN.
+- Historique : date, acteur, rôle, action, cible et détail, avec recherche et filtres. Aucun PIN, code SMS ou numéro de document dans le journal des actions.
+- Dossiers : les mêmes fonctions que l’agent. Chaque dossier conserve la version de ses contrôles et des documents attendus.
 
-- Numéro connu : saisie du PIN, puis ouverture de l'espace correspondant. Citoyen : **11111111 / 0000** → `/usager`. Agent : **22222222 / 1234** → `/guichet`. Le numéro agent est réservé et ne passe pas par la création d'un profil citoyen.
-- Nouveau numéro : OTP de démonstration **123456**, valable cinq minutes, avec renvoi après trente secondes. Après validation, les cases OTP sont remplacées par une coche verte et les champs PIN/confirmation. La définition du PIN ouvre ensuite `/usager`.
-- Les profils de démonstration créés sont mémorisés dans ce navigateur : aux connexions suivantes, seul le PIN est demandé après le numéro. Le stockage local conserve un sel et une empreinte PBKDF2 du PIN, jamais le PIN en clair. Effacer les données du navigateur efface ces profils.
+## Organisation
 
-Aucun SMS n'est envoyé et aucune session serveur n'est créée. Le portail reste un aperçu public avec des données fictives. La reconnaissance du numéro, l'OTP et la validation du PIN devront être réalisés par le backend / Keycloak pour un accès réel. Cette simulation locale nécessite un contexte sécurisé (HTTPS ou localhost) et le stockage local du navigateur.
+- `app/` : routes légères ; groupes `(auth)`, `(citizen)`, `(agent)`, `(administration)`.
+- `features/<espace>/` : écrans, composants et styles propres à chaque rôle.
+- `modules/casework/` : dossiers et contrôles communs à l’agent et à l’administrateur.
+- `components/shared/` et `styles/` : bandeau Flash info et champs documentaires partagés.
+- `lib/` : contrats locaux d’accord, références, profil documentaire, consultations et administration.
+- La centrale reste à implémenter.
+
+ESLint interdit les imports entre espaces et les dépendances des modules partagés vers un espace. Cette séparation ne remplace pas les contrôles d’accès serveur.
+
+## Limites de la démonstration et intégration
+
+Les données sont fictives, dans le stockage local du navigateur. Les onglets du même navigateur échangent leurs mises à jour ; les échanges entre appareils ne sont pas implémentés. Les codes temporaires restent en mémoire. Les routes sont des aperçus publics, sans permissions serveur ni journal infalsifiable. Les références enregistrées localement ne sont ni vérifiées ni chiffrées par un service de profil.
+
+Les références sont utilisées pour délimiter l’accord et les contrôles simulés, sans appel réel aux registres. Les scénarios fictifs de disponibilité sont associés aux téléphones 44444444 (Justice indisponible au premier essai) et 33333333 (nationalité ambiguë). Les autres numéros suivent le parcours nominal. Cela ne constitue pas une recherche d’identité par téléphone.
+
+Le backend actuel et ses contrats utilisent encore `subject.pivot_id`. Leur évolution vers des références distinctes par contrôle devra être coordonnée avec les connecteurs des registres : aucune modification backend ou de `contracts/` n’est incluse ici. L’intégration nécessite également Keycloak, l’adressage sécurisé des demandes au citoyen, la preuve de consentement assisté, les comptes agents, la validation des conventions et un stockage de profil protégé. Le backend actuel exige le rôle citoyen pour répondre à un consentement ; ne pas remplacer la preuve assistée par le jeton de l’agent.
+
+« Vérifications terminées » signifie que les contrôles requis ont abouti ; la décision administrative reste à l’administration.

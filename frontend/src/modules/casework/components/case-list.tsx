@@ -18,7 +18,7 @@ export function CaseList({ cases, authorizations, loading, onOpen }: {
   const visible = cases.filter((item) => {
     const authorization = authorizations.find((entry) => entry.id === item.authorizationId);
     const label = caseLabel(item, authorization, now);
-    const searchable = [item.reference, item.citizenId, item.phone, item.subjectRef].join(" ").toLowerCase();
+    const searchable = [item.reference, item.applicantName, item.phone].join(" ").toLowerCase();
     const normalizedQuery = query.trim().toLowerCase();
     return (searchable.includes(normalizedQuery) || item.phone.includes(normalizedQuery.replace(/\s/g, ""))) &&
       (filter === "all" || filter === "waiting" && label === "En attente du citoyen" ||
@@ -28,7 +28,7 @@ export function CaseList({ cases, authorizations, loading, onOpen }: {
   });
   return <section aria-label="Toutes les demandes">
     <div className={styles.listToolbar}>
-      <div className={styles.search}><Search size={17} aria-hidden="true" /><input aria-label="Rechercher une demande" placeholder="Dossier, identifiant unique ou téléphone" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
+      <div className={styles.search}><Search size={17} aria-hidden="true" /><input aria-label="Rechercher une demande" placeholder="Dossier, nom ou téléphone" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
       <select className={styles.filter} aria-label="Filtrer les demandes" value={filter} onChange={(e) => setFilter(e.target.value)}>
         <option value="all">Toutes les demandes</option><option value="waiting">En attente du citoyen</option><option value="ready">Prêtes à vérifier</option><option value="pending">À reprendre ou examiner</option><option value="completed">Vérifications terminées</option>
       </select>
@@ -37,7 +37,7 @@ export function CaseList({ cases, authorizations, loading, onOpen }: {
     <div className={styles.tableScroll} role="region" aria-label="Tableau des demandes, défilement horizontal disponible" tabIndex={0}>
       <table className={styles.requestsTable}>
         <caption className={styles.srOnly}>Demandes de l’administration</caption>
-        <thead><tr><th scope="col">Dossier</th><th scope="col">Identifiant citoyen</th><th scope="col">Téléphone</th><th scope="col">Démarche</th><th scope="col">Accord</th><th scope="col">État</th><th scope="col">Créé le</th><th scope="col" className={styles.actionsHeading}>Actions</th></tr></thead>
+        <thead><tr><th scope="col">Dossier</th><th scope="col">Citoyen</th><th scope="col">Téléphone</th><th scope="col">Démarche</th><th scope="col">Accord</th><th scope="col">État</th><th scope="col">Créé le</th><th scope="col" className={styles.actionsHeading}>Actions</th></tr></thead>
         <tbody>
           {loading ? <tr><td colSpan={8} className={styles.tableEmpty}>Chargement…</td></tr> : visible.length === 0 ? <tr><td colSpan={8} className={styles.tableEmpty}><strong>{cases.length === 0 ? "Aucune demande enregistrée" : "Aucune demande correspondante"}</strong><p>{cases.length === 0 ? "Ouvrez le dossier d’un citoyen pour commencer." : "Modifiez votre recherche ou le filtre."}</p></td></tr> :
             visible.map((item) => {
@@ -47,7 +47,7 @@ export function CaseList({ cases, authorizations, loading, onOpen }: {
               const hasShortcut = item.status !== "completed" && authorization?.status !== "refused";
               return <tr key={item.id} className={styles.requestRow}>
                 <td><button type="button" className={styles.tableReference} onClick={() => onOpen(item.id)} aria-label={"Ouvrir le dossier " + item.reference}>{item.reference}</button></td>
-                <td className={styles.citizenId}>{item.citizenId}</td>
+                <td className={styles.applicantName}>{item.applicantName}</td>
                 <td className={styles.phoneCell}>{item.phone.match(/.{1,2}/g)?.join(" ")}</td>
                 <td><span className={styles.tableProcedure} title={item.procedureTitle}>{item.procedureTitle}</span></td>
                 <td><span className={styles.channelTag}>{item.channel === "assisted" ? "Au guichet" : "À distance"}</span></td>

@@ -1,11 +1,10 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, CircleHelp, LogOut, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, X } from "lucide-react";
 import { FlashInfo } from "@/components/shared/flash-info";
 import { citizenHomeDemo, type CitizenHomeData } from "@/features/citizen/mocks/home";
+import { CitizenHeader } from "@/features/citizen/components/citizen-header";
 import { AuthorizationRequest } from "@/features/citizen/components/authorization-request";
 import { answerAuthorization } from "@/lib/demo-authorizations";
 import { useDemoAuthorizations, useDemoCitizenPhone } from "@/lib/use-demo-authorizations";
@@ -42,16 +41,7 @@ export function CitizenHomeScreen({ data = citizenHomeDemo }: { data?: CitizenHo
   return (
     <div className={styles.page}>
       <FlashInfo />
-      <header className={styles.header}>
-        <Link href="/usager" className={styles.brand} aria-label="Mon espace citoyen">
-          <Image src="/Coat_of_arms_of_Burkina_Faso_(2025-present)%20(1).svg" alt="Armoiries du Burkina Faso" width={44} height={54} />
-          <span><small>BURKINA FASO</small><strong>Dites-le-nous une fois</strong></span>
-        </Link>
-        <div className={styles.headerActions}>
-          <button type="button" className={styles.helpButton} aria-label="Besoin d’aide ?" aria-expanded={help} aria-controls="citizen-help" onClick={() => setHelp(!help)}><CircleHelp size={19} aria-hidden="true" /><span>Besoin d’aide ?</span></button>
-          <Link className={styles.exit} href="/" aria-label="Quitter et revenir à la connexion"><LogOut size={18} aria-hidden="true" /><span>Quitter</span></Link>
-        </div>
-      </header>
+      <CitizenHeader help={help} onHelp={() => setHelp(!help)} />
 
       <main className={styles.main}>
         <div className={styles.accountLine}><span>Espace citoyen</span><span>{phone === data.phone ? `Bonjour ${data.firstName}` : "Mon espace"}</span></div>

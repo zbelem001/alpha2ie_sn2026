@@ -37,6 +37,10 @@
 .flash-info:focus-within .flash-info-track,
 .flash-info--paused .flash-info-track { animation-play-state: paused; }
 @keyframes flash-scroll { to { transform: translateX(-50%); } }
+@media (max-width: 700px) {
+  .flash-info { display: none; }
+  .flash-info-track { animation: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .flash-info { align-items: flex-start; }
   .flash-info-label { padding-top: 12px; padding-bottom: 12px; }

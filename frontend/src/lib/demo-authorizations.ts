@@ -1,10 +1,12 @@
+import { cleanReferences, type DocumentReferences, type DocumentRequirement } from "@/lib/document-references";
 // Contrat d'échange local commun aux deux espaces, sans dépendance vers leur UI.
 // Simulation uniquement : le backend doit vérifier l'identité, la preuve et les droits.
 import { appendAdminAudit } from "@/lib/demo-administration";
 export type DemoAuthorization = {
   id: string;
   caseId: string;
-  subjectRef: string;
+  documents?: DocumentRequirement[];
+  references?: DocumentReferences;
   phone: string;
   organization: string;
   purpose: string;
@@ -44,6 +46,7 @@ export function putAuthorization(item: DemoAuthorization) {
 export function answerAuthorization(id: string, decision: "granted" | "refused", phone: string, channel: "web" | "assisted" = "web") {
   const item = readAuthorizations().find((entry) => entry.id === id);
   if (!item || item.phone !== phone || item.status !== "pending") throw new Error("Cette demande n’est plus disponible.");
+  if (decision === "granted") cleanReferences(item.documents ?? [], item.references ?? {});
   const now = Date.now();
   const days = Math.min(30, Math.max(1, item.validityDays ?? 30));
   putAuthorization({ ...item, channel, status: decision, decidedAt: new Date(now).toISOString(), expiresAt: decision === "granted" ? new Date(now + days * 86400_000).toISOString() : undefined });
@@ -54,4 +57,10 @@ export function subscribeAuthorizations(callback: () => void) {
   window.addEventListener("storage", onStorage);
   window.addEventListener(EVENT, callback);
   return () => { window.removeEventListener("storage", onStorage); window.removeEventListener(EVENT, callback); };
+}
+
+export function updateAuthorizationReferences(id: string, phone: string, values: DocumentReferences) {
+  const item = readAuthorizations().find((entry) => entry.id === id && entry.phone === phone);
+  if (!item || item.status !== "pending") throw new Error("Cette demande ne peut plus etre modifiee.");
+  putAuthorization({ ...item, references: cleanReferences(item.documents ?? [], values) });
 }

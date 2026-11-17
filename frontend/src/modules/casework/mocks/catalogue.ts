@@ -1,3 +1,4 @@
+import { documentForQuestion } from "@/lib/document-references";
 import type { DemoCitizen, AgentCheck } from "@/modules/casework/types/cases";
 import { DEFAULT_PROCEDURE, LOCAL_ORGANIZATION, LOCAL_QUESTIONS, type LocalProcedure } from "@/lib/demo-administration";
 
@@ -20,13 +21,13 @@ export const passportProcedure = {
   ],
 };
 export const demoCitizens: DemoCitizen[] = [
-  { uniqueId: "BF-00000001", subjectRef: "ACTE:OUAGA:2004:01234", displayName: "Awa · profil fictif", phone: "11111111", scenario: "normal" },
-  { uniqueId: "BF-00000002", subjectRef: "ACTE:OUAGA:1998:04567", displayName: "Issa · profil fictif", phone: "44444444", scenario: "unavailable" },
-  { uniqueId: "BF-00000003", subjectRef: "ACTE:BOBO:2001:00890", displayName: "Mariam · profil fictif", phone: "33333333", scenario: "ambiguous" },
+  { displayName: "Awa · profil fictif", phone: "11111111", scenario: "normal" },
+  { displayName: "Issa · profil fictif", phone: "44444444", scenario: "unavailable" },
+  { displayName: "Mariam · profil fictif", phone: "33333333", scenario: "ambiguous" },
 ];
 export function newChecks(procedure: LocalProcedure = DEFAULT_PROCEDURE): AgentCheck[] {
   return procedure.checks.map((check) => {
     const definition = LOCAL_QUESTIONS.find((question) => question.code === check.questionCode)!;
-    return { questionCode: definition.code, label: definition.label, registry: definition.provider, required: check.required, status: "queued", result: null, attemptCount: 0 };
+    return { questionCode: definition.code, label: definition.label, registry: definition.provider, document: check.document ?? documentForQuestion(check.questionCode), required: check.required, status: "queued", result: null, attemptCount: 0 };
   });
 }

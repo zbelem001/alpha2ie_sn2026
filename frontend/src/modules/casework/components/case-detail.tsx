@@ -1,5 +1,8 @@
 "use client";
 
+import { RequestDocuments } from "@/components/shared/request-documents";
+import { requirementsFor } from "@/lib/document-references";
+import { updateAuthorizationReferences } from "@/lib/demo-authorizations";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { CheckCircle2, Clock3, Send, ShieldCheck } from "lucide-react";
@@ -11,11 +14,11 @@ import styles from "@/modules/casework/styles/workspace.module.css";
 
 const checkLabels: Record<CheckStatus, string> = { queued: "Non lancé", confirmed: "Oui", rejected: "Non", ambiguous: "Identité ambiguë", not_found: "Introuvable", unavailable: "Indisponible", blocked: "Accès bloqué", error: "À reprendre" };
 
-export function CaseDetail({ item, authorization, challenge, busy, focusSection, onSendCode, onVerifyCode, onChangeChannel, onRunChecks }: {
+export function CaseDetail({ item, authorization, challenge, busy, focusSection, onSendCode, onVerifyCode, onChangeChannel, onRunChecks, onReferencesSaved }: {
   item: AgentCase; authorization?: DemoAuthorization; challenge: AssistedChallenge | null; busy: string;
   focusSection?: "consent" | "checks";
   onSendCode: (resend?: boolean) => Promise<void>; onVerifyCode: (code: string) => Promise<void>;
-  onChangeChannel: (channel: ConsentChannel) => Promise<void>; onRunChecks: () => Promise<void>;
+  onChangeChannel: (channel: ConsentChannel) => Promise<void>; onRunChecks: () => Promise<void>; onReferencesSaved: () => void;
 }) {
   const [code, setCode] = useState("");
   useEffect(() => {
@@ -33,7 +36,9 @@ export function CaseDetail({ item, authorization, challenge, busy, focusSection,
   async function submit(e: FormEvent) { e.preventDefault(); if (!busy) await onVerifyCode(code); }
 
   return <>
-    <div className={styles.caseOverview}><div><span className={styles.smallLabel}>Dossier {item.reference} · démarche v{item.procedureVersion}</span><h2>{item.procedureTitle}</h2><p>Identifiant citoyen : {item.citizenId} · Téléphone : {item.phone.match(/.{1,2}/g)?.join(" ")}</p></div><CaseStatusBadge item={item} authorization={authorization} /></div>
+    <div className={styles.caseOverview}><div><span className={styles.smallLabel}>Dossier {item.reference} · démarche v{item.procedureVersion}</span><h2>{item.procedureTitle}</h2><p>{item.applicantName} · Téléphone : {item.phone.match(/.{1,2}/g)?.join(" ")}</p></div><CaseStatusBadge item={item} authorization={authorization} /></div>
+    {authorization?.status === "pending" && <section className={styles.consentPanel}><h3>Références des documents</h3><RequestDocuments key={authorization.id} documents={authorization.documents ?? requirementsFor(item.checks)} initial={authorization.references ?? {}} phone={item.phone} onSave={(values) => { updateAuthorizationReferences(authorization.id, item.phone, values); onReferencesSaved(); }} /></section>}
+    {authorization?.status === "granted" && <section className={styles.consentPanel}><h3>Références autorisées</h3><dl>{authorization.documents?.map((doc) => <div key={doc.key}><dt>{doc.label}</dt><dd>{authorization.references?.[doc.key]}</dd></div>)}</dl></section>}
     <div className={styles.detailGrid}>
       <section className={styles.consentPanel} aria-labelledby="consent-title">
         <div className={styles.panelTitle}><ShieldCheck size={19} aria-hidden="true" /><h3 id="consent-title" tabIndex={-1}>Accord du citoyen</h3></div>
