@@ -346,17 +346,19 @@ def execute_checks(
         transport_status = reply.get("status")
         data = reply.get("data") if transport_status == "ok" else None
         value = data.get(question.response_key) if isinstance(data, dict) else None
-        if transport_status == "ok" and value is not None:
-            request.status = "confirmed" if value is True else "rejected" if value is False else "confirmed"
+        valid_boolean = type(value) is bool
+        valid_pivot = question.response_key == "pivot_id" and type(value) is str and value == case.subject_ref
+        if transport_status == "ok" and (valid_boolean or valid_pivot):
+            request.status = "confirmed" if value is True or valid_pivot else "rejected"
             request.minimal_result = {question.response_key: value}
             attempt.status = "succeeded"
         else:
             mapping = {"not_found": "not_found", "ambiguous": "ambiguous", "refused": "blocked",
                        "unavailable": "unavailable", "invalid_request": "error"}
-            request.status = mapping.get(transport_status, "error")
+            request.status = mapping.get(transport_status, "error") if transport_status != "ok" else "error"
             request.minimal_result = None
             attempt.status = "failed"
-            attempt.error_code = transport_status or "invalid_response"
+            attempt.error_code = "invalid_response" if transport_status == "ok" else transport_status or "invalid_response"
         attempt.finished_at = datetime.now(timezone.utc)
         attempt.transport_id = reply.get("transport_id")
         _add_event(db, case, "registry_check", question.description, outcome=request.status,

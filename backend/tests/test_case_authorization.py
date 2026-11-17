@@ -155,3 +155,48 @@ def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Sessi
     assert result["status"] == "completed"
     assert result["checks"][0]["status"] == "confirmed"
     assert result["checks"][0]["attempt_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("response_value", "expected_check_status", "expected_case_status", "expected_result"),
+    [
+        ("false", "error", "pending", None),
+        (False, "rejected", "rejected", {"valid": False}),
+    ],
+)
+def test_registry_boolean_must_be_a_boolean(
+    db: Session,
+    monkeypatch,
+    response_value,
+    expected_check_status,
+    expected_case_status,
+    expected_result,
+):
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    case = create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)
+    case_id = UUID(case["id"])
+    consent = record_consent(
+        case_id,
+        ConsentCreate(decision="granted", question_codes=["passport_cnib_valid"], notice_version="demo-1", channel="web"),
+        citizen,
+        db,
+    )
+    # SQLite drops timezone metadata on reads; expiry was covered in the test above.
+    db.get(Consent, UUID(consent["id"])).expires_at = None
+
+    class RegistryConnector:
+        def query(self, organization, service, payload):
+            return {"status": "ok", "data": {"valid": response_value}, "transport_id": "test-transport"}
+
+    monkeypatch.setattr(connectors, "build_connector", lambda: RegistryConnector())
+    result = execute_checks(case_id, agent, db)
+
+    check = result["checks"][0]
+    request = db.scalar(select(RegistryRequest).where(RegistryRequest.case_id == case_id))
+    assert result["status"] == expected_case_status
+    assert check["status"] == expected_check_status
+    assert request.minimal_result == expected_result
+    if expected_check_status == "error":
+        assert request.attempt_count == 1
