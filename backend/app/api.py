@@ -186,6 +186,8 @@ def create_case(
                                                        Administration.active.is_(True)))
     if procedure is None or requester is None:
         raise HTTPException(status_code=404, detail="Démarche ou administration inconnue")
+    if requester.id != procedure.owner_administration_id:
+        raise HTTPException(status_code=403, detail="Un agent ne peut ouvrir que les démarches de son administration")
     links = db.scalars(select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == procedure.id)).all()
     if not links:
         raise HTTPException(status_code=409, detail="La démarche ne contient aucune vérification")
