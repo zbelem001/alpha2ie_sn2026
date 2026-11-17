@@ -1,0 +1,7 @@
+# Connecteur direct hors Docker : registres publiés sur les ports de la machine
+# (voir infrastructure/docker-compose.yml). REGISTRY_ROUTES_FILE=.../routing.local.yaml
+BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL: http://localhost:8101
+BF/GOV/TRANSPORT/PERMIS: http://localhost:8102
+BF/GOV/JUSTICE/REGISTRES: http://localhost:8103
+BF/GOV/POLICE/PERTES: http://localhost:8104
+BF/GOV/TRESOR/PAIEMENTS: http://localhost:8105

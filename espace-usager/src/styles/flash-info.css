@@ -1,0 +1,52 @@
+
+
+.flash-info {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 42px;
+  width: 100%;
+  overflow: hidden;
+  color: #fff;
+  background: #b82032;
+  font-size: 0.75rem;
+}
+.flash-info-label {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 0 clamp(12px, 2vw, 28px);
+  background: #971b2a;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+.flash-info-window { flex: 1; min-width: 0; overflow: hidden; }
+.flash-info-track { display: flex; width: max-content; animation: flash-scroll 35s linear infinite; }
+.flash-info-messages { display: flex; flex-shrink: 0; align-items: center; margin: 0; padding: 0; list-style: none; }
+.flash-info-messages li { padding: 0 32px; white-space: nowrap; line-height: 1.5; }
+.flash-info-messages li + li { border-left: 1px solid rgb(255 255 255 / 35%); }
+.flash-info-toggle { display: grid; flex: 0 0 42px; align-self: stretch; place-items: center; border: 0; border-left: 1px solid rgb(255 255 255 / 20%); color: inherit; background: transparent; cursor: pointer; }
+.flash-info-toggle:hover { background: #971b2a; }
+.flash-info-toggle:focus-visible { outline: 2px solid #fff; outline-offset: -5px; }
+.flash-info:hover .flash-info-track,
+.flash-info:focus-within .flash-info-track,
+.flash-info--paused .flash-info-track { animation-play-state: paused; }
+@keyframes flash-scroll { to { transform: translateX(-50%); } }
+@media (max-width: 700px) {
+  .flash-info { display: none; }
+  .flash-info-track { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flash-info { align-items: flex-start; }
+  .flash-info-label { padding-top: 12px; padding-bottom: 12px; }
+  .flash-info-track { width: auto; animation: none; }
+  .flash-info-messages { display: block; padding: 8px 0; }
+  .flash-info-messages li { padding: 4px 12px; white-space: normal; }
+  .flash-info-messages li + li { border: 0; }
+  .flash-info-messages[aria-hidden="true"], .flash-info-toggle { display: none; }
+}

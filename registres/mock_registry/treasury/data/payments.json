@@ -1,0 +1,7 @@
+[
+  { "reference": "PAY-2026-0001", "pivot_id": "ACTE:OUAGA:2004:01234", "procedure": "cnib-application", "amount_xof": 2500, "status": "paid", "paid_at": "2026-11-15T09:12:00Z", "_scenario": "Awa a payé" },
+  { "reference": "PAY-2026-0002", "pivot_id": "ACTE:OUAGA:1998:00456", "procedure": "cnib-application", "amount_xof": 2500, "status": "pending", "paid_at": null, "_scenario": "Issa : paiement non reçu" },
+  { "reference": "PAY-2026-0003", "pivot_id": "ACTE:OUAGA:1997:00933", "procedure": "cnib-application", "amount_xof": 2500, "status": "paid", "paid_at": "2026-11-10T15:40:00Z", "_scenario": "Mariam : renouvellement après perte" },
+  { "reference": "PAY-2026-0004", "pivot_id": "ACTE:OUAGA:2004:01234", "procedure": "passeport_ordinaire_precheck", "amount_xof": 200, "status": "paid", "paid_at": "2026-11-16T09:30:00Z", "_scenario": "Awa : timbre fiscal du passeport payé" },
+  { "reference": "PAY-2026-0005", "pivot_id": "ACTE:OUAGA:1998:00456", "procedure": "passeport_ordinaire_precheck", "amount_xof": 200, "status": "pending", "paid_at": null, "_scenario": "Issa : timbre fiscal du passeport non réglé" }
+]
