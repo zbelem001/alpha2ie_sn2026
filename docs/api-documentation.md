@@ -10,7 +10,7 @@ Le contrat OpenAPI partagé est `contracts/openapi/backend.yaml`. Toutes les rou
 6. `GET /v1/cases/{case_id}/journal` — fournir les événements métier lisibles par l’usager.
 7. `DELETE /v1/cases/{case_id}/consent` — révoquer le consentement actif et bloquer les appels non encore envoyés.
 
-Les réponses des registres suivent `contracts/schemas/registry-response.json`. L’API métier n’expose jamais le corps brut d’une réponse. Une indisponibilité conserve la vérification en attente ; la relance incrémente le compteur de tentative sans créer une nouvelle vérification logique.
+Les réponses des registres suivent `contracts/schemas/registry-response.json`. L’API métier n’expose jamais le corps brut d’une réponse. Une indisponibilité laisse la vérification relançable ; la relance incrémente le compteur de tentative sans créer une nouvelle vérification logique. La demande est revendiquée atomiquement avant l’appel au registre, ce qui empêche deux exécutions concurrentes d’envoyer le même contrôle. Une revendication restée `pending` est considérée abandonnée après 60 secondes et peut alors être reprise ; l’ancienne tentative est clôturée avant la nouvelle.
 
 Un nouveau choix du citoyen remplace tout accord précédent pour le dossier : un refus révoque les accords antérieurs. Sans `expires_at`, l’accord expire après 30 jours ; une date fournie doit inclure un fuseau horaire et se situer dans les 30 jours suivants.
 

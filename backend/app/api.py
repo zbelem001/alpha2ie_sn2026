@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -27,6 +27,7 @@ from app.database.models import (
 from app.security import Principal, get_current_principal, require_role
 
 router = APIRouter(prefix="/v1")
+REQUEST_LEASE_SECONDS = 60
 
 
 class CaseCreate(BaseModel):
@@ -317,6 +318,7 @@ def execute_checks(
     from connectors import build_connector
 
     connector = build_connector()
+    stale_request_before = now - timedelta(seconds=REQUEST_LEASE_SECONDS)
     for request in requests:
         if request.status in {"confirmed", "rejected", "not_found", "ambiguous"}:
             continue
@@ -334,10 +336,51 @@ def execute_checks(
             _add_event(db, case, "check_blocked", "consentement ou autorisation absent", outcome="blocked", question=question)
             continue
         registry_info = _check_payload(db, request)
+
+        # Claim the logical request atomically so concurrent calls cannot query
+        # the same registry twice. A stale pending claim can be recovered later.
+        claim = db.execute(
+            update(RegistryRequest)
+            .where(
+                RegistryRequest.id == request.id,
+                or_(
+                    RegistryRequest.status.in_({"queued", "unavailable", "error", "blocked"}),
+                    and_(
+                        RegistryRequest.status == "pending",
+                        or_(
+                            RegistryRequest.updated_at.is_(None),
+                            RegistryRequest.updated_at < stale_request_before,
+                        ),
+                    ),
+                ),
+            )
+            .values(
+                status="pending",
+                attempt_count=RegistryRequest.attempt_count + 1,
+                updated_at=now,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        if claim.rowcount != 1:
+            db.refresh(request)
+            continue
+
+        previous_attempt_number = request.attempt_count
+        if request.status == "pending":
+            abandoned_attempt = db.scalar(select(RequestAttempt).where(
+                RequestAttempt.registry_request_id == request.id,
+                RequestAttempt.attempt_number == previous_attempt_number,
+                RequestAttempt.status == "started",
+            ))
+            if abandoned_attempt is not None:
+                abandoned_attempt.status = "failed"
+                abandoned_attempt.finished_at = now
+                abandoned_attempt.error_code = "attempt_lease_expired"
+
+        request.status = "pending"
         request.attempt_count += 1
         attempt = RequestAttempt(registry_request_id=request.id, attempt_number=request.attempt_count, status="started")
         db.add(attempt)
-        request.status = "pending"
         db.commit()
         try:
             reply = connector.query(registry_info["organization"], question.service_code, registry_info["payload"])
