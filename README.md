@@ -8,8 +8,8 @@ Socle d’interopérabilité administrative : vérifications ciblées, consentem
 
 | Lot | État |
 |---|---|
-| `interoperability/`, `infrastructure/` | Registres simulés, connecteurs et Docker Compose opérationnels (voir « Démarrer ») |
-| `contracts/` | Contrat backend ↔ registres proposé (`registry-request`, `registry-response`), à valider ; autres schémas réservés |
+| `interoperability/`, `infrastructure/` | Registres simulés, connecteurs, notifications simulées et Docker Compose opérationnels (voir « Démarrer ») ; banc X-Road facultatif, validé de bout en bout ([interoperability/xroad](interoperability/xroad/README.md)) |
+| `contracts/` | Contrats proposés, à valider : backend ↔ registres (`registry-request`, `registry-response`) et backend ↔ notifications (`notification-request`, `notification-response`, `sms-reply`) ; autres schémas réservés |
 | `frontend/` | À initialiser par la Personne 1 |
 | `backend/` | API FastAPI, base PostgreSQL, Keycloak et catalogue de démonstration intégrés dans Compose |
 
@@ -21,7 +21,7 @@ Les fichiers `.gitkeep` permettent à Git de conserver les dossiers réservés.
 |---|---|---|
 | `frontend/` | Personne 1 | Interfaces citoyenne et administrative, Next.js / TypeScript |
 | `backend/` | Personne 2 | API FastAPI, consentements, orchestration, autorisations, audit |
-| `interoperability/` | Personne 3 | X-Road, adaptateurs et registres simulés |
+| `interoperability/` | Personne 3 | X-Road, adaptateurs, registres et notifications simulés |
 | `infrastructure/` | Personne 3 | Docker Compose, Keycloak et PostgreSQL |
 | `contracts/` | Collectif | OpenAPI, schémas JSON et exemples partagés |
 | `docs/` | Collectif | Architecture, API, modèle de données et installation |
@@ -42,6 +42,7 @@ docker compose up -d --build
 | Police (pertes) | http://localhost:8104/docs |
 | Trésor (paiements, simulé) | http://localhost:8105/docs |
 | ONI (statut CNIB simulé) | http://localhost:8106/docs |
+| Notifications simulées : boîte d'envoi, téléphone du citoyen (`/phone/22670000001`) | http://localhost:8107 |
 | Keycloak | http://localhost:8180 |
 | API métier FastAPI | http://localhost:8000/docs |
 | PostgreSQL | localhost:55432 |
@@ -49,6 +50,8 @@ docker compose up -d --build
 Le conteneur backend applique les migrations et charge le catalogue de démonstration au démarrage. Les comptes locaux d’essai sont décrits dans [la documentation API](docs/api-documentation.md).
 
 Pour changer les valeurs par défaut : `cp .env.example .env`, puis modifier `.env`.
+
+Banc X-Road (facultatif, 5,3 Go de mémoire en plus) : `docker compose --profile xroad up -d --build` démarre et configure tout, en une commande (prêt après 12 à 16 minutes la première fois). Pour l'activer par défaut : `COMPOSE_PROFILES=xroad` dans `.env`. Détails : [interoperability/xroad/README.md](interoperability/xroad/README.md).
 
 ### SMS et codes Infobip
 

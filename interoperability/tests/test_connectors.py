@@ -194,6 +194,10 @@ def test_xroad_url_and_headers():
         ("Server.ServerProxy.UnknownService", "invalid_request"),
         ("Server.ServerProxy.ServiceFailed", "unavailable"),
         ("Server.ClientProxy.NetworkError", "unavailable"),
+        # Codes réellement renvoyés par le banc X-Road 7.8.3
+        ("server.serverproxy.access_denied", "refused"),
+        ("server.serverproxy.unknown_service", "invalid_request"),
+        ("server.serverproxy.service_failed.ssl_authentication_failed", "unavailable"),
     ],
 )
 def test_xroad_errors_are_mapped(error_type, expected):

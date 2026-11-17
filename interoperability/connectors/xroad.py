@@ -7,8 +7,8 @@ Les erreurs propres à X-Road arrivent avec l'en-tête X-Road-Error ; elles sont
 traduites en statuts du contrat. L'identifiant du message (X-Road-Id) est conservé
 dans transport_id.
 
-ATTENTION : ce connecteur a été écrit d'après la documentation du protocole
-et n'est testé qu'avec des réponses simulées. À valider sur le banc X-Road (phase 3).
+Validé sur le banc X-Road 7.8.3 (interoperability/xroad) : réponses ok,
+not_found, ambiguous, invalid_request, refus hors droits d'accès, service inconnu.
 """
 
 from __future__ import annotations
@@ -24,8 +24,14 @@ from .http_base import DEFAULT_TIMEOUT_S, BaseHttpConnector, RoutingError
 IDENTIFIER_PART = re.compile(r"^[A-Za-z0-9._-]+$")
 
 # Fragments du type d'erreur X-Road -> statut du contrat. Tout le reste => unavailable.
-_REFUSED_MARKERS = ("AccessDenied",)
-_INVALID_MARKERS = ("UnknownService", "InvalidRequest", "InvalidClientIdentifier", "UnknownMember")
+# X-Road 7 écrit « server.serverproxy.access_denied », X-Road 6 « Server.ServerProxy.AccessDenied » :
+# la comparaison se fait sans casse ni tirets bas.
+_REFUSED_MARKERS = ("accessdenied",)
+_INVALID_MARKERS = ("unknownservice", "invalidrequest", "invalidclientidentifier", "unknownmember", "unknownsubsystem")
+
+
+def _normalize(error_type: str) -> str:
+    return error_type.lower().replace("_", "")
 
 
 def _check_identifier(value: str, parts: int, label: str) -> None:
@@ -57,9 +63,10 @@ class XRoadConnector(BaseHttpConnector):
         error_type = response.headers.get("X-Road-Error")
         if not error_type:
             return None
-        if any(marker in error_type for marker in _REFUSED_MARKERS):
+        normalized = _normalize(error_type)
+        if any(marker in normalized for marker in _REFUSED_MARKERS):
             status, message = Status.REFUSED, f"Accès refusé par le serveur de sécurité ({error_type})"
-        elif any(marker in error_type for marker in _INVALID_MARKERS):
+        elif any(marker in normalized for marker in _INVALID_MARKERS):
             status, message = Status.INVALID_REQUEST, f"Requête refusée par X-Road ({error_type})"
         else:
             status, message = Status.UNAVAILABLE, f"Échange X-Road impossible ({error_type})"

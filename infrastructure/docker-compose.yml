@@ -6,6 +6,8 @@
 # Panne d'un registre (épreuve) :
 #   docker compose stop justice-registry
 #   docker compose start justice-registry
+#
+# Notifications simulées : boîte d'envoi sur http://localhost:8107
 
 name: dlnuf
 
@@ -138,6 +140,20 @@ services:
     command: ["uvicorn", "mock_registry.treasury.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8105:8000"
+
+  # --- Notifications simulées (même image) --------------------------------------------
+
+  notifications:
+    <<: *registry
+    # Pas de journal d'accès : les URL du téléphone simulé contiennent le numéro.
+    command: ["uvicorn", "notifications.app:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    environment:
+      SIMULATED_LATENCY_MS: ${SIMULATED_LATENCY_MS:-0}
+      # Où transmettre les réponses SMS du citoyen (vide : le backend les lit par GET /replies).
+      NOTIFICATION_REPLY_WEBHOOK_URL: ${NOTIFICATION_REPLY_WEBHOOK_URL:-}
+    ports:
+      # 8107 : le 8106 est pris par le registre ONI.
+      - "8107:8000"
 
   # --- Applications ----------------------------------------------------------------------
   #

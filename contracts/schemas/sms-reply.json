@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sms-reply.json",
+  "title": "Réponse d'un citoyen à un SMS",
+  "description": "Réponse tapée par le citoyen sur son téléphone (simulé). Transmise au backend par webhook (POST vers NOTIFICATION_REPLY_WEBHOOK_URL) et disponible dans GET /replies?after=<seq>. Statut : PROPOSITION à valider entre Personne 2 et Personne 3.",
+  "type": "object",
+  "required": ["reply_id", "seq", "sender", "text", "in_reply_to", "reference", "received_at"],
+  "additionalProperties": false,
+  "properties": {
+    "reply_id": {
+      "type": "string",
+      "description": "Identifiant unique de la réponse : le backend s'en sert pour ignorer un doublon."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Numéro d'ordre croissant, curseur de GET /replies?after=<seq>."
+    },
+    "sender": {
+      "type": "string",
+      "pattern": "^[0-9]{8,15}$",
+      "description": "Numéro du citoyen, au même format que recipient."
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "Texte brut tapé par le citoyen, ex. « 1 ». Le backend l'interprète (1 = oui, 2 = non…)."
+    },
+    "in_reply_to": {
+      "type": ["string", "null"],
+      "description": "notification_id du SMS auquel le citoyen répond. Sans indication, le dernier SMS à choix envoyé à ce numéro ; null s'il n'y en a pas."
+    },
+    "reference": {
+      "type": ["string", "null"],
+      "description": "reference du SMS d'origine, recopiée."
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

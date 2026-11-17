@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "notification-request.json",
+  "title": "Demande d'envoi d'une notification (SMS ou e-mail)",
+  "description": "Corps de POST /notifications sur le service de notifications simulé. Envoyé par le backend, par exemple pour demander un consentement par SMS ou prévenir le citoyen qu'un registre est indisponible. Statut : PROPOSITION à valider entre Personne 2 et Personne 3.",
+  "type": "object",
+  "required": ["notification_id", "channel", "recipient", "message"],
+  "additionalProperties": false,
+  "properties": {
+    "notification_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "description": "Clé d'idempotence choisie par le backend, ex. « DOS-2026-0042:consentement:1 ». Renvoyer le même identifiant lors d'une relance n'envoie jamais un second message."
+    },
+    "channel": {
+      "enum": ["sms", "email"]
+    },
+    "recipient": {
+      "type": "string",
+      "description": "SMS : numéro en chiffres, sans « + » ni espaces, comme l'identifiant Keycloak (ex. 22670000001). E-mail : adresse."
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "type": "string", "pattern": "[Aa][Cc][Tt][Ee]:[A-Za-z]+:[0-9]{4}:[0-9]{5}" },
+      "description": "Texte remis tel quel. Message sobre : référence du dossier, jamais de donnée personnelle sensible ni d'identifiant pivot (refusé). 480 caractères au plus pour un SMS, 5000 pour un e-mail."
+    },
+    "subject": {
+      "type": ["string", "null"],
+      "maxLength": 150,
+      "not": { "type": "string", "pattern": "[Aa][Cc][Tt][Ee]:[A-Za-z]+:[0-9]{4}:[0-9]{5}" },
+      "description": "Objet de l'e-mail. Interdit pour un SMS. Pas d'identifiant pivot."
+    },
+    "reference": {
+      "type": ["string", "null"],
+      "maxLength": 64,
+      "description": "Référence du dossier ou de la requête. Reprise dans les réponses du citoyen pour que le backend retrouve la demande."
+    },
+    "reply_choices": {
+      "type": ["array", "null"],
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[0-9A-Za-z]{1,10}$" },
+      "description": "SMS seulement : réponses courtes proposées au citoyen, ex. [\"1\", \"2\"] pour « Répondez 1 pour OUI, 2 pour NON ». Le téléphone simulé les affiche comme boutons. Le backend interprète la réponse."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "channel": { "const": "sms" } } },
+      "then": {
+        "properties": {
+          "recipient": { "pattern": "^[0-9]{8,15}$" },
+          "message": { "maxLength": 480 },
+          "subject": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "channel": { "const": "email" } } },
+      "then": {
+        "properties": {
+          "recipient": { "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" },
+          "message": { "maxLength": 5000 },
+          "reply_choices": { "type": "null" }
+        }
+      }
+    }
+  ]
+}

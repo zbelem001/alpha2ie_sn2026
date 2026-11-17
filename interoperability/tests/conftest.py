@@ -28,6 +28,9 @@ def _validator(name: str) -> Draft202012Validator:
 
 RESPONSE_SCHEMA = _validator("registry-response.json")
 REQUEST_SCHEMA = _validator("registry-request.json")
+NOTIFICATION_REQUEST_SCHEMA = _validator("notification-request.json")
+NOTIFICATION_RESPONSE_SCHEMA = _validator("notification-response.json")
+SMS_REPLY_SCHEMA = _validator("sms-reply.json")
 
 
 def assert_conforms(validator: Draft202012Validator, document: Any) -> None:
