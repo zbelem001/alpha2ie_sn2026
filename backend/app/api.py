@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+import os
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -26,6 +27,7 @@ from app.database.models import (
     RequestAttempt,
 )
 from app.security import Principal, get_current_principal, require_role
+from app.sms import dispatch_sms_notification
 
 router = APIRouter(prefix="/v1")
 REQUEST_LEASE_SECONDS = 60
@@ -209,18 +211,26 @@ def create_case(
         "Une demande de consentement vous attend pour votre démarche. "
         "Connectez-vous à la plateforme pour la consulter et donner votre réponse."
     )
-    for channel, delivery_status in (("platform", "delivered"), ("sms", "simulated")):
-        db.add(Notification(
+    sms_provider = os.getenv("SMS_PROVIDER", "simulated").lower()
+    sms_delivery_status = "queued" if sms_provider == "twilio" else "simulated"
+    sms_notification = None
+    for channel, delivery_status in (("platform", "delivered"), ("sms", sms_delivery_status)):
+        notification = Notification(
             case_id=case.id,
             recipient_ref=case.subject_ref,
             channel=channel,
             title=notification_title,
             message=notification_message,
             delivery_status=delivery_status,
-        ))
+        )
+        db.add(notification)
+        if channel == "sms":
+            sms_notification = notification
     _add_event(db, case, "consent_requested", procedure.code, outcome="notification_created",
                actor_type="system")
     db.commit()
+    if sms_notification and sms_delivery_status == "queued":
+        dispatch_sms_notification(db, sms_notification)
     db.refresh(case)
     return _serialize_case(db, case)
 

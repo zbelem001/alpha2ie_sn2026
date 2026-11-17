@@ -117,10 +117,11 @@ def test_agent_can_open_its_own_administrations_procedure(db: Session):
     assert db.scalar(select(func.count()).select_from(Case)) == 1
 
 
-def test_case_creation_notifies_citizen_and_keeps_sms_simulated(db: Session):
+def test_case_creation_notifies_citizen_and_keeps_sms_simulated(db: Session, monkeypatch):
     owner, _, procedure = add_procedure(db)
     agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    monkeypatch.setenv("SMS_PROVIDER", "simulated")
     case = create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)
     case_id = UUID(case["id"])
 
@@ -147,6 +148,36 @@ def test_case_creation_notifies_citizen_and_keeps_sms_simulated(db: Session):
 
     marked = mark_notification_read(UUID(visible[0]["id"]), citizen, db)
     assert marked["read_at"] is not None
+
+
+def test_case_creation_dispatches_twilio_for_configured_demo_citizen(db: Session, monkeypatch):
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    monkeypatch.setenv("SMS_PROVIDER", "twilio")
+    monkeypatch.setenv("TWILIO_ACCOUNT_SID", "AC" + "1" * 32)
+    monkeypatch.setenv("TWILIO_API_KEY_SID", "SK" + "2" * 32)
+    monkeypatch.setenv("TWILIO_API_KEY_SECRET", "test-secret")
+    monkeypatch.setenv("TWILIO_MESSAGING_SERVICE_SID", "MG" + "3" * 32)
+    monkeypatch.setenv("TWILIO_DEMO_CITIZEN_REF", citizen.citizen_ref)
+    monkeypatch.setenv("TWILIO_DEMO_TO", "+22670000000")
+    sent = {}
+
+    def fake_send(settings, to_number, body):
+        sent.update(to=to_number, body=body)
+        return "SM" + "4" * 32
+
+    monkeypatch.setattr("app.sms.send_twilio_sms", fake_send)
+    case = create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)
+    sms = db.scalar(select(Notification).where(
+        Notification.case_id == UUID(case["id"]), Notification.channel == "sms"
+    ))
+
+    assert sms.delivery_status == "sent"
+    assert sms.provider_message_id == "SM" + "4" * 32
+    assert sms.delivery_error is None
+    assert sent["to"] == "+22670000000"
+    assert "Connectez-vous à la plateforme" in sent["body"]
 
 
 def test_sms_cannot_be_recorded_as_consent_channel():
