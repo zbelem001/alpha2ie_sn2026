@@ -44,7 +44,7 @@ docker compose up -d --build
 
 Pour changer les valeurs par défaut : `cp .env.example .env`, puis modifier `.env`.
 
-Banc X-Road (facultatif, 5,3 Go de mémoire en plus) : `docker compose --profile xroad up -d`, puis `docker compose --profile xroad run --rm xroad-setup`.
+Banc X-Road (facultatif, 5,3 Go de mémoire en plus) : `docker compose --profile xroad up -d --build` démarre et configure tout, en une commande (prêt après 12 à 16 minutes la première fois). Pour l'activer par défaut : `COMPOSE_PROFILES=xroad` dans `.env`. Détails : [interoperability/xroad/README.md](interoperability/xroad/README.md).
 
 ## Contrat entre le backend et les registres
 

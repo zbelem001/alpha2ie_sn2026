@@ -1,6 +1,8 @@
 """Configuration automatique du banc X-Road « BF » par les API REST.
 
-Lancement (depuis la racine du dépôt, banc démarré) :
+Lancé automatiquement par `docker compose --profile xroad up -d` (service
+xroad-setup), en même temps que les serveurs : il attend qu'ils répondent.
+À la main, depuis la racine du dépôt :
     docker compose --profile xroad run --rm xroad-setup
 
 Relançable : chaque étape vérifie d'abord si elle est déjà faite. Les attentes
@@ -36,6 +38,10 @@ CA_URL = "http://xroad-ca:8888"
 TSA_URL = "http://xroad-ca:8899"
 ACME_URL = "http://xroad-ca:8887"
 CA_CERTS = Path(os.environ.get("XROAD_CA_CERTS_DIR", "/ca"))
+
+# Démarrage à froid des quatre serveurs Java : 5 à 9 minutes mesurées. On attend
+# jusqu'à 12 minutes que leur interface d'administration réponde.
+STARTUP_TRIES = 72
 
 ADMIN_USER = os.environ.get("XROAD_ADMIN_USER", "xrd")
 ADMIN_PASSWORD = os.environ.get("XROAD_ADMIN_PASSWORD", "secret")
@@ -241,7 +247,7 @@ def sign_csr(csr_pem: str, kind: str) -> str:
 def setup_central_server() -> tuple[Api, bytes]:
     log("1. Serveur central")
     cs = Api(CS_HOST)
-    eventually("interface du serveur central", cs.login)
+    eventually("interface du serveur central", cs.login, tries=STARTUP_TRIES)
 
     def token_status() -> str:
         value = cs.get("/api/v1/initialization/status")["software_token_init_status"]
@@ -436,7 +442,7 @@ def client_status(ss: Api, client: str) -> str | None:
 def setup_security_server(cs: Api, anchor: bytes, spec: SecurityServerSpec) -> Api:
     log(f"2. Security Server {spec.host} (propriétaire {member_id(spec.owner)})")
     ss = Api(spec.host)
-    eventually(f"interface de {spec.host}", ss.login)
+    eventually(f"interface de {spec.host}", ss.login, tries=STARTUP_TRIES)
 
     status = ss.get("/api/v1/initialization/status")
     if not status.get("is_anchor_imported"):

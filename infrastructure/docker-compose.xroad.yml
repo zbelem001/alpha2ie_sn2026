@@ -1,7 +1,8 @@
 # Banc de test X-Road (profil « xroad »), réservé au développement.
 #
-#   docker compose --profile xroad up -d                      démarrer le banc (avec le reste)
-#   docker compose --profile xroad run --rm xroad-setup       le configurer (relançable)
+#   docker compose --profile xroad up -d                démarrer et configurer le banc (avec le reste)
+#   docker compose --profile xroad logs -f xroad-setup  suivre la configuration
+#   docker compose --profile xroad run --rm xroad-setup reconfigurer ou vérifier à la main
 #
 # Topologie (détails : interoperability/xroad/README.md) :
 #   xroad-cs       serveur central de l'instance BF
@@ -36,6 +37,15 @@ services:
     image: niis/xroad-central-server:noble-7.8.3
     profiles: [xroad]
     restart: unless-stopped
+    environment:
+      # Connexion automatique au jeton de signature au démarrage. Sans elle, après
+      # un redémarrage, le serveur central ne signe plus la configuration globale,
+      # qui expire : plus aucun échange ne passe (global_conf_outdated).
+      XROAD_TOKEN_PIN: ${XROAD_TOKEN_PIN:-Secret1234}
+    volumes:
+      - xroad-cs-config:/etc/xroad
+      - xroad-cs-db:/var/lib/postgresql/16/main
+      - xroad-cs-data:/var/lib/xroad
     ports:
       - "127.0.0.1:${XROAD_CS_ADMIN_PORT:-4100}:4000"
     mem_limit: 2560m
@@ -66,11 +76,17 @@ services:
 
   ss-registres:
     <<: *security-server
+    volumes:
+      - ss-registres-config:/etc/xroad
+      - ss-registres-db:/var/lib/postgresql/16/main
     ports:
       - "127.0.0.1:${XROAD_SS_REGISTRES_ADMIN_PORT:-4101}:4000"
 
   ss-demandeurs:
     <<: *security-server
+    volumes:
+      - ss-demandeurs-config:/etc/xroad
+      - ss-demandeurs-db:/var/lib/postgresql/16/main
     ports:
       - "127.0.0.1:${XROAD_SS_DEMANDEURS_ADMIN_PORT:-4102}:4000"
       # Interface « système d'information » : là où le backend envoie ses requêtes X-Road
@@ -78,10 +94,14 @@ services:
       - "127.0.0.1:${XROAD_SS_DEMANDEURS_CLIENT_PORT:-8280}:8080"
 
   xroad-setup:
-    # Configuration automatique du banc par les API REST (relançable sans casse).
+    # Configuration automatique du banc par les API REST, lancée avec le profil :
+    # le script attend lui-même les serveurs, configure ce qui manque, puis s'arrête
+    # (« Banc X-Road prêt »). Relançable sans casse. En cas d'échec, Docker le relance
+    # (trois fois au plus) : les étapes déjà faites sont sautées.
     build:
       context: ../interoperability
-    profiles: [xroad-setup]
+    profiles: [xroad]
+    restart: on-failure:3
     command: ["python", "/xroad/setup_bench.py"]
     environment:
       XROAD_TOKEN_PIN: ${XROAD_TOKEN_PIN:-Secret1234}
@@ -91,12 +111,27 @@ services:
     volumes:
       - ../interoperability/xroad/configuration:/xroad:ro
       - xroad-ca-certs:/ca:ro
+    # « started » et non « healthy » : `up -d` rend la main tout de suite au lieu
+    # de bloquer pendant le démarrage des serveurs (5 à 9 minutes).
     depends_on:
-      xroad-cs: { condition: service_healthy }
-      xroad-ca: { condition: service_healthy }
-      ss-registres: { condition: service_healthy }
-      ss-demandeurs: { condition: service_healthy }
+      xroad-cs: { condition: service_started }
+      xroad-ca: { condition: service_started }
+      ss-registres: { condition: service_started }
+      ss-demandeurs: { condition: service_started }
 
+# Toute la configuration du banc est dans des volumes nommés : elle survit à
+# `stop` / `start`, à `down` / `up` et à la recréation des conteneurs.
+# Remise à zéro : supprimer les conteneurs X-Road puis TOUS ces volumes ensemble
+# (commande dans interoperability/xroad/README.md). Jamais une partie seulement :
+# serveur central, Security Servers et autorité de test se reconnaissent par leurs
+# clés et leurs certificats.
 volumes:
   xroad-ca-home:
   xroad-ca-certs:
+  xroad-cs-config:
+  xroad-cs-db:
+  xroad-cs-data:
+  ss-registres-config:
+  ss-registres-db:
+  ss-demandeurs-config:
+  ss-demandeurs-db:

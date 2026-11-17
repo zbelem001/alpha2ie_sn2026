@@ -25,11 +25,11 @@ Mémoire : environ 0,9 Go au total, dont environ 565 Mo pour Keycloak.
 ## Banc X-Road (facultatif)
 
 ```bash
-docker compose --profile xroad up -d
-docker compose --profile xroad run --rm xroad-setup
+docker compose --profile xroad up -d --build        # démarre et configure le banc
+docker compose --profile xroad logs -f xroad-setup  # suivre la configuration
 ```
 
-Serveur central, autorité de test et deux Security Servers, définis dans `docker-compose.xroad.yml`. Environ 5,3 Go de mémoire en plus, et 9 minutes de démarrage. Détails : [interoperability/xroad/README.md](../interoperability/xroad/README.md).
+Serveur central, autorité de test et deux Security Servers, définis dans `docker-compose.xroad.yml`. Le service `xroad-setup` configure le banc tout seul puis s'arrête. Environ 5,3 Go de mémoire en plus ; prêt après 12 à 16 minutes la première fois. Pour activer le banc par défaut : `COMPOSE_PROFILES=xroad` dans `.env`. Détails : [interoperability/xroad/README.md](../interoperability/xroad/README.md).
 
 ## Simuler une panne
 
