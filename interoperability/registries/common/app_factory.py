@@ -12,7 +12,6 @@ un appel à /r1/BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL/identity arrive ici sur /services
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -22,11 +21,12 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from .envelope import ServiceResult, Status, build_envelope
+from .logs import console_logger
 from .models import RegistryRequest
 
 ServiceHandler = Callable[[RegistryRequest], ServiceResult]
 
-logger = logging.getLogger("registry")
+logger = console_logger("registry")
 
 
 @dataclass(frozen=True)

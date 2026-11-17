@@ -10,7 +10,7 @@ Prérequis : Docker et Docker Compose.
 docker compose up -d --build
 ```
 
-Cette commande démarre PostgreSQL (port 55432), Keycloak (port 8180) et les cinq registres simulés (ports 8101 à 8105). Le détail est dans [infrastructure/README.md](../infrastructure/README.md).
+Cette commande démarre PostgreSQL (port 55432), Keycloak (port 8180), les cinq registres simulés (ports 8101 à 8105) et le service de notifications simulé (port 8106). Le détail est dans [infrastructure/README.md](../infrastructure/README.md).
 
 Tests du lot interopérabilité :
 
@@ -26,4 +26,4 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 ## Backend (Personne 2)
 
-À initialiser dans `backend/` : FastAPI et les dépendances Python. Pour interroger les registres, utiliser les connecteurs du lot interopérabilité (`pip install -e ../interoperability`), comme décrit dans [interoperability/README.md](../interoperability/README.md).
+À initialiser dans `backend/` : FastAPI et les dépendances Python. Pour interroger les registres et envoyer les SMS ou e-mails simulés, utiliser les connecteurs du lot interopérabilité (`pip install -e ../interoperability`) : `build_connector()` et `build_notifier()`, décrits dans [interoperability/README.md](../interoperability/README.md).

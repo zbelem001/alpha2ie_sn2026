@@ -1,5 +1,5 @@
-# Une seule image pour tous les registres simulés ; le registre lancé est choisi
-# par la commande (voir infrastructure/docker-compose.yml).
+# Une seule image pour les registres simulés et le service de notifications ;
+# le service lancé est choisi par la commande (voir infrastructure/docker-compose.yml).
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY registries ./registries
 COPY mock_registry ./mock_registry
+COPY notifications ./notifications
 
 RUN useradd --create-home --uid 10001 registry
 USER registry

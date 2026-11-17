@@ -6,6 +6,8 @@
 # Panne d'un registre (épreuve) :
 #   docker compose stop justice-registry
 #   docker compose start justice-registry
+#
+# Notifications simulées : boîte d'envoi sur http://localhost:8106
 
 name: dlnuf
 
@@ -117,6 +119,19 @@ services:
     ports:
       - "8105:8000"
 
+  # --- Notifications simulées (même image) --------------------------------------------
+
+  notifications:
+    <<: *registry
+    # Pas de journal d'accès : les URL du téléphone simulé contiennent le numéro.
+    command: ["uvicorn", "notifications.app:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    environment:
+      SIMULATED_LATENCY_MS: ${SIMULATED_LATENCY_MS:-0}
+      # Où transmettre les réponses SMS du citoyen (vide : le backend les lit par GET /replies).
+      NOTIFICATION_REPLY_WEBHOOK_URL: ${NOTIFICATION_REPLY_WEBHOOK_URL:-}
+    ports:
+      - "8106:8000"
+
   # --- Applications (à activer quand backend/ et frontend/ existent) --------------------
   #
   # backend:                      # Personne 2
@@ -125,6 +140,7 @@ services:
   #     DATABASE_URL: postgresql://${POSTGRES_USER:-dlnuf}:${POSTGRES_PASSWORD:-dlnuf-dev}@postgres:5432/backend
   #     REGISTRY_CONNECTOR: direct          # ou xroad (phase 3)
   #     XROAD_CLIENT_ID: BF/GOV/ONI/CNIB
+  #     NOTIFICATION_SERVICE_URL: http://notifications:8000
   #   ports: ["8000:8000"]
   #   depends_on:
   #     postgres: { condition: service_healthy }
