@@ -25,11 +25,3 @@ export function cleanReferences(requirements: DocumentRequirement[], values: Doc
   }
   return result;
 }
-const profileKey = (phone: string) => "dlnuf:demo:documents:" + phone;
-export function readDocumentProfile(phone: string): DocumentReferences {
-  try { return JSON.parse(localStorage.getItem(profileKey(phone)) ?? "{}"); } catch { return {}; }
-}
-export function saveDocumentProfile(phone: string, values: DocumentReferences) {
-  localStorage.setItem(profileKey(phone), JSON.stringify(cleanReferences([...DOCUMENT_TYPES], values, false)));
-  window.dispatchEvent(new Event("dlnuf-demo-documents"));
-}
