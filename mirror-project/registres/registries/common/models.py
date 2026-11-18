@@ -18,6 +18,8 @@ class Subject(BaseModel):
     first_names: str | None = Field(default=None, min_length=1)
     birth_date: date | None = None
     birth_place: str | None = Field(default=None, min_length=1)
+    # Nom de la mère tel qu'inscrit sur l'acte : élément connu du titulaire (identity-match).
+    mother_name: str | None = Field(default=None, min_length=1, max_length=160)
 
     @property
     def has_criteria(self) -> bool:

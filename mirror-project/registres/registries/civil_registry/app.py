@@ -3,6 +3,7 @@
 Services :
 - identity        : identité nécessaire à un titre (recherche par identifiant pivot ou par critères)
 - identity-match  : « correspond : oui/non » entre un identifiant pivot et ce que déclare l'usager
+                    (nom, prénoms, date de naissance, et nom de la mère pour prouver la titularité)
 - is-adult        : « majeur : oui/non », jamais la date de naissance
 """
 

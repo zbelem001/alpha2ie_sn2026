@@ -95,6 +95,21 @@ def test_identity_match_answers_yes_or_no_only(civil):
     assert call(civil, "identity-match", wrong)["data"] == {"match": False}
 
 
+def test_identity_match_checks_the_mother_name_when_given(civil):
+    """Preuve de titularité : le nom de la mère, inscrit sur l'acte, s'ajoute aux critères publics."""
+    declared = {"pivot_id": AWA, "last_name": "KABORE", "first_names": "Awa", "birth_date": "2004-03-12", "mother_name": "Compaoré Salimata"}
+    assert call(civil, "identity-match", declared)["data"] == {"match": True}
+    assert call(civil, "identity-match", {**declared, "mother_name": "KONATE Aminata"})["data"] == {"match": False}
+
+
+def test_mother_name_separates_homonyms_born_the_same_day(civil):
+    moussa = {"last_name": "TRAORE", "first_names": "Moussa", "birth_date": "1995-06-01"}
+    assert call(civil, "identity", moussa)["status"] == "ambiguous"
+    body = call(civil, "identity", {**moussa, "mother_name": "KEITA Mariam"})
+    assert body["status"] == "ok" and body["data"]["pivot_id"] == "ACTE:OUAGA:1995:00322"
+    assert "mother_name" not in body["data"]
+
+
 def test_identity_match_requires_pivot_and_criteria(civil):
     body = call(civil, "identity-match", {"pivot_id": AWA})
     assert body["status"] == "invalid_request"

@@ -36,6 +36,8 @@ def matches_criteria(record: Record, subject: Subject) -> bool:
         return False
     if subject.birth_place and normalize(record.get("birth_place", "")) != normalize(subject.birth_place):
         return False
+    if subject.mother_name and normalize(record.get("mother_name", "")) != normalize(subject.mother_name):
+        return False
     return True
 
 
