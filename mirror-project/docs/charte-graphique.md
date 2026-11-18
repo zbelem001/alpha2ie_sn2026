@@ -103,7 +103,7 @@ box-shadow: 0 1px 2px rgb(20 22 26 / 0.04), 0 8px 24px -12px rgb(20 22 26 / 0.08
 
 **Bloc vert plein** pour le contenu mis en avant : le dossier suivi au guichet.
 
-**Écran de connexion :** à droite du formulaire, les armoiries (`public/armoiries.webp`), tirées de l'image `armoiries-1.png` fournie : fond gris extérieur rendu transparent, contour noir adouci, image recadrée au ras du cartouche, 889 × 1 081 px, 82 Ko au lieu de 937 Ko. Le cartouche tient lieu de carte, avec la même ombre, et en prend la hauteur : son cadre s'aligne sur les bords haut et bas du formulaire, la pointe dépasse dessous, et il suit la carte quand un message d'erreur l'allonge. L'image est décorative (texte de remplacement vide) : la pilule du logo annonce déjà les armoiries. Elle est masquée sur téléphone.
+**Écran de connexion :** la carte du formulaire est centrée dans la page, sur un fond d'armoiries en motif : les armoiries réduites (`public/armoiries-motif.webp`, 4,8 Ko, tirée de l'image `armoiries-1.png` fournie, fond rendu transparent), 52 × 64 px dans une case de 104 × 112 px, répétées en grille sur toute la page, à 8 % d'opacité. Le motif est décoratif et hors du flux : la pilule du logo annonce déjà les armoiries. Les angles y sont moins arrondis qu'ailleurs : carte 14 px ; champs, bouton et messages 10 px (`--rayon-connexion`).
 
 ## Composants
 
@@ -145,4 +145,5 @@ box-shadow: 0 1px 2px rgb(20 22 26 / 0.04), 0 8px 24px -12px rgb(20 22 26 / 0.08
 
 - **Champs :** contour `#7f8c83` au lieu d'une bordure blanche, pour que le champ reste repérable sur une carte blanche (3:1 exigé par WCAG 1.4.11).
 - **Vert et rouge du drapeau :** trop clairs pour du texte, ils ne servent qu'aux pastilles ; les textes utilisent leurs versions foncées.
+- **Écran de connexion :** champs et bouton à angles de 10 px au lieu de pilules, carte à 14 px, à la demande de l'équipe (18/11).
 - **Pas de notifications flottantes (Sonner) ni de hachures :** les confirmations s'affichent dans la page, et les interfaces n'ont pas de graphiques.

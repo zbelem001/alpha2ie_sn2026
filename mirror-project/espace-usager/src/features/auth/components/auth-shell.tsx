@@ -24,12 +24,6 @@ export function AuthShell({ children }: { children: ReactNode }) {
       <section className="login-panel" aria-labelledby="login-title">
         <div className="login-block">{children}</div>
       </section>
-      {/* Armoiries tirées de docs/armoiries-1.png (fond rendu transparent, recadrées au ras du
-          cartouche, 82 Ko), à la hauteur de la carte (auth.css) ; décoratives : la pilule du logo
-          les annonce déjà aux lecteurs d'écran. Masquées sur téléphone. */}
-      <div className="visual-panel">
-        <Image className="login-arms" src="/armoiries.webp" alt="" width={889} height={1081} unoptimized />
-      </div>
     </main>
   );
 }

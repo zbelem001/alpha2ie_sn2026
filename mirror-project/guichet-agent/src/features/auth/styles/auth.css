@@ -1,18 +1,33 @@
 /* Écran de connexion : charte de docs/charte-graphique.md (variables dans src/app/globals.css).
-   Formulaire dans une carte givrée, champs et bouton en pilules, armoiries à droite à la hauteur de la carte. */
+   Formulaire centré dans une carte givrée aux angles peu arrondis, sur un fond d'armoiries en motif. */
 
 .auth-space {
+  /* Angles des champs, du bouton et des messages : moins arrondis que les pilules du reste de l'application. */
+  --rayon-connexion: 10px;
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   min-height: 100svh;
 }
 
+/* Fond : les armoiries réduites (public/armoiries-motif.webp, 4,8 Ko : 52 × 64 px dans une case de
+   104 × 112 px), répétées en grille sur toute la page, très atténuées. Décoratives, hors du flux. */
+.auth-space::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("/armoiries-motif.webp") center top / 104px 112px repeat;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
 .auth-space .login-page {
   display: grid;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  /* Logo, espace, carte et armoiries, espace : la troisième rangée prend la hauteur de la carte,
-     les deux espaces égaux la centrent dans la page. */
+  grid-template-columns: minmax(0, 1fr);
+  /* Logo, espace, carte, espace : les deux espaces égaux centrent la carte dans la page. */
   grid-template-rows: auto 1fr auto 1fr;
   gap: 24px clamp(24px, 4vw, 56px);
   width: 100%;
@@ -80,7 +95,7 @@
   width: min(100%, 440px);
   padding: clamp(28px, 4vw, 44px);
   border: 1px solid var(--surface-bordure);
-  border-radius: var(--rayon-carte);
+  border-radius: 14px;
   background: var(--surface-fond);
   backdrop-filter: var(--surface-flou);
   box-shadow: var(--ombre-carte);
@@ -133,13 +148,13 @@
   font-weight: 500;
 }
 
-/* Champ : pilule de 48 px */
+/* Champ de 48 px */
 .auth-space .field-wrapper {
   display: flex;
   align-items: center;
   height: 48px;
   border: 1px solid var(--bordure-champ);
-  border-radius: var(--rayon-pilule);
+  border-radius: var(--rayon-connexion);
   background: var(--champ-fond);
   transition: border-color var(--duree) var(--courbe), box-shadow var(--duree) var(--courbe);
 }
@@ -176,7 +191,7 @@
   padding: 0 20px 0 12px;
   border: 0;
   outline: 0;
-  border-radius: 0 var(--rayon-pilule) var(--rayon-pilule) 0;
+  border-radius: 0 var(--rayon-connexion) var(--rayon-connexion) 0;
   background: transparent;
   color: var(--texte);
   font: inherit;
@@ -200,7 +215,7 @@
 .auth-space .form-error {
   margin: 0 0 16px;
   padding: 12px 18px;
-  border-radius: var(--rayon);
+  border-radius: var(--rayon-connexion);
   background: var(--erreur-fond);
   color: var(--erreur-texte);
   font-size: 0.875rem;
@@ -211,7 +226,7 @@
   margin-top: 4px;
 }
 
-/* Bouton principal : pilule vert sombre de 48 px, réduite à 97 % à la pression */
+/* Bouton principal vert sombre de 48 px, réduit à 97 % à la pression */
 .auth-space .login-button {
   display: inline-flex;
   align-items: center;
@@ -221,7 +236,7 @@
   margin-top: 6px;
   padding: 0 24px;
   border: 0;
-  border-radius: var(--rayon-pilule);
+  border-radius: var(--rayon-connexion);
   background: var(--vert-faso);
   color: #ffffff;
   font: inherit;
@@ -269,42 +284,7 @@
   white-space: nowrap;
 }
 
-/* ---------- Armoiries à droite du formulaire, à la hauteur de la carte ---------- */
-
-/* Le panneau occupe la rangée de la carte ; l'image, hors du flux, ne compte pas dans sa hauteur. */
-.auth-space .visual-panel {
-  grid-row: 3;
-  position: relative;
-  min-width: 0;
-}
-
-/* Le cartouche tient lieu de carte, avec la même ombre que les cartes givrées. Son cadre
-   (1 019 px sur les 1 081 de l'image) s'aligne sur les bords haut et bas de la carte ; la pointe
-   dépasse dessous. Il suit la carte quand elle s'allonge (message d'erreur) ; dans une colonne
-   trop étroite, l'image rétrécit et reste alignée en haut. */
-.auth-space .login-arms {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: calc(100% * 1081 / 1019);
-  object-fit: contain;
-  object-position: top;
-  filter: drop-shadow(0 8px 24px rgb(20 22 26 / 0.1));
-  animation: auth-rise 520ms var(--courbe) both;
-}
-
 /* ---------- Petits écrans ---------- */
-
-@media (max-width: 900px) {
-  .auth-space .login-page {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .auth-space .visual-panel {
-    display: none;
-  }
-}
 
 @media (max-width: 640px) {
   /* Carte en haut, juste sous le logo. */
