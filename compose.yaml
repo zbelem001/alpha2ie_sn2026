@@ -1,0 +1,16 @@
+# Architecture par couche — Dites-le-nous une fois.
+# Depuis la racine du dépôt :
+#   docker compose up -d --build
+# X-Road est démarré et configuré avec le reste de la pile.
+# Projet Compose : dlnuf-couches.
+name: dlnuf-couches
+
+include:
+  - path: infrastructure/docker-compose.yml
+    project_directory: .
+    env_file: .env.example
+  # Banc X-Road obligatoire, démarré et configuré avec la pile
+  - path: passerelle/xroad/docker-compose.xroad.yml
+    project_directory: ./passerelle
+    env_file: .env.example
+
