@@ -376,6 +376,40 @@ def test_agent_can_find_citizen_by_document_identifier(db: Session, monkeypatch)
     assert request.lookup_identifier_ciphertext is None
 
 
+def test_document_reference_is_sent_with_the_expected_holder(db: Session, monkeypatch):
+    """Avec une référence de pièce, le registre reçoit aussi le titulaire attendu, pour vérifier la concordance."""
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv("CITIZEN_IDENTIFIER_ENCRYPTION_KEY", Fernet.generate_key().decode())
+    owner, _, procedure = add_procedure(db)
+    subject_ref = "ACTE:OUAGA:2004:01234"
+    db.add(CitizenIdentityLink(principal_sub="citizen-sub", subject_ref=subject_ref, phone_number="+22670000001"))
+    db.commit()
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    created = create_case(CaseCreate.model_validate({
+        "procedureCode": procedure.code, "channel": "web", "phone": "70000001",
+        "references": {"cnib": "CNIB-DEMO-123456"},
+    }), agent, db)
+    case_id = UUID(created["id"])
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, subject_ref)
+    consent = record_consent(
+        case_id,
+        ConsentCreate(decision="granted", question_codes=["passport_cnib_valid"], notice_version="demo-1", channel="web"),
+        citizen,
+        db,
+    )
+    db.get(Consent, UUID(consent["id"])).expires_at = None
+
+    class RegistryConnector:
+        def query(self, organization, service, payload):
+            assert payload["subject"] == {"pivot_id": subject_ref}
+            assert payload["parameters"] == {"identifier_type": "cnib_number", "document_identifier": "CNIB-DEMO-123456"}
+            return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
+
+    monkeypatch.setattr(connectors, "build_connector", lambda: RegistryConnector())
+    assert execute_checks(case_id, agent, db)["status"] == "completed"
+
+
 def test_sms_cannot_be_recorded_as_consent_channel():
     with pytest.raises(ValidationError):
         ConsentCreate(

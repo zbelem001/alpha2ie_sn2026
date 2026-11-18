@@ -267,6 +267,11 @@ def _check_payload(db: Session, request: RegistryRequest) -> dict:
     case = db.get(Case, request.case_id)
     subject: dict[str, str] = {}
     parameters: dict[str, str] = {}
+    # Titulaire attendu, transmis dès qu'il est connu : avec une référence de pièce, le registre
+    # vérifie que la fiche désignée appartient bien à cette personne (un faux lien est pire que
+    # pas de lien). Sans lui, le casier d'un tiers saisi par erreur était attribué au citoyen.
+    if case.subject_ref.startswith("ACTE:"):
+        subject["pivot_id"] = case.subject_ref
     if request.lookup_identifier_ciphertext:
         try:
             parameters = {
@@ -275,8 +280,6 @@ def _check_payload(db: Session, request: RegistryRequest) -> dict:
             }
         except IdentifierVaultError as error:
             raise HTTPException(status_code=503, detail="Impossible de déchiffrer l’identifiant de registre") from error
-    elif case.subject_ref.startswith("ACTE:"):
-        subject["pivot_id"] = case.subject_ref
     return {
         "question": question,
         "registry": registry,
