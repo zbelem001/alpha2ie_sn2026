@@ -56,14 +56,14 @@
   --vert-faso: #183624;        /* vert sombre : primaire (boutons, onglet actif, focus) ; blanc dessus 13,2:1 */
   --vert-faso-survol: #245236; /* blanc dessus 9,0:1 */
   --vert-armoiries: #316d49;   /* icônes, liens, succès ; 6,2:1 sur blanc */
-  --vert-drapeau: #009e49;     /* pastilles et filets, jamais pour du texte */
+  --vert-drapeau: #009e49;     /* pastilles des badges, jamais pour du texte */
   --or: #e7bc03;               /* or du mil : action phare, texte vert sombre dessus (7,3:1), jamais blanc */
   --or-survol: #d6ad00;        /* vert sombre dessus 6,2:1 */
   --or-sombre: #987c02;        /* pastilles sur fond or */
-  --or-etoile: #fcd116;        /* jaune-or de l'étoile : accents et focus sur fond vert (9,0:1) */
+  --or-etoile: #fcd116;        /* jaune-or de l'étoile : étiquettes et focus sur fond vert (9,0:1) */
   --or-doux: #fbf0c4;          /* fonds « en attente » */
   --surlignage: #fdf7e3;       /* encadrés d'information */
-  --rouge-drapeau: #ef2b2d;    /* pastilles et filets, jamais pour du texte */
+  --rouge-drapeau: #ef2b2d;    /* pastilles et icônes, jamais pour du texte */
   --rouge: #b3141c;            /* erreurs et actions destructives ; 6,9:1 sur blanc */
   --rouge-sombre: #8f1016;
 

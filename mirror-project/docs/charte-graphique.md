@@ -26,11 +26,11 @@ La Constitution nomme les couleurs du drapeau (rouge, vert, jaune-or) sans en fi
 | Vert des armoiries | `--vert-armoiries` | `#316d49` | Icônes, liens, étiquettes, succès. 6,2:1 sur blanc |
 | Or (accent) | `--or` | `#e7bc03` | Action phare : « Lancer la démarche », « Répondre », « Nouveau dossier ». Texte **vert sombre** dessus (7,3:1), jamais blanc |
 | Or, survol | `--or-survol` | `#d6ad00` | Vert sombre dessus : 6,2:1 |
-| Jaune-or de l'étoile | `--or-etoile` | `#fcd116` | Étoile et étiquettes sur les blocs verts (9,0:1), focus du lien d'évitement |
+| Jaune-or de l'étoile | `--or-etoile` | `#fcd116` | Étiquettes sur le bloc vert du guichet (9,0:1), focus du lien d'évitement |
 | Or doux | `--or-doux` | `#fbf0c4` | Fond des badges « en attente » |
 | Surlignage | `--surlignage` | `#fdf7e3` | Encadrés d'information (aide) |
 | Rouge | `--rouge` | `#b3141c` | Erreurs, refus, bandeau d'annonces. 6,9:1 sur blanc |
-| Vert et rouge du drapeau | `--vert-drapeau`, `--rouge-drapeau` | `#009e49`, `#ef2b2d` | Pastilles et filets seulement : trop clairs pour du texte (3,5:1 et 4,2:1 sur blanc) |
+| Vert et rouge du drapeau | `--vert-drapeau`, `--rouge-drapeau` | `#009e49`, `#ef2b2d` | Pastilles des badges seulement : trop clairs pour du texte (3,5:1 et 4,2:1 sur blanc) |
 
 ### Neutres
 
@@ -101,7 +101,9 @@ border-radius: 1.75rem;
 box-shadow: 0 1px 2px rgb(20 22 26 / 0.04), 0 8px 24px -12px rgb(20 22 26 / 0.08);
 ```
 
-**Bloc vert plein** pour le contenu mis en avant : l'accueil de l'écran de connexion (avec l'étoile d'or et un filet rouge et vert au pied) et le dossier suivi au guichet.
+**Bloc vert plein** pour le contenu mis en avant : le dossier suivi au guichet.
+
+**Écran de connexion :** à droite du formulaire, les armoiries (`public/armoiries.webp`), tirées de l'image `armoiries-1.png` fournie : fond gris extérieur rendu transparent, contour noir adouci, 936 × 1 100 px, 83 Ko au lieu de 937 Ko. Le cartouche tient lieu de carte, avec la même ombre. L'image est décorative (texte de remplacement vide) : la pilule du logo annonce déjà les armoiries. Elle est masquée sur téléphone.
 
 ## Composants
 
@@ -142,5 +144,5 @@ box-shadow: 0 1px 2px rgb(20 22 26 / 0.04), 0 8px 24px -12px rgb(20 22 26 / 0.08
 ## Écarts avec DESIGN.md
 
 - **Champs :** contour `#7f8c83` au lieu d'une bordure blanche, pour que le champ reste repérable sur une carte blanche (3:1 exigé par WCAG 1.4.11).
-- **Vert et rouge du drapeau :** trop clairs pour du texte, ils ne servent qu'aux pastilles et aux filets ; les textes utilisent leurs versions foncées.
+- **Vert et rouge du drapeau :** trop clairs pour du texte, ils ne servent qu'aux pastilles ; les textes utilisent leurs versions foncées.
 - **Pas de notifications flottantes (Sonner) ni de hachures :** les confirmations s'affichent dans la page, et les interfaces n'ont pas de graphiques.

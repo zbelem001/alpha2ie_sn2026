@@ -1,5 +1,5 @@
 /* Écran de connexion : charte de docs/charte-graphique.md (variables dans src/app/globals.css).
-   Formulaire dans une carte givrée, champs et bouton en pilules, bloc vert plein pour l'accueil. */
+   Formulaire dans une carte givrée, champs et bouton en pilules, armoiries à droite. */
 
 .auth-space {
   display: flex;
@@ -266,69 +266,23 @@
   white-space: nowrap;
 }
 
-/* ---------- Accueil : bloc vert plein, étoile d'or, filet du drapeau ---------- */
+/* ---------- Armoiries à droite du formulaire ---------- */
 
 .auth-space .visual-panel {
-  position: relative;
   display: flex;
-  align-items: flex-end;
-  min-height: 520px;
-  overflow: hidden;
-  padding: clamp(32px, 5vw, 64px);
-  border-radius: var(--rayon-carte);
-  background: var(--vert-faso);
-  color: var(--texte-sur-vert);
-  box-shadow: var(--ombre-carte);
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 
-.auth-space .visual-panel::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 6px;
-  background: linear-gradient(90deg, var(--rouge-drapeau) 0 50%, var(--vert-drapeau) 50% 100%);
-}
-
-.auth-space .visual-star {
-  position: absolute;
-  top: clamp(28px, 5vw, 56px);
-  right: clamp(28px, 5vw, 56px);
-  width: clamp(56px, 8vw, 96px);
+/* Le cartouche des armoiries tient lieu de carte : même ombre que les cartes givrées. */
+.auth-space .login-arms {
+  width: auto;
   height: auto;
-  color: var(--or-etoile);
-}
-
-.auth-space .visual-copy {
-  position: relative;
-  max-width: 470px;
-}
-
-.auth-space .visual-eyebrow {
-  display: block;
-  margin-bottom: 18px;
-  color: var(--or-etoile);
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.auth-space .visual-copy h2 {
-  margin: 0 0 16px;
-  color: var(--texte-sur-vert);
-  font-size: clamp(2.25rem, 4vw, 3.5rem);
-  font-weight: 300;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-
-.auth-space .visual-copy p {
-  margin: 0;
-  color: var(--texte-sur-vert-secondaire);
-  font-size: 1rem;
-  line-height: 1.6;
+  max-width: 100%;
+  max-height: min(640px, calc(100svh - 200px));
+  filter: drop-shadow(0 8px 24px rgb(20 22 26 / 0.1));
+  animation: auth-rise 520ms var(--courbe) both;
 }
 
 /* ---------- Petits écrans ---------- */
