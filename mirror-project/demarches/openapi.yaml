@@ -68,7 +68,7 @@ paths:
                       required: { type: boolean }
                       document: { type: object, required: [key, label, provider, hint] }
       responses:
-        '200': { description: Démarche créée, enregistrée ou publiée }
+        '200': { description: 'Démarche créée, enregistrée ou publiée' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -288,7 +288,7 @@ paths:
           in: query
           schema: { type: integer, minimum: 1, maximum: 500, default: 200 }
       responses:
-        '200': { description: Événements du périmètre administratif, triés du plus récent au plus ancien }
+        '200': { description: 'Événements du périmètre administratif, triés du plus récent au plus ancien' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /v1/auth/registration/otp:
@@ -425,9 +425,12 @@ paths:
       tags: [citizen]
       summary: Rattacher la référence pivot au compte citoyen
       description: >-
-        Nécessite un téléphone vérifié dans les claims Keycloak et la confirmation explicite
-        du citoyen. Le prototype vérifie que la référence existe dans le registre fictif, mais
-        cette déclaration ne prouve pas l’identité civile du titulaire.
+        Nécessite un téléphone vérifié dans les claims Keycloak, la confirmation explicite du
+        citoyen et une preuve de titularité : nom, prénoms, date de naissance et nom de la mère,
+        comparés par l’état civil (identity-match, réponse oui/non, rien n’est conservé). Une
+        preuve fausse et un acte inexistant reçoivent le même refus 422. Le conflit « acte déjà
+        rattaché » n’est signalé qu’après une preuve correcte. Au-delà de 5 échecs par compte en
+        15 minutes, réponse 429.
       requestBody:
         required: true
         content:
@@ -441,9 +444,9 @@ paths:
               schema: { $ref: '#/components/schemas/IdentityLink' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/Unavailable' }
   /v1/citizen/identifiers:
     get:
@@ -495,6 +498,31 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Invalid' }
         '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/citizen/cases:
+    post:
+      tags: [citizen]
+      summary: Lancer soi-même une démarche, sans guichet et sans pièce à fournir
+      description: >-
+        Réservé au citoyen dont le compte est rattaché à son acte de naissance. L’administration
+        qui propose la démarche est la demandeuse : ses droits d’échange s’appliquent. Dans le
+        même geste, l’accord du citoyen est enregistré (canal web), puis les vérifications
+        partent aussitôt ; le dossier renvoyé porte leurs résultats.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CitizenCaseRequest' }
+      responses:
+        '201':
+          description: Dossier créé, accord enregistré, vérifications faites
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Case' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
   /v1/cases:
     get:
       tags: [cases]
@@ -828,6 +856,38 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/cases/{case_id}/journal/{event_id}/report:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+      - name: event_id
+        in: path
+        required: true
+        description: Consultation visée (événement registry_check du journal de ce dossier)
+        schema: { type: string, format: uuid }
+    post:
+      tags: [audit]
+      summary: Signaler une consultation du journal (contestation ou demande de correction)
+      description: >-
+        Réservé au citoyen concerné par le dossier. not_me inscrit consultation_contested,
+        wrong_result inscrit correction_requested : un événement du journal rattaché à la
+        consultation (correlation_id), visible par l’administration demandeuse. Un seul
+        signalement de chaque sorte par consultation ; aucun texte libre n’est conservé.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConsultationReportRequest' }
+      responses:
+        '201':
+          description: Signalement inscrit au journal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsultationReport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
 components:
   securitySchemes:
     BearerAuth:
@@ -859,13 +919,22 @@ components:
     IdentityLinkRequest:
       type: object
       additionalProperties: false
-      required: [subject_ref, confirmed]
+      required: [subject_ref, confirmed, last_name, first_names, birth_date, mother_name]
       properties:
         subject_ref:
           type: string
           pattern: '^ACTE:[A-Z]+:[0-9]{4}:[0-9]{5}$'
           example: ACTE:OUAGA:2004:01234
         confirmed: { type: boolean, const: true }
+        last_name: { type: string, minLength: 1, maxLength: 100, example: KABORE }
+        first_names: { type: string, minLength: 1, maxLength: 160, example: Awa }
+        birth_date: { type: string, format: date, example: '2004-03-12' }
+        mother_name:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Inscrit sur l’acte ; ce n’est pas une donnée publique.
+          example: COMPAORE Salimata
     IdentityLink:
       type: object
       required: [linked, subject_ref]
@@ -1003,6 +1072,53 @@ components:
         purpose: { type: string }
         outcome: { type: [string, 'null'] }
         data_categories: { type: [array, 'null'], items: { type: string } }
+        correlation_id:
+          type: [string, 'null']
+          description: >-
+            Pour un signalement (consultation_contested, correction_requested), identifiant
+            de la consultation visée.
+    CitizenCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [procedure_code, confirmed]
+      properties:
+        procedure_code: { type: string, minLength: 1, maxLength: 64, example: concours_direct_preverification }
+        confirmed:
+          type: boolean
+          const: true
+          description: Le citoyen autorise les vérifications listées de la démarche.
+    ConsultationReportRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [not_me, wrong_result]
+          description: >-
+            not_me : « je ne reconnais pas cette consultation » ; wrong_result : une
+            information du registre est fausse, correction à demander à la source.
+    ConsultationReport:
+      type: object
+      required: [id, case_id, event_id, reason, status, reported_at]
+      properties:
+        id: { type: string, format: uuid, description: Événement du signalement }
+        case_id: { type: string, format: uuid }
+        event_id: { type: string, format: uuid, description: Consultation signalée }
+        reason: { type: string, enum: [not_me, wrong_result] }
+        status: { type: string, enum: [open] }
+        reported_at: { type: string, format: date-time }
+    Error:
+      type: object
+      description: Erreur métier
+      required: [detail]
+      properties:
+        detail:
+          description: Message lisible ; pour un corps mal formé (422), liste des erreurs de validation.
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: object }
   responses:
     NotFound:
       description: Ressource inconnue
@@ -1047,12 +1163,3 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
-    Error:
-      description: Erreur métier
-      content:
-        application/json:
-          schema:
-            type: object
-            required: [detail]
-            properties:
-              detail: { type: string }

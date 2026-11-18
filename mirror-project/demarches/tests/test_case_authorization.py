@@ -16,7 +16,10 @@ from app.api import (
     DocumentIdentifierInput,
     IdentityLinkCreate,
     CitizenCaseCreate,
+    ConsultationReport,
     create_case,
+    get_journal,
+    report_consultation,
     start_citizen_case,
     execute_checks,
     link_citizen_identity,
@@ -507,6 +510,55 @@ def test_citizen_start_requires_link_confirmation_and_published_procedure(db: Se
             start_citizen_case(body, principal, db)
         assert refused.value.status_code == expected
     assert db.scalar(select(func.count()).select_from(Case)) == 0
+
+
+def test_citizen_reports_a_consultation_once_and_the_requester_sees_it(db: Session, monkeypatch):
+    owner, _, procedure = add_procedure(db)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+
+    class SuccessfulConnector:
+        def query(self, organization, service, payload):
+            return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
+
+    monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
+    case_id = UUID(start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)["id"])
+    consultation = db.scalar(select(AuditEvent).where(AuditEvent.case_id == case_id, AuditEvent.event_type == "registry_check"))
+
+    report = report_consultation(case_id, consultation.id, ConsultationReport(reason="not_me"), citizen, db)
+    assert report["status"] == "open" and report["event_id"] == str(consultation.id)
+    with pytest.raises(HTTPException) as again:
+        report_consultation(case_id, consultation.id, ConsultationReport(reason="not_me"), citizen, db)
+    assert again.value.status_code == 409
+    report_consultation(case_id, consultation.id, ConsultationReport(reason="wrong_result"), citizen, db)
+
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    journal = get_journal(case_id, agent, db)
+    reports = {event["event_type"]: event for event in journal if event["event_type"] in {"consultation_contested", "correction_requested"}}
+    assert set(reports) == {"consultation_contested", "correction_requested"}
+    assert all(event["correlation_id"] == str(consultation.id) and event["outcome"] == "open" for event in reports.values())
+
+
+def test_only_the_citizen_can_report_and_only_a_registry_consultation(db: Session, monkeypatch):
+    _, _, procedure = add_procedure(db)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+
+    class SuccessfulConnector:
+        def query(self, organization, service, payload):
+            return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
+
+    monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
+    case_id = UUID(start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)["id"])
+    created = db.scalar(select(AuditEvent).where(AuditEvent.case_id == case_id, AuditEvent.event_type == "case_created"))
+    consultation = db.scalar(select(AuditEvent).where(AuditEvent.case_id == case_id, AuditEvent.event_type == "registry_check"))
+    with pytest.raises(HTTPException) as not_a_consultation:
+        report_consultation(case_id, created.id, ConsultationReport(reason="not_me"), citizen, db)
+    assert not_a_consultation.value.status_code == 422
+    someone_else = Principal("other-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:1998:00456")
+    with pytest.raises(HTTPException) as forbidden:
+        report_consultation(case_id, consultation.id, ConsultationReport(reason="not_me"), someone_else, db)
+    assert forbidden.value.status_code == 403
+    with pytest.raises(ValidationError):
+        ConsultationReport(reason="autre")
 
 
 def test_sms_cannot_be_recorded_as_consent_channel():

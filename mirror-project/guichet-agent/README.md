@@ -6,7 +6,8 @@ Application Next.js de l'agent, construite à partir d'une copie de `frontend/` 
 
 - ouvre le dossier d'un citoyen pour une démarche de son administration (catalogue `GET /v1/procedures`) ;
 - recueille l'accord : au guichet avec le code reçu par SMS (simulé), ou à distance depuis l'espace usager ;
-- lance les vérifications et voit le résultat minimisé de chacune (« oui », « non », « indisponible », « à examiner ») ; un registre indisponible est réinterrogé automatiquement tant que l'accord est valide.
+- lance les vérifications et voit le résultat minimisé de chacune (« oui », « non », « indisponible », « à examiner ») ; un registre indisponible est réinterrogé automatiquement tant que l'accord est valide ;
+- voit les **signalements du citoyen** : étiquette « Signalement » dans la liste (et le dossier sous le filtre « À reprendre ou examiner »), et dans le dossier, la vérification contestée (« le citoyen ne reconnaît pas la consultation », à examiner avant toute décision) ou la correction demandée, avec le registre à qui la transmettre.
 
 ## Lancer
 
@@ -28,12 +29,12 @@ Variables serveur : les mêmes que [l'espace usager](../espace-usager/README.md#
 
 - [openapi.yaml](openapi.yaml) : routes de l'application (connexion, session, déconnexion, relais vers l'API démarches, limité à `procedures` et `cases`).
 - Tests (Playwright, `npm ci` d'abord) :
-  - `npm run test:unit` : routes relayées, accord tiré du journal ;
-  - `npm run test:e2e` : parcours dans Chrome contre le miroir démarré : pages protégées, compte citoyen refusé, dossier au guichet sans pièce (accord par code simulé, vérifications, dossier retrouvé par la recherche). Prérequis : compte d'Awa rattaché à son acte (les tests de l'espace usager s'en chargent).
+  - `npm run test:unit` : routes relayées, accord et signalements tirés du journal ;
+  - `npm run test:e2e` : parcours dans Chrome contre le miroir démarré : pages protégées, compte citoyen refusé, dossier au guichet sans pièce (accord par code simulé, vérifications, dossier retrouvé par la recherche), signalement du citoyen visible dans la liste et dans le dossier. Prérequis : compte d'Awa rattaché à son acte et une consultation signalée ; lancer d'abord `npm run test:e2e` dans `espace-usager/`, qui s'en charge.
 
 ## Fonctionnement
 
-Même socle que l'espace usager : session côté serveur (cookies `httpOnly`), relais `/api/backend/…` limité ici aux routes `procedures` et `cases` (`src/lib/space.ts`), pages protégées par `src/proxy.ts`. L'état de l'accord de chaque dossier est tiré de son journal ; la liste se rafraîchit toutes les 10 secondes, pour voir arriver l'accord donné à distance.
+Même socle que l'espace usager : session côté serveur (cookies `httpOnly`), relais `/api/backend/…` limité ici aux routes `procedures` et `cases` (`src/lib/space.ts`), pages protégées par `src/proxy.ts`. L'état de l'accord et les signalements de chaque dossier sont tirés de son journal ; la liste se rafraîchit toutes les 10 secondes, pour voir arriver l'accord donné à distance.
 
 ## Écarts avec `frontend/`
 

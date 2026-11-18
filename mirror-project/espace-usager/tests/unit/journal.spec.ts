@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { consentFromJournal, consentIsActive, consultationsFromJournal, formatPhone, requesterFromJournal, type JournalEvent } from "@/lib/journal";
+import { consentFromJournal, consentIsActive, consultationsFromJournal, formatPhone, reportsFromJournal, requesterFromJournal, type JournalEvent } from "@/lib/journal";
 import type { AgentCheck } from "@/modules/casework/types/cases";
 
 const event = (overrides: Partial<JournalEvent>): JournalEvent => ({
@@ -53,6 +53,24 @@ test.describe("consultations tirées du journal", () => {
     const item = { id: "c2", procedureTitle: "Passeport", channel: "assisted" as const, checks: [check] };
     const [entry] = consultationsFromJournal(item, [event({ event_type: "registry_check", question_code: "candidate_minimum_age", outcome: "confirmed" })]);
     expect(entry.basis).toBe("Votre accord au guichet");
+  });
+});
+
+test.describe("signalements du citoyen", () => {
+  const contested = event({ id: "s1", event_type: "consultation_contested", correlation_id: "r1", question_code: "candidate_minimum_age", outcome: "open", occurred_at: "2026-11-18T11:00:00Z" });
+  const correction = event({ id: "s2", event_type: "correction_requested", correlation_id: "r1", question_code: "candidate_minimum_age", outcome: "open" });
+
+  test("rattachés à leur consultation, les autres événements ignorés", () => {
+    expect(reportsFromJournal([event({ id: "r1", event_type: "registry_check" }), contested, correction, event({ event_type: "consent_recorded", correlation_id: "r1" })])).toEqual([
+      { kind: "not_me", consultationId: "r1", occurredAt: "2026-11-18T11:00:00Z", questionCode: "candidate_minimum_age" },
+      { kind: "wrong_result", consultationId: "r1", occurredAt: "2026-11-18T10:00:00Z", questionCode: "candidate_minimum_age" },
+    ]);
+  });
+
+  test("un signalement n'est pas une consultation ; seule une consultation peut être signalée", () => {
+    const item = { id: "c1", procedureTitle: "Concours direct", channel: "web" as const, checks: [check] };
+    const listed = consultationsFromJournal(item, [contested, correction, event({ id: "r1", event_type: "registry_check", question_code: "candidate_minimum_age", outcome: "confirmed" }), event({ id: "b1", event_type: "check_blocked", outcome: "missing_identifier" })]);
+    expect(listed.map((entry) => [entry.id, entry.kind])).toEqual([["r1", "consultation"], ["b1", "blocked"]]);
   });
 });
 

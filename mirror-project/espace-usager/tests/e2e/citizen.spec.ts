@@ -68,6 +68,21 @@ test("démarche faite par le citoyen seul, sans pièce, puis consultations retro
   await expect(consultations.first()).toContainText("Votre accord sur le portail");
 });
 
+test("le citoyen signale une consultation qu'il ne reconnaît pas", async ({ page }) => {
+  await openSpace(page);
+  const consultation = page.locator("section[aria-labelledby='journal-title'] ol > li").first();
+  await consultation.locator("summary").click();
+  await consultation.getByRole("button", { name: "Je ne reconnais pas cette consultation" }).click();
+  await expect(consultation).toContainText("Votre signalement sera inscrit au journal de la démarche");
+  await consultation.getByRole("button", { name: "Confirmer" }).click();
+  await expect(consultation.getByRole("status").filter({ hasText: "Consultation signalée le" })).toBeVisible({ timeout: 15_000 });
+  await page.reload();
+  const again = page.locator("section[aria-labelledby='journal-title'] ol > li").first();
+  await again.locator("summary").click();
+  await expect(again.getByRole("status").filter({ hasText: "Consultation signalée le" })).toBeVisible({ timeout: 20_000 });
+  await expect(again.getByRole("button", { name: "Une information est fausse : demander une correction" })).toBeVisible();
+});
+
 test("le citoyen retire son accord", async ({ page }) => {
   await openSpace(page);
   const entry = page.locator("section[aria-labelledby='cases-title'] ol > li").first();

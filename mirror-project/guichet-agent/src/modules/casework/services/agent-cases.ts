@@ -1,11 +1,11 @@
 import { api } from "@/lib/api";
-import { consentFromJournal, type JournalEvent } from "@/lib/journal";
+import { consentFromJournal, reportsFromJournal, type JournalEvent } from "@/lib/journal";
 import type { AgentCase, AgentCaseService, ApiCase, AssistedChallenge, Procedure } from "@/modules/casework/types/cases";
 
 // API démarches, par le relais de l'application (jeton agent Keycloak gardé côté serveur).
 async function withConsent(item: ApiCase): Promise<AgentCase> {
   const events = await api<JournalEvent[]>(`cases/${item.id}/journal`);
-  return { ...item, consent: consentFromJournal(events, item.consentDays) };
+  return { ...item, consent: consentFromJournal(events, item.consentDays), reports: reportsFromJournal(events) };
 }
 
 const reload = async (id: string) => withConsent(await api<ApiCase>(`cases/${id}`));

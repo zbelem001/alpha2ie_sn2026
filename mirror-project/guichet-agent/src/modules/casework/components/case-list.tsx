@@ -22,7 +22,7 @@ export function CaseList({ cases, loading, onOpen }: {
     return (searchable.includes(normalizedQuery) || item.phone.includes(normalizedQuery.replace(/\s/g, ""))) &&
       (filter === "all" || filter === "waiting" && label === "En attente du citoyen" ||
         filter === "ready" && label === "Prêt à vérifier" ||
-        filter === "pending" && ["Registre indisponible", "À examiner", "Accord expiré", "Accord refusé", "Accord retiré"].includes(label) ||
+        filter === "pending" && (["Registre indisponible", "À examiner", "Accord expiré", "Accord refusé", "Accord retiré"].includes(label) || item.reports.length > 0) ||
         filter === "completed" && item.status === "completed");
   });
   return <section aria-label="Toutes les demandes">
@@ -49,7 +49,7 @@ export function CaseList({ cases, loading, onOpen }: {
                 <td className={styles.phoneCell}>{formatPhone(item.phone)}</td>
                 <td><span className={styles.tableProcedure} title={item.procedureTitle}>{item.procedureTitle}</span></td>
                 <td><span className={styles.channelTag}>{item.channel === "assisted" ? "Au guichet" : "À distance"}</span></td>
-                <td><CaseStatusBadge item={item} /></td>
+                <td><div className={styles.statusStack}><CaseStatusBadge item={item} />{item.reports.length > 0 && <span className={`${styles.status} ${styles.danger}`}>Signalement</span>}</div></td>
                 <td><time className={styles.tableDate} dateTime={item.createdAt}>{new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "Africa/Ouagadougou" }).format(new Date(item.createdAt))}<span>{new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Ouagadougou" }).format(new Date(item.createdAt))}</span></time></td>
                 <td className={styles.actionsCell}><div className={styles.rowActions}>
                   <button type="button" className={styles.iconAction} title="Voir le détail" aria-label={"Voir le détail du dossier " + item.reference} onClick={() => onOpen(item.id)}><Eye size={18} aria-hidden="true" /></button>

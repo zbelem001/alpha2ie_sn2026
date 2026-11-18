@@ -1,5 +1,5 @@
 import type { DocumentReferences, DocumentRequirement } from "@/lib/document-references";
-import type { ConsentView } from "@/lib/journal";
+import type { ConsentView, Report } from "@/lib/journal";
 export type CheckStatus = "queued" | "confirmed" | "rejected" | "ambiguous" | "not_found" | "unavailable" | "blocked" | "error";
 export type CaseStatus = "received" | "pending" | "completed" | "rejected";
 export type ConsentChannel = "assisted" | "web";
@@ -12,8 +12,8 @@ export type ApiCase = {
   channel: ConsentChannel; status: CaseStatus; authorizationId: string;
   checks: AgentCheck[];
 };
-/** Dossier affiché : celui de l'API, avec l'état de l'accord tiré de son journal. */
-export type AgentCase = ApiCase & { consent: ConsentView };
+/** Dossier affiché : celui de l'API, avec l'accord et les signalements du citoyen tirés de son journal. */
+export type AgentCase = ApiCase & { consent: ConsentView; reports: Report[] };
 export type Procedure = {
   code: string; title: string; purpose: string; version: number; consentDays: number; active: boolean; published: boolean;
   checks: { questionCode: string; required: boolean; document: DocumentRequirement }[];

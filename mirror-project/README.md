@@ -8,14 +8,14 @@ La carte du jury impose un dossier par couche : registres, passerelle d'échange
 
 | Dossier | Couche de la carte | Copié depuis (racine du dépôt) | Responsable | État | OpenAPI | Tests |
 |---|---|---|---|---|---|---|
-| [registres/](registres/README.md) | Registres | `interoperability/registries`, `mock_registry` | P3 | Fonctionne seul | [openapi.yaml](registres/openapi.yaml), à remplacer par le contrat du jury | 38 |
+| [registres/](registres/README.md) | Registres | `interoperability/registries`, `mock_registry` | P3 | Fonctionne seul | [openapi.yaml](registres/openapi.yaml), à remplacer par le contrat du jury | 43 |
 | [passerelle/](passerelle/README.md) | Passerelle d'échange | `interoperability/connectors`, `xroad`, `notifications` | P3 | Fonctionne seul | [openapi.yaml](passerelle/openapi.yaml), [notifications](passerelle/notifications.openapi.yaml) | 72 |
 | [consentement-minimisation/](consentement-minimisation/README.md) | Consentement et minimisation | À extraire de `demarches/app/api.py` | À désigner (P2 ?) | README seulement | — | — |
 | [journal/](journal/README.md) | Journal de traçabilité | À extraire de `demarches/app/api.py` | À désigner (P2 ?) | README seulement | — | — |
-| [espace-usager/](espace-usager/README.md) | Espace usager | `frontend/`, partie citoyen | P1 | Branché sur Keycloak et l'API démarches (port 3000) | [openapi.yaml](espace-usager/openapi.yaml) (routes de l'application) | Playwright : 8 unitaires, 6 de bout en bout |
-| [guichet-agent/](guichet-agent/README.md) | Guichet agent (bonus) | `frontend/`, partie agent | P1 | Branché sur Keycloak et l'API démarches (port 3001) | [openapi.yaml](guichet-agent/openapi.yaml) (routes de l'application) | Playwright : 4 unitaires, 3 de bout en bout |
+| [espace-usager/](espace-usager/README.md) | Espace usager | `frontend/`, partie citoyen | P1 | Branché sur Keycloak et l'API démarches (port 3000) | [openapi.yaml](espace-usager/openapi.yaml) (routes de l'application) | Playwright : 10 unitaires, 7 de bout en bout |
+| [guichet-agent/](guichet-agent/README.md) | Guichet agent (bonus) | `frontend/`, partie agent | P1 | Branché sur Keycloak et l'API démarches (port 3001) | [openapi.yaml](guichet-agent/openapi.yaml) (routes de l'application) | Playwright : 5 unitaires, 4 de bout en bout |
 | [resilience/](resilience/README.md) | Résilience (bonus) | Répartie (connecteurs, `execute_checks`, banc X-Road) | À désigner (P3 ?) | README seulement | — | — |
-| [demarches/](demarches/README.md) | (orchestration, hors carte) | `backend/` | P2 | Fonctionne | [openapi.yaml](demarches/openapi.yaml), copie non valide de `contracts/openapi/backend.yaml` | 28 |
+| [demarches/](demarches/README.md) | (orchestration, hors carte) | `backend/` | P2 | Fonctionne | [openapi.yaml](demarches/openapi.yaml), issu de `contracts/openapi/backend.yaml`, corrigé et complété | 36 |
 
 Pas de dossier `contracts/` : chaque contrat est dans la couche qui en est responsable (`registres/schemas`, `passerelle/schemas`, `consentement-minimisation/schemas`, `demarches/schemas` et chaque `openapi.yaml`).
 
@@ -38,12 +38,13 @@ L'environnement d'origine se lance toujours depuis la racine du dépôt. Les deu
 
 ## Vérifié le 17 et le 18/11/2026
 
-- Tests de chaque couche, chacune dans son propre environnement Python : registres 38, passerelle 72 (dont les tests d'interopérabilité avec les registres), démarches 28. Interfaces : construction et lint sans erreur.
+- Tests de chaque couche, chacune dans son propre environnement Python : registres 43, passerelle 72 (dont les tests d'interopérabilité avec les registres), démarches 36. Interfaces : construction et lint sans erreur. Les cinq `openapi.yaml` passent `openapi-spec-validator` ; celui de `demarches/` couvre toutes les routes de l'API.
 - `docker compose up` : 11 services sains (contrôle de santé), Keycloak démarré, tâche `keycloak-profile-init` terminée sans erreur ; images des interfaces construites l'une après l'autre, 308 Mo chacune.
 - Parcours par les routes des interfaces (23 contrôles) : connexion, cookies `httpOnly` sans jeton exposé, pages protégées, compte citoyen refusé au guichet et inversement, chaque interface ne relaie que ses routes, démarche à distance de bout en bout, déconnexion.
 - Parcours dans les écrans, avec Chrome sans interface, sur les deux applications : démarche « concours direct » à distance (l'accord donné par Awa apparaît au guichet sans recharger, trois vérifications confirmées, consultations retrouvées dans l'espace usager), démarche au guichet avec le code simulé, profil, déconnexion ; aucune erreur dans la console.
 - Retrait de l'accord par le citoyen dans « Mes démarches » : état « retiré » affiché, second retrait refusé par l'API, retrait inscrit au journal (Chrome).
 - Démarche lancée par le citoyen seul, depuis l'espace usager (sans guichet, couche bonus) : choix de la démarche, accord, trois vérifications confirmées, résultat et consultations visibles aussitôt (Chrome).
+- Signalement d'une consultation par le citoyen (« Je ne reconnais pas cette consultation » ou demande de correction) : inscrit au journal, toujours affiché après rechargement, visible au guichet (étiquette « Signalement » dans la liste, détail dans le dossier) ; second signalement identique refusé, signalement par un autre citoyen ou d'un événement qui n'est pas une consultation refusé (Chrome et tests de l'API).
 - Démarche « passeport » (`agent-passeport-demo`) : cinq vérifications confirmées (ONI, état civil, Justice, Trésor) ; ouverture d'une démarche d'une autre administration refusée (403).
 - Sécurité : le casier d'un tiers saisi pour Awa donne « introuvable » au lieu de lui être attribué ; le rattachement d'un acte exige la preuve de titularité (refus identique pour une preuve fausse et un acte inexistant, homonyme refusé, essais limités), testé aussi dans Chrome.
 - Non vérifié : banc X-Road lancé depuis `passerelle/` (vérifié depuis `interoperability/`).

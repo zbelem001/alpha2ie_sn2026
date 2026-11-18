@@ -9,6 +9,7 @@ import { AuthorizationRequest } from "@/features/citizen/components/authorizatio
 import { IdentityLinkForm } from "@/features/citizen/components/identity-link-form";
 import { StartProcedure } from "@/features/citizen/components/start-procedure";
 import { ConsentControl } from "@/features/citizen/components/consent-control";
+import { ReportActions } from "@/features/citizen/components/report-actions";
 import { useCitizenSpace, type CitizenCase } from "@/features/citizen/hooks/use-citizen-space";
 import { getSession } from "@/lib/api";
 import styles from "@/features/citizen/styles/home.module.css";
@@ -39,7 +40,6 @@ export function CitizenHomeScreen() {
   const space = useCitizenSpace();
   const [help, setHelp] = useState(false);
   const [notice, setNotice] = useState("");
-  const [reported, setReported] = useState<string[]>([]);
   const [name, setName] = useState("");
   useEffect(() => { getSession().then((session) => { if (session.authenticated) setName(session.name); }).catch(() => undefined); }, []);
 
@@ -108,8 +108,7 @@ export function CitizenHomeScreen() {
                 </summary>
                 <div className={styles.entryBody}>
                   <dl><div><dt>Information concernée</dt><dd>{entry.information}</dd></div><div><dt>Registre consulté</dt><dd>{entry.source}</dd></div><div><dt>Autorisation utilisée</dt><dd>{entry.basis}</dd></div><div><dt>Résultat</dt><dd>{OUTCOMES[entry.outcome] ?? "Vérification à examiner"}</dd></div></dl>
-                  <button className={styles.reportButton} type="button" disabled={reported.includes(entry.id)} onClick={() => setReported((old) => [...old, entry.id])}>{reported.includes(entry.id) ? "Signalement simulé" : "Je ne reconnais pas cette consultation"}</button>
-                  {reported.includes(entry.id) && <p className={styles.reportNote} role="status">Ce signalement est une démonstration. Aucune administration n’a été contactée.</p>}
+                  <ReportActions entry={entry} reports={space.reports.filter((item) => item.consultationId === entry.id)} onReport={(kind) => space.report(entry.caseId, entry.id, kind)} />
                 </div>
               </details>
             </li>)}

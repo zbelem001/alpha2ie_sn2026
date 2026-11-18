@@ -1800,4 +1800,58 @@ def get_journal(
              "registry": db.get(Registry, event.registry_id).code if event.registry_id else None,
              "question_code": db.get(Question, event.question_id).code if event.question_id else None,
              "purpose": event.purpose, "outcome": event.outcome,
-             "data_categories": event.data_categories} for event in events]
+             "data_categories": event.data_categories,
+             # Rattache un signalement du citoyen à la consultation qu'il vise.
+             "correlation_id": event.correlation_id} for event in events]
+
+
+class ConsultationReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # not_me : « je ne reconnais pas cette consultation » (contestation) ;
+    # wrong_result : une information du registre est fausse (correction auprès de la source).
+    reason: str = Field(pattern="^(not_me|wrong_result)$")
+
+
+REPORT_EVENTS = {"not_me": "consultation_contested", "wrong_result": "correction_requested"}
+
+
+@router.post("/cases/{case_id}/journal/{event_id}/report", status_code=status.HTTP_201_CREATED)
+def report_consultation(
+    case_id: UUID,
+    event_id: UUID,
+    body: ConsultationReport,
+    principal: Principal = Depends(require_role("citizen")),
+    db: Session = Depends(get_db),
+):
+    """Le citoyen signale une consultation de son journal : contestation ou demande de correction.
+
+    Le signalement est inscrit au journal du dossier et rattaché à la consultation visée
+    (correlation_id) : l'administration demandeuse le voit dans le dossier. Aucun texte libre
+    n'est conservé.
+    """
+    case = _case_or_404(db, case_id)
+    if principal.citizen_ref != case.subject_ref:
+        raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut signaler une consultation")
+    reported = db.get(AuditEvent, event_id)
+    if reported is None or reported.case_id != case.id:
+        raise HTTPException(status_code=404, detail="Consultation introuvable dans ce dossier")
+    if reported.event_type != "registry_check":
+        raise HTTPException(status_code=422, detail="Seule la consultation d’un registre peut être signalée")
+    event_type = REPORT_EVENTS[body.reason]
+    already = db.scalar(select(AuditEvent).where(
+        AuditEvent.case_id == case.id,
+        AuditEvent.event_type == event_type,
+        AuditEvent.correlation_id == str(reported.id),
+    ))
+    if already is not None:
+        raise HTTPException(status_code=409, detail="Ce signalement a déjà été envoyé pour cette consultation")
+    question = db.get(Question, reported.question_id) if reported.question_id else None
+    registry = db.get(Registry, reported.registry_id) if reported.registry_id else None
+    purpose = ("consultation non reconnue par le citoyen" if body.reason == "not_me"
+               else "correction demandée à l’administration source")
+    event = _add_event(db, case, event_type, purpose, outcome="open", actor_type="citizen",
+                       actor_ref=case.subject_ref, question=question, registry=registry,
+                       correlation_id=str(reported.id))
+    db.commit()
+    return {"id": str(event.id), "case_id": str(case.id), "event_id": str(reported.id),
+            "reason": body.reason, "status": "open", "reported_at": event.occurred_at}

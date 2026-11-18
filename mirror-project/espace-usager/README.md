@@ -10,6 +10,7 @@ Application Next.js du citoyen, construite à partir d'une copie de `frontend/` 
 - suit ses démarches et le résultat de chaque vérification (« Mes démarches ») ;
 - **consulte et retire son accord** pour chaque démarche (quand, où, jusqu'à quand ; `DELETE /v1/cases/{id}/consent`) : aucune nouvelle vérification ne peut ensuite partir avec cet accord ;
 - retrouve chaque consultation de ses informations, refus et blocages compris (« Historique des consultations », tiré du journal de traçabilité) ;
+- **signale une consultation** depuis cet historique : « Je ne reconnais pas cette consultation » (contestation) ou « Une information est fausse : demander une correction » (`POST /v1/cases/{id}/journal/{consultation}/report`). Le signalement est inscrit au journal, l'administration qui a consulté le voit dans le dossier, et il reste affiché ;
 - enregistre au besoin les références de ses documents (profil, chiffré par l'API).
 
 ## Lancer
@@ -36,15 +37,15 @@ Compte de démonstration : `citoyen-demo` / `CitoyenDemo-2026!` (Awa, téléphon
 
 - [openapi.yaml](openapi.yaml) : routes de l'application (connexion, session, déconnexion, relais vers l'API démarches avec la liste des routes relayées).
 - Tests (Playwright, `npm ci` d'abord) :
-  - `npm run test:unit` : logique sans navigateur (accord et consultations tirés du journal, routes relayées) ;
-  - `npm run test:e2e` : parcours dans Chrome contre le miroir démarré (`docker compose up -d` dans `mirror-project/`) : pages protégées, refus d'un mauvais mot de passe et d'un compte agent, démarche faite par le citoyen seul puis consultations retrouvées (scénario de la vidéo), retrait de l'accord, déconnexion. Chrome installé est utilisé ; sinon `npx playwright install chromium` et `PLAYWRIGHT_CHANNEL=chromium`.
+  - `npm run test:unit` : logique sans navigateur (accord, consultations et signalements tirés du journal, routes relayées) ;
+  - `npm run test:e2e` : parcours dans Chrome contre le miroir démarré (`docker compose up -d` dans `mirror-project/`) : pages protégées, refus d'un mauvais mot de passe et d'un compte agent, démarche faite par le citoyen seul puis consultations retrouvées (scénario de la vidéo), signalement d'une consultation, retrait de l'accord, déconnexion. Chrome installé est utilisé ; sinon `npx playwright install chromium` et `PLAYWRIGHT_CHANNEL=chromium`.
 
 ## Fonctionnement
 
 - **Session côté serveur** (`src/lib/server/auth.ts`, `src/app/api/auth/*`) : l'identifiant et le mot de passe sont échangés contre des jetons Keycloak, gardés dans des cookies `httpOnly` et renouvelés automatiquement. Le navigateur ne voit jamais de jeton.
 - **Relais** (`src/app/api/backend/[...path]`) : le navigateur appelle `/api/backend/…`, l'application ajoute le jeton et transmet à `/v1/…`. Seules les routes `cases`, `citizen`, `notifications` et `procedures` (catalogue) sont relayées (`src/lib/space.ts`).
 - **Pages protégées** (`src/proxy.ts`) : sans session, `/usager` renvoie vers la connexion. L'API démarches vérifie de toute façon chaque jeton.
-- **Journal** (`src/lib/journal.ts`) : l'état de l'accord et les consultations sont tirés de `GET /v1/cases/{id}/journal`.
+- **Journal** (`src/lib/journal.ts`) : l'état de l'accord, les consultations et les signalements sont tirés de `GET /v1/cases/{id}/journal` ; un signalement y est rattaché à sa consultation par `correlation_id`.
 - La liste se rafraîchit toutes les 15 secondes : une demande ouverte au guichet apparaît sans recharger.
 
 ## Écarts avec `frontend/`
@@ -57,4 +58,4 @@ Compte de démonstration : `citoyen-demo` / `CitoyenDemo-2026!` (Awa, téléphon
 ## Limites
 
 - Connexion par échange identifiant / mot de passe (Direct Access Grant) pour garder le formulaire : en production, passer au flux Authorization Code avec PKCE.
-- « Je ne reconnais pas cette consultation » reste un signalement simulé : aucune route de contestation dans l'API.
+- Un signalement est inscrit et visible, mais son traitement n'est pas outillé : pas d'état « traité », pas de réponse au citoyen, pas de transmission automatique au registre source (l'agent la fait).

@@ -11,6 +11,7 @@ export type JournalEvent = {
   purpose: string;
   outcome: string | null;
   data_categories: string[] | null;
+  correlation_id?: string | null;
 };
 
 export type ConsentView = {
@@ -22,7 +23,20 @@ export type ConsentView = {
 export type Consultation = {
   id: string; caseId: string; dateTime: string; organization: string; information: string;
   purpose: string; source: string; basis: string; outcome: string;
+  // consultation : un registre a été interrogé (peut être signalée) ; blocked : aucun registre consulté.
+  kind: "consultation" | "blocked";
 };
+
+export type ReportKind = "not_me" | "wrong_result";
+export type Report = { kind: ReportKind; consultationId: string; occurredAt: string; questionCode: string | null };
+const REPORT_TYPES: Record<string, ReportKind> = { consultation_contested: "not_me", correction_requested: "wrong_result" };
+
+/** Signalements du citoyen (contestation, demande de correction), rattachés à leur consultation. */
+export function reportsFromJournal(events: JournalEvent[]): Report[] {
+  return events.filter((event) => REPORT_TYPES[event.event_type] && event.correlation_id).map((event) => ({
+    kind: REPORT_TYPES[event.event_type], consultationId: event.correlation_id!, occurredAt: event.occurred_at, questionCode: event.question_code,
+  }));
+}
 
 /** Dernière décision du citoyen inscrite au journal ; l'accord vaut au plus `consentDays` jours. */
 export function consentFromJournal(events: JournalEvent[], consentDays: number): ConsentView {
@@ -55,6 +69,7 @@ export function consultationsFromJournal(item: Pick<AgentCase, "id" | "procedure
       source: check?.registry ?? event.registry ?? "Registre",
       basis: blocked && event.outcome === "blocked" ? "Aucun accord valide" : channelBasis(item.channel),
       outcome: event.outcome ?? "error",
+      kind: blocked ? "blocked" : "consultation",
     };
   });
 }

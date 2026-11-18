@@ -283,7 +283,7 @@ Selon la pièce, le lien se fait ainsi :
 | Journal visible par l'usager | Fait dans le miroir : espace usager, tiré de `GET /v1/cases/{id}/journal`, refus et blocages compris. | P1, P2 |
 | Identifiant opaque à la place de `ACTE:…` (§7) | Non décidé. Existe de fait pour les comptes sans acte rattaché (`CITIZEN:…`, §11.3). | Collectif |
 | Lien enregistré par le détenteur, avec son niveau de confiance (§8) | À faire. La concordance titulaire–fiche est vérifiée à chaque requête, sans lien enregistré. | P3 |
-| Contestation d'une consultation par l'usager | À faire : bouton simulé dans l'espace usager. | P1, P2 |
+| Contestation d'une consultation par l'usager | Fait dans le miroir : depuis l'historique des consultations, le citoyen conteste (« Je ne reconnais pas cette consultation ») ou demande une correction (`POST /v1/cases/{id}/journal/{consultation}/report`). Le signalement est inscrit au journal, rattaché à la consultation, et l'administration demandeuse le voit au guichet. Reste à faire : son traitement (état « traité », réponse au citoyen), la transmission au détenteur et la révision d'un lien contesté (§8). | P1, P2 |
 | Déclaration des références (§9) | Fait en version simple : références au profil (chiffrées par l'API) ou saisies par l'agent. Condition « le détenteur vérifie » remplie dans le miroir (§11.2). La plateforme conserve la liste des références (§11.4). | P1, P2, P3 |
 
 ## 11. Écarts constatés le 18/11 et corrections

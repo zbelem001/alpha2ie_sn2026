@@ -60,6 +60,7 @@
 .waiting { background: #fbf7e9; color: #806c2c; }
 .success { background: #edf5e9; color: #3a6a3f; }
 .danger { background: #fcf0ed; color: #a14d43; }
+.statusStack { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .newForm { max-width: 800px; }
 .sectionTitle { display: flex; align-items: baseline; gap: 12px; margin: 0 0 24px; }
 .sectionTitle > span { color: #8b9583; font-size: 11px; }
@@ -115,6 +116,8 @@
 .checkActions { margin-top: 22px; }
 .checkActions .hint { margin-top: 12px; margin-bottom: 0; }
 .pendingNote { padding: 14px; margin: 20px 0; background: #fbf7e9; color: #7b6c36; font-size: 12px; line-height: 1.8; }
+.reports { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.reports li { padding: 14px; background: #fcf0ed; color: #a14d43; font-size: 13px; line-height: 1.8; }
 .completion, .granted { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0; color: #3b7846; font-size: 13px; line-height: 1.8; }
 .completion svg, .granted svg { flex-shrink: 0; margin-top: 3px; }
 .refused { color: #a35648; font-size: 14px; line-height: 1.8; }
