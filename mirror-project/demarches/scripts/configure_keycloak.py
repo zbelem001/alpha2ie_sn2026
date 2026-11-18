@@ -36,6 +36,13 @@ PROFILE_ATTRIBUTES = {
 LOCAL_ADMIN_USERNAME = "admin-passeport-demo"
 LOCAL_ADMIN_PASSWORD = os.getenv("LOCAL_ADMIN_DEMO_PASSWORD", "AdminPasseport-2026!")
 LOCAL_ADMINISTRATION_CODE = "BF/GOV/DIPF/PASSEPORTS"
+# HTTPS exigé par Keycloak : « none » pour la démonstration servie en HTTP (http://localhost:8180).
+# Avec « external » (valeur par défaut de Keycloak), Keycloak refuse en HTTP les demandes qu'il ne
+# juge pas locales : depuis la machine, à travers Docker Desktop, la connexion à la console et les
+# jetons de `npm run dev` étaient refusés (« HTTPS required »). Hors démonstration : external ou all.
+SSL_REQUIRED = os.getenv("KEYCLOAK_SSL_REQUIRED", "none").strip().lower()
+if SSL_REQUIRED not in {"none", "external", "all"}:
+    raise SystemExit(f"KEYCLOAK_SSL_REQUIRED inconnu : {SSL_REQUIRED!r} (none, external ou all)")
 
 
 def request_json(path: str, token: str, *, method: str = "GET", body: object = None) -> tuple[int, object]:
@@ -63,6 +70,12 @@ def admin_token() -> str:
     )
     with urllib.request.urlopen(request, timeout=10) as response:
         return json.load(response)["access_token"]
+
+
+def require_ssl(token: str) -> None:
+    """Applique SSL_REQUIRED aux realms master (console) et dlnuf (application), à chaque démarrage."""
+    for realm in ("master", "dlnuf"):
+        request_json(f"/admin/realms/{realm}", token, method="PUT", body={"sslRequired": SSL_REQUIRED})
 
 
 def configure(token: str) -> None:
@@ -145,7 +158,9 @@ def main() -> None:
     for attempt in range(1, 61):
         try:
             token = admin_token()
+            require_ssl(token)
             configure(token)
+            print(f"HTTPS exigé : {SSL_REQUIRED} (realms master et dlnuf).", flush=True)
             print("Profil et claims des comptes Keycloak de démonstration configurés.", flush=True)
             return
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as error:

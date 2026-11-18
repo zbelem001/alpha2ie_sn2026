@@ -94,6 +94,8 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-dev}
       CITIZEN_DEMO_PHONE: ${TEST_PHONE_NUMBER:-}
       CITIZEN_DEMO_PHONE_VERIFIED: ${CITIZEN_DEMO_PHONE_VERIFIED:-false}
+      # HTTPS exigé par Keycloak sur les realms master et dlnuf (none : démonstration en HTTP).
+      KEYCLOAK_SSL_REQUIRED: ${KEYCLOAK_SSL_REQUIRED:-none}
     depends_on:
       keycloak:
         condition: service_started

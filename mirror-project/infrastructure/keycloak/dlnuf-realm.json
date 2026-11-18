@@ -1,6 +1,7 @@
 {
   "realm": "dlnuf",
   "enabled": true,
+  "sslRequired": "none",
   "displayName": "Dites-le-nous une fois (démo)",
   "roles": {
     "realm": [
