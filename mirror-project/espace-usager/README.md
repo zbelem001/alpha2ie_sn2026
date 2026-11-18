@@ -8,6 +8,7 @@ Application Next.js du citoyen, construite à partir d'une copie de `frontend/` 
 - **lance lui-même une démarche**, sans guichet ni pièce à fournir : il choisit la démarche, voit les informations qui seront vérifiées, autorise ces vérifications, et le résultat arrive aussitôt (`POST /v1/citizen/cases`) ;
 - répond aux demandes d'accord des administrations (démarches ouvertes au guichet, « à distance ») ;
 - suit ses démarches et le résultat de chaque vérification (« Mes démarches ») ;
+- **consulte et retire son accord** pour chaque démarche (quand, où, jusqu'à quand ; `DELETE /v1/cases/{id}/consent`) : aucune nouvelle vérification ne peut ensuite partir avec cet accord ;
 - retrouve chaque consultation de ses informations, refus et blocages compris (« Historique des consultations », tiré du journal de traçabilité) ;
 - enregistre au besoin les références de ses documents (profil, chiffré par l'API).
 

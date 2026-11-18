@@ -143,3 +143,7 @@
 .profilePanel button { font-size: 12px; padding: 10px 16px; }
 
 .profilePanel form > p { font-size: 12px; }
+
+/* Accord du citoyen pour une démarche : consulter et retirer. */
+.consentBox { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e3e8e0; font-size: 14px; line-height: 1.5; }
+.consentBox .decisions { margin-top: 12px; }

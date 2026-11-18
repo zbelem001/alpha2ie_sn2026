@@ -8,6 +8,7 @@ import { CitizenHeader } from "@/features/citizen/components/citizen-header";
 import { AuthorizationRequest } from "@/features/citizen/components/authorization-request";
 import { IdentityLinkForm } from "@/features/citizen/components/identity-link-form";
 import { StartProcedure } from "@/features/citizen/components/start-procedure";
+import { ConsentControl } from "@/features/citizen/components/consent-control";
 import { useCitizenSpace, type CitizenCase } from "@/features/citizen/hooks/use-citizen-space";
 import { getSession } from "@/lib/api";
 import styles from "@/features/citizen/styles/home.module.css";
@@ -87,6 +88,7 @@ export function CitizenHomeScreen() {
                 </summary>
                 <div className={styles.entryBody}>
                   <dl>{item.checks.map((check) => <div key={check.questionCode}><dt>{check.label}</dt><dd>{CHECK_RESULTS[check.status] ?? "À reprendre"}{check.required ? "" : " · facultatif"}</dd></div>)}</dl>
+                  <ConsentControl item={item} onRevoke={async (caseId) => { await space.revokeConsent(caseId); setNotice("Votre accord est retiré : plus aucune vérification ne peut être faite avec cet accord."); }} />
                 </div>
               </details>
             </li>)}
