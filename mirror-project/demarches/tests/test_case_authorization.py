@@ -262,6 +262,64 @@ def test_case_creation_dispatches_infobip_for_configured_demo_citizen(db: Sessio
     assert case["id"][:8].upper() in sent["body"]
 
 
+def identity_proof(**overrides):
+    """Rattachement d'Awa avec sa preuve de titularité (nom de la mère inscrit sur l'acte)."""
+    values = {
+        "subject_ref": "ACTE:OUAGA:2004:01234", "confirmed": True, "last_name": "KABORE",
+        "first_names": "Awa", "birth_date": "2004-03-12", "mother_name": "COMPAORE Salimata",
+    }
+    return IdentityLinkCreate.model_validate({**values, **overrides})
+
+
+class MatchConnector:
+    def __init__(self, reply):
+        self.reply = reply
+
+    def query(self, organization, service, payload):
+        return self.reply
+
+
+def test_identity_link_requires_the_holder_proof_without_revealing_why(db: Session, monkeypatch):
+    citizen = Principal("proof-sub", frozenset({"citizen"}), None, None, phone_number="+22670000077", phone_number_verified=True)
+    messages = []
+    for reply in ({"status": "ok", "data": {"match": False}}, {"status": "not_found", "data": None}):
+        monkeypatch.setattr(connectors, "build_connector", lambda reply=reply: MatchConnector(reply))
+        with pytest.raises(HTTPException) as refused:
+            link_citizen_identity(identity_proof(mother_name="KONATE Aminata"), citizen, db)
+        assert refused.value.status_code == 422
+        messages.append(refused.value.detail)
+    # Même réponse pour un acte inexistant et pour une preuve fausse : rien n'est révélé.
+    assert messages[0] == messages[1]
+    assert db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.principal_sub == "proof-sub")) is None
+
+
+def test_identity_link_conflict_is_reported_only_after_the_proof(db: Session, monkeypatch):
+    db.add(CitizenIdentityLink(principal_sub="first-owner", subject_ref="ACTE:OUAGA:2004:01234", phone_number="+22670000001"))
+    db.commit()
+    intruder = Principal("intruder-sub", frozenset({"citizen"}), None, None, phone_number="+22670000088", phone_number_verified=True)
+    monkeypatch.setattr(connectors, "build_connector", lambda: MatchConnector({"status": "ok", "data": {"match": False}}))
+    with pytest.raises(HTTPException) as wrong_proof:
+        link_citizen_identity(identity_proof(mother_name="Inconnue"), intruder, db)
+    assert wrong_proof.value.status_code == 422
+    monkeypatch.setattr(connectors, "build_connector", lambda: MatchConnector({"status": "ok", "data": {"match": True}}))
+    with pytest.raises(HTTPException) as already_linked:
+        link_citizen_identity(identity_proof(), intruder, db)
+    assert already_linked.value.status_code == 409
+
+
+def test_identity_link_attempts_are_limited(db: Session, monkeypatch):
+    citizen = Principal("guesser-sub", frozenset({"citizen"}), None, None, phone_number="+22670000066", phone_number_verified=True)
+    monkeypatch.setattr(connectors, "build_connector", lambda: MatchConnector({"status": "ok", "data": {"match": False}}))
+    for _ in range(5):
+        with pytest.raises(HTTPException) as refused:
+            link_citizen_identity(identity_proof(mother_name="Essai"), citizen, db)
+        assert refused.value.status_code == 422
+    monkeypatch.setattr(connectors, "build_connector", lambda: MatchConnector({"status": "ok", "data": {"match": True}}))
+    with pytest.raises(HTTPException) as blocked:
+        link_citizen_identity(identity_proof(), citizen, db)
+    assert blocked.value.status_code == 429
+
+
 def test_citizen_can_link_confirmed_reference_with_verified_phone(db: Session, monkeypatch):
     citizen = Principal(
         "citizen-sub", frozenset({"citizen"}), None, None,
@@ -271,15 +329,15 @@ def test_citizen_can_link_confirmed_reference_with_verified_phone(db: Session, m
     class IdentityConnector:
         def query(self, organization, service, payload):
             assert organization == "BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL"
-            assert service == "identity"
-            return {"status": "ok", "data": {"pivot_id": payload["subject"]["pivot_id"]}}
+            assert service == "identity-match"
+            assert payload["subject"] == {
+                "pivot_id": "ACTE:OUAGA:2004:01234", "last_name": "KABORE", "first_names": "Awa",
+                "birth_date": "2004-03-12", "mother_name": "COMPAORE Salimata",
+            }
+            return {"status": "ok", "data": {"match": True}}
 
     monkeypatch.setattr(connectors, "build_connector", lambda: IdentityConnector())
-    result = link_citizen_identity(
-        IdentityLinkCreate(subject_ref="acte:ouaga:2004:01234", confirmed=True),
-        citizen,
-        db,
-    )
+    result = link_citizen_identity(identity_proof(subject_ref="acte:ouaga:2004:01234"), citizen, db)
 
     assert result == {"linked": True, "subject_ref": "ACTE:OUAGA:2004:01234"}
     stored = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.principal_sub == citizen.subject))
@@ -290,11 +348,11 @@ def test_citizen_can_link_confirmed_reference_with_verified_phone(db: Session, m
 def test_citizen_identity_link_requires_confirmation_and_verified_phone(db: Session):
     unverified = Principal("citizen-sub", frozenset({"citizen"}), None, None, "+22670000099", False)
     with pytest.raises(HTTPException) as unchecked:
-        link_citizen_identity(IdentityLinkCreate(subject_ref="ACTE:OUAGA:2004:01234", confirmed=False), unverified, db)
+        link_citizen_identity(identity_proof(confirmed=False), unverified, db)
     assert unchecked.value.status_code == 422
 
     with pytest.raises(HTTPException) as no_verified_phone:
-        link_citizen_identity(IdentityLinkCreate(subject_ref="ACTE:OUAGA:2004:01234", confirmed=True), unverified, db)
+        link_citizen_identity(identity_proof(), unverified, db)
     assert no_verified_phone.value.status_code == 403
 
 

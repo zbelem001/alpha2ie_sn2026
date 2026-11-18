@@ -1,10 +1,11 @@
 """Routes métier MVP, protégées par des jetons Bearer Keycloak."""
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 import logging
 import os
 import re
+import threading
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -211,6 +212,33 @@ class IdentityLinkCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     subject_ref: str = Field(min_length=1, max_length=160)
     confirmed: bool
+    # Preuve de titularité : comparée par l'état civil (identity-match, réponse oui/non),
+    # jamais conservée. Le nom de la mère, inscrit sur l'acte, n'est pas une donnée publique.
+    last_name: str = Field(min_length=1, max_length=100)
+    first_names: str = Field(min_length=1, max_length=160)
+    birth_date: date
+    mother_name: str = Field(min_length=1, max_length=160)
+
+
+# Essais de rattachement manqués, par compte : au-delà, attente (empêche de deviner la preuve).
+# Mémoire du processus : suffisant pour la démonstration ; en production, un stockage partagé.
+IDENTITY_LINK_MAX_FAILURES = 5
+IDENTITY_LINK_WINDOW = timedelta(minutes=15)
+_identity_link_failures: dict[str, list[datetime]] = {}
+_identity_link_lock = threading.Lock()
+
+
+def _identity_link_blocked(subject: str) -> bool:
+    cutoff = datetime.now(timezone.utc) - IDENTITY_LINK_WINDOW
+    with _identity_link_lock:
+        recent = [moment for moment in _identity_link_failures.get(subject, []) if moment > cutoff]
+        _identity_link_failures[subject] = recent
+        return len(recent) >= IDENTITY_LINK_MAX_FAILURES
+
+
+def _record_identity_link_failure(subject: str) -> None:
+    with _identity_link_lock:
+        _identity_link_failures.setdefault(subject, []).append(datetime.now(timezone.utc))
 
 
 def _add_event(
@@ -755,26 +783,51 @@ def link_citizen_identity(
             by_account.phone_number = principal.phone_number
             db.commit()
         return {"linked": True, "subject_ref": subject_ref}
-    if by_reference and by_reference.principal_sub != principal.subject:
-        raise HTTPException(status_code=409, detail="Cette référence est déjà associée à un autre compte")
+    if _identity_link_blocked(principal.subject):
+        raise HTTPException(
+            status_code=429,
+            detail="Trop d’essais de rattachement. Réessayez dans 15 minutes, ou présentez-vous au guichet avec votre acte de naissance.",
+        )
 
+    # Preuve de titularité : l'état civil compare ce que déclare la personne à l'acte et ne
+    # répond que « correspond : oui ou non ». Avant tout autre contrôle sur la référence, pour
+    # ne révéler ni qu'un acte existe, ni qu'il est déjà rattaché.
     from connectors import build_connector
 
     try:
-        identity_reply = build_connector().query(
+        match_reply = build_connector().query(
             "BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL",
-            "identity",
-            {"procedure": "citizen_identity_link", "subject": {"pivot_id": subject_ref}},
+            "identity-match",
+            {
+                "procedure": "citizen_identity_link",
+                "subject": {
+                    "pivot_id": subject_ref,
+                    "last_name": body.last_name.strip(),
+                    "first_names": body.first_names.strip(),
+                    "birth_date": body.birth_date.isoformat(),
+                    "mother_name": body.mother_name.strip(),
+                },
+            },
         )
     except Exception as error:
-        raise HTTPException(status_code=503, detail="Le registre de démonstration est indisponible") from error
-    identity_status = identity_reply.get("status")
-    if identity_status == "not_found":
-        raise HTTPException(status_code=404, detail="Référence absente du jeu de données de démonstration")
-    if identity_status == "ambiguous":
-        raise HTTPException(status_code=409, detail="Référence ambiguë dans le jeu de données de démonstration")
-    if identity_status != "ok" or not isinstance(identity_reply.get("data"), dict) or identity_reply["data"].get("pivot_id") != subject_ref:
-        raise HTTPException(status_code=422, detail="La référence n’a pas pu être validée dans le jeu de données")
+        raise HTTPException(status_code=503, detail="L’état civil est momentanément indisponible. Réessayez.") from error
+    match_status = match_reply.get("status")
+    if match_status == "unavailable":
+        raise HTTPException(status_code=503, detail="L’état civil est momentanément indisponible. Réessayez.")
+    if match_status == "ambiguous":
+        raise HTTPException(status_code=409, detail="Cet acte doit être vérifié au guichet, avec votre acte de naissance.")
+    match_data = match_reply.get("data")
+    if match_status != "ok" or not isinstance(match_data, dict) or match_data.get("match") is not True:
+        _record_identity_link_failure(principal.subject)
+        raise HTTPException(
+            status_code=422,
+            detail="Ces informations ne correspondent pas à un acte de naissance. Vérifiez la référence, vos nom, prénoms, date de naissance et le nom de votre mère.",
+        )
+    if by_reference and by_reference.principal_sub != principal.subject:
+        raise HTTPException(
+            status_code=409,
+            detail="Cet acte est déjà rattaché à un autre compte. Présentez-vous au guichet avec votre acte pour faire vérifier ce rattachement.",
+        )
 
     link = CitizenIdentityLink(
         principal_sub=principal.subject,
