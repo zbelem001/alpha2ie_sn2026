@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { DocumentFields } from "@/components/shared/document-fields";
-import { IdentityLinkForm } from "@/features/citizen/components/identity-link-form";
+import { IdentityLinkForm, linkIdentity } from "@/features/citizen/components/identity-link-form";
 import { DOCUMENT_TYPES, cleanReferences, type DocumentReferences } from "@/lib/document-references";
 import { api } from "@/lib/api";
 import styles from "@/features/citizen/styles/home.module.css";
@@ -33,7 +33,7 @@ export function DocumentProfile() {
     finally { setBusy(false); }
   }
   if (!profile) return <div className={styles.profilePanel}><p role="status">{notice || "Chargement…"}</p></div>;
-  if (!profile.linked) return <IdentityLinkForm onLink={async (subjectRef) => { await api("citizen/identity-link", { body: { subject_ref: subjectRef.trim(), confirmed: true } }); await load(); }} />;
+  if (!profile.linked) return <IdentityLinkForm onLink={async (proof) => { await linkIdentity(proof); await load(); }} />;
   return <div className={styles.profilePanel}>
     <p>Compte rattaché à l’acte de naissance <strong>{profile.subject_ref}</strong>.</p>
     <form onSubmit={(e) => { e.preventDefault(); if (!busy) void save(); }}>

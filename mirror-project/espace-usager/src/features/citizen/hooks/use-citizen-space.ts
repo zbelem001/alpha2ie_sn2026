@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { consentFromJournal, consultationsFromJournal, requesterFromJournal, type ConsentView, type Consultation, type JournalEvent } from "@/lib/journal";
 import type { ApiCase } from "@/modules/casework/types/cases";
+import { linkIdentity as sendIdentityProof, type IdentityProof } from "@/features/citizen/components/identity-link-form";
 
 const REFRESH_MS = 15_000;
 
@@ -53,8 +54,8 @@ export function useCitizenSpace() {
     await load();
   }
 
-  async function linkIdentity(subjectRef: string) {
-    await api("citizen/identity-link", { body: { subject_ref: subjectRef.trim(), confirmed: true } });
+  async function linkIdentity(proof: IdentityProof) {
+    await sendIdentityProof(proof);
     await load();
   }
 
