@@ -5,24 +5,6 @@
   "description": "Corps transmis par le connecteur au service d'un registre : c'est le `payload` de RegistryConnector.query(organization, service, payload). Il est identique en appel direct et via X-Road. Statut : PROPOSITION à valider entre Personne 2 et Personne 3.",
   "type": "object",
   "required": ["subject"],
-  "anyOf": [
-    {
-      "properties": {
-        "subject": {
-          "anyOf": [
-            { "required": ["pivot_id"] },
-            { "required": ["last_name", "first_names", "birth_date"] }
-          ]
-        }
-      }
-    },
-    {
-      "required": ["parameters"],
-      "properties": {
-        "parameters": { "required": ["identifier_type", "document_identifier"] }
-      }
-    }
-  ],
   "additionalProperties": false,
   "properties": {
     "request_id": {
@@ -37,8 +19,12 @@
     },
     "subject": {
       "type": "object",
-      "description": "Personne concernée : son identifiant pivot, ou des critères de recherche (nom, prénoms, date de naissance).",
+      "description": "Titulaire attendu, toujours requis : son identifiant pivot, ou des critères d'identité (nom, prénoms, date de naissance). Avec une référence de pièce, le registre vérifie que la fiche trouvée appartient à ce titulaire.",
       "additionalProperties": false,
+      "anyOf": [
+        { "required": ["pivot_id"] },
+        { "required": ["last_name", "first_names", "birth_date"] }
+      ],
       "properties": {
         "pivot_id": {
           "type": "string",
@@ -53,7 +39,7 @@
     },
     "parameters": {
       "type": "object",
-      "description": "Paramètres propres à un service. Une recherche par document utilise identifier_type et document_identifier ; ces valeurs sont réservées au registre concerné."
+      "description": "Paramètres propres à un service. Une référence de pièce (identifier_type, document_identifier) désigne la fiche à consulter ; elle ne prouve pas à qui la pièce appartient : la fiche doit appartenir au titulaire (subject), sinon la réponse est not_found. Ces valeurs sont réservées au registre concerné."
     }
   }
 }

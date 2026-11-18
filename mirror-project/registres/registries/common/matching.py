@@ -55,10 +55,27 @@ def resolve_single(records: list[Record], subject: Subject) -> Record | ServiceR
     return found[0]
 
 
+def holder_matches(record: Record, subject: Subject) -> bool:
+    """La fiche appartient-elle au titulaire attendu ? Identifiant pivot, à défaut critères d'identité."""
+    if subject.pivot_id:
+        return str(record.get("pivot_id", "")) == subject.pivot_id
+    if subject.has_criteria and all(key in record for key in ("last_name", "first_names", "birth_date")):
+        return matches_criteria(record, subject)
+    return False
+
+
 def resolve_by_identifier(
-    records: list[Record], parameters: dict[str, Any], expected_type: str, field: str
+    records: list[Record], parameters: dict[str, Any], expected_type: str, field: str, subject: Subject
 ) -> Record | ServiceResult:
-    """Resolve one synthetic registry record by its registry-specific document ID."""
+    """Retrouve une fiche par la référence propre au registre, puis vérifie son titulaire.
+
+    La référence désigne la pièce ; elle ne prouve pas à qui elle appartient (une référence
+    saisie par erreur, ou celle d'un tiers). Une fiche qui n'appartient pas au titulaire attendu
+    donne not_found, comme une référence inconnue : rien n'est révélé, et un faux lien est
+    pire que pas de lien (docs/resolution-des-donnees.md, §8).
+    """
+    if not (subject.pivot_id or subject.has_criteria):
+        return ServiceResult.invalid("La référence d’une pièce doit être accompagnée de l’identité attendue de son titulaire")
     if parameters.get("identifier_type") != expected_type:
         return ServiceResult.invalid("Type d’identifiant incompatible avec ce registre")
     value = parameters.get("document_identifier")
@@ -70,4 +87,6 @@ def resolve_by_identifier(
         return ServiceResult.not_found()
     if len(found) > 1:
         return ServiceResult.ambiguous()
+    if not holder_matches(found[0], subject):
+        return ServiceResult.not_found()
     return found[0]

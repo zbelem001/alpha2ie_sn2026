@@ -30,7 +30,7 @@ def create_app(records: list[Record] | None = None) -> FastAPI:
 
     def cnib_status(request: RegistryRequest) -> ServiceResult:
         if request.parameters.get("document_identifier"):
-            found = resolve_by_identifier(records, request.parameters, "cnib_number", "cnib_number")
+            found = resolve_by_identifier(records, request.parameters, "cnib_number", "cnib_number", request.subject)
             if isinstance(found, ServiceResult):
                 return found
             return ServiceResult.ok({"valid": bool(found["valid"])})

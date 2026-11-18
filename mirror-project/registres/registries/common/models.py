@@ -33,7 +33,8 @@ class RegistryRequest(BaseModel):
 
     @model_validator(mode="after")
     def _must_provide_lookup(self) -> RegistryRequest:
+        # Une référence de pièce désigne une fiche, elle ne dit pas à qui elle appartient :
+        # l'identité attendue du titulaire est toujours requise.
         if self.subject.pivot_id is None and not self.subject.has_criteria:
-            if not (self.parameters.get("identifier_type") and self.parameters.get("document_identifier")):
-                raise ValueError("subject ou parameters.identifier_type + document_identifier est requis")
+            raise ValueError("subject.pivot_id ou les critères d'identité (nom, prénoms, date de naissance) sont requis")
         return self

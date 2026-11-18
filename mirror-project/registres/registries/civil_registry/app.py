@@ -38,7 +38,7 @@ def create_app(records: list[Record] | None = None, today: Callable[[], date] = 
 
     def identity(request: RegistryRequest) -> ServiceResult:
         if request.parameters.get("document_identifier"):
-            found = resolve_by_identifier(records, request.parameters, "birth_act_number", "birth_act_number")
+            found = resolve_by_identifier(records, request.parameters, "birth_act_number", "birth_act_number", request.subject)
             if isinstance(found, ServiceResult):
                 return found
             return ServiceResult.ok({"found": True})
@@ -74,7 +74,7 @@ def create_app(records: list[Record] | None = None, today: Callable[[], date] = 
         return ServiceResult.ok({"match": matches_criteria(candidates[0], subject)})
 
     def is_adult(request: RegistryRequest) -> ServiceResult:
-        found = (resolve_by_identifier(records, request.parameters, "birth_act_number", "birth_act_number")
+        found = (resolve_by_identifier(records, request.parameters, "birth_act_number", "birth_act_number", request.subject)
                  if request.parameters.get("document_identifier") else resolve_single(records, request.subject))
         if isinstance(found, ServiceResult):
             return found

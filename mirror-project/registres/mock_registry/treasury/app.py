@@ -49,7 +49,7 @@ def create_app(payments: list[dict[str, Any]] | None = None) -> FastAPI:
 
     def payment_status(request: RegistryRequest) -> ServiceResult:
         if request.parameters.get("document_identifier"):
-            payment = resolve_by_identifier(payments, request.parameters, "payment_reference", "reference")
+            payment = resolve_by_identifier(payments, request.parameters, "payment_reference", "reference", request.subject)
             if isinstance(payment, ServiceResult):
                 return payment
             if payment.get("procedure") != request.procedure:

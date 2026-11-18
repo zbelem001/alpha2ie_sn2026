@@ -1,4 +1,4 @@
-from .conftest import call
+from .conftest import REQUEST_SCHEMA, call
 
 AWA = "ACTE:OUAGA:2004:01234"
 ISSA = "ACTE:OUAGA:1998:00456"
@@ -39,31 +39,31 @@ def test_registry_specific_document_identifiers_return_only_minimal_results(civi
     cnib = call(
         oni,
         "cnib-status",
-        {},
+        {"pivot_id": AWA},
         parameters={"identifier_type": "cnib_number", "document_identifier": "CNIB-DEMO-OUAGA-2004-01234"},
     )
     birth_act = call(
         civil,
         "identity",
-        {},
+        {"pivot_id": AWA},
         parameters={"identifier_type": "birth_act_number", "document_identifier": "ACTE-DEMO-OUAGA-2004-01234"},
     )
     nationality = call(
         justice,
         "nationality",
-        {},
+        {"pivot_id": AWA},
         parameters={"identifier_type": "nationality_reference", "document_identifier": "NAT-DEMO-OUAGA-2004-01234"},
     )
     criminal_record = call(
         justice,
         "criminal-record-current",
-        {},
+        {"pivot_id": AWA},
         parameters={"identifier_type": "criminal_record_number", "document_identifier": "CASIER-DEMO-OUAGA-2004-01234"},
     )
     payment = call(
         treasury,
         "payment-status",
-        {},
+        {"pivot_id": AWA},
         procedure="passeport_ordinaire_precheck",
         parameters={"identifier_type": "payment_reference", "document_identifier": "PAY-2026-0004"},
     )
@@ -73,6 +73,63 @@ def test_registry_specific_document_identifiers_return_only_minimal_results(civi
     assert nationality["data"] == {"burkinabe": True}
     assert criminal_record["data"] == {"valid": True}
     assert payment["data"] == {"paid": True}
+
+
+ADAMA_CRIMINAL_RECORD = "CASIER-DEMO-OUAGA-1992-01120"  # Adama SOME, une condamnation
+
+
+def test_document_reference_of_someone_else_is_not_found(justice):
+    """Le casier d'Adama saisi dans le dossier d'Awa : jamais attribué à Awa, rien n'est révélé."""
+    wrong_record = call(
+        justice,
+        "criminal-record",
+        {"pivot_id": AWA},
+        parameters={"identifier_type": "criminal_record_number", "document_identifier": ADAMA_CRIMINAL_RECORD},
+    )
+    unknown_record = call(
+        justice,
+        "criminal-record",
+        {"pivot_id": AWA},
+        parameters={"identifier_type": "criminal_record_number", "document_identifier": "CASIER-INCONNU-0000"},
+    )
+    assert wrong_record["status"] == "not_found" and wrong_record["data"] is None
+    # Même réponse qu'une référence inconnue : on n'apprend pas que la référence existe.
+    assert wrong_record["message"] == unknown_record["message"]
+    issa_nationality = call(
+        justice,
+        "nationality",
+        {"pivot_id": AWA},
+        parameters={"identifier_type": "nationality_reference", "document_identifier": "NAT-DEMO-OUAGA-1998-00456"},
+    )
+    assert issa_nationality["status"] == "not_found"
+    own_record = call(
+        justice,
+        "criminal-record",
+        {"pivot_id": "ACTE:OUAGA:1992:01120"},
+        parameters={"identifier_type": "criminal_record_number", "document_identifier": ADAMA_CRIMINAL_RECORD},
+    )
+    assert own_record["status"] == "ok" and own_record["data"] == {"clean": False}
+
+
+def test_document_reference_without_holder_is_refused(justice):
+    """Une référence seule ne suffit pas : le titulaire attendu est toujours requis."""
+    response = justice.post("/services/criminal-record", json={
+        "request_id": "test-1",
+        "subject": {},
+        "parameters": {"identifier_type": "criminal_record_number", "document_identifier": "CASIER-DEMO-OUAGA-2004-01234"},
+    })
+    body = response.json()
+    assert response.status_code == 400 and body["status"] == "invalid_request" and body["data"] is None
+    assert list(REQUEST_SCHEMA.iter_errors({"subject": {}, "parameters": {"identifier_type": "x", "document_identifier": "y"}}))
+
+
+def test_document_reference_checked_against_identity_criteria(justice):
+    """Sans identifiant pivot, la fiche doit correspondre au nom, aux prénoms et à la date de naissance."""
+    awa = {"last_name": "KABORE", "first_names": "Awa", "birth_date": "2004-03-12"}
+    issa = {"last_name": "SAWADOGO", "first_names": "Issa", "birth_date": "1998-07-23"}
+    reference = {"identifier_type": "nationality_reference", "document_identifier": "NAT-DEMO-OUAGA-2004-01234"}
+    assert call(justice, "nationality", awa, parameters=reference)["data"] == {"burkinabe": True}
+    assert call(justice, "nationality", issa, parameters=reference)["status"] == "not_found"
 
 
 def test_person_absent_from_justice_is_not_found_never_yes(justice):

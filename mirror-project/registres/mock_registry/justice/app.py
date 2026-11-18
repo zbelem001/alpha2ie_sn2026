@@ -32,21 +32,21 @@ def create_app(records: list[Record] | None = None) -> FastAPI:
     records = load_records(DATA_FILE) if records is None else records
 
     def nationality(request: RegistryRequest) -> ServiceResult:
-        found = (resolve_by_identifier(records, request.parameters, "nationality_reference", "nationality_reference")
+        found = (resolve_by_identifier(records, request.parameters, "nationality_reference", "nationality_reference", request.subject)
                  if request.parameters.get("document_identifier") else resolve_single(records, request.subject))
         if isinstance(found, ServiceResult):
             return found
         return ServiceResult.ok({"burkinabe": bool(found["burkinabe"])})
 
     def criminal_record(request: RegistryRequest) -> ServiceResult:
-        found = (resolve_by_identifier(records, request.parameters, "criminal_record_number", "criminal_record_number")
+        found = (resolve_by_identifier(records, request.parameters, "criminal_record_number", "criminal_record_number", request.subject)
                  if request.parameters.get("document_identifier") else resolve_single(records, request.subject))
         if isinstance(found, ServiceResult):
             return found
         return ServiceResult.ok({"clean": found["convictions"] == 0})
 
     def criminal_record_current(request: RegistryRequest) -> ServiceResult:
-        found = (resolve_by_identifier(records, request.parameters, "criminal_record_number", "criminal_record_number")
+        found = (resolve_by_identifier(records, request.parameters, "criminal_record_number", "criminal_record_number", request.subject)
                  if request.parameters.get("document_identifier") else resolve_single(records, request.subject))
         if isinstance(found, ServiceResult):
             return found
