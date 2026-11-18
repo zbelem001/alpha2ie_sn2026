@@ -2,6 +2,8 @@
 
 Comment le nœud ONI, qui instruit la CNIB d'Awa, sait que sa nationalité se vérifie auprès de la Justice, et comment il obtient la réponse. Et ce qu'Awa doit fournir, et quand.
 
+> **Mise à jour du 18/11/2026, dans le miroir.** Les sections 1 à 9 restent la conception de référence. L'état réel du code est au §10, les écarts constatés et les corrections au §11.
+
 Sources : [architecture-socle.md](architecture-socle.md) (§4.1, §4.2, §4.5, §5.2, §5.3) et [DITES-LE-NOUS-UNE-FOIS.md](DITES-LE-NOUS-UNE-FOIS.md) (§7, §10, §20, §21). Le document de référence de l'équipe reste [architecture.md](architecture.md).
 
 ## En bref
@@ -28,7 +30,9 @@ L'identité est établie à l'inscription sur le portail ou au premier passage a
 | Renouvellement | Ancienne carte ou identifiant déjà lié aux empreintes | 3 |
 | Avant fabrication de la carte | Enrôlement biométrique et dédoublonnage | 3 |
 
-Le résultat est enregistré dans Keycloak : attributs `identifiant_pivot` et `niveau_garantie`. Ils figurent dans le jeton de connexion (voir [infrastructure/keycloak/README.md](../infrastructure/keycloak/README.md)). L'usager ne peut pas les modifier : seul un administrateur le peut.
+Le résultat est enregistré dans Keycloak : attributs `identifiant_pivot` et `niveau_garantie`. Ils figurent dans le jeton de connexion. L'usager ne peut pas les modifier : seul un administrateur le peut.
+
+> Au 18/11 : remplacé par le rattachement du compte à l'acte dans l'API démarches (`POST /v1/citizen/identity-link`), sans niveau de garantie. Ce rattachement ne vérifie pas encore que la personne est titulaire de l'acte (§11.1).
 
 ## 2. Trouver le détenteur, à chaque démarche
 
@@ -108,7 +112,7 @@ C'est le principe du sujet. La plateforme ne transporte pas le certificat de nat
 |---|---|---|---|
 | Qui est membre, à quelle adresse | Annuaire de la Centrale | Configuration globale du serveur central | `interoperability/connectors/routing.yaml` |
 | Adresser un service | Nom du service dans le catalogue | `BF/GOV/JUSTICE/REGISTRES` + code de service | `connector.query(organisation, service, payload)` |
-| Qui a le droit d'appeler | Conventions | Droits d'accès sur le Security Server du fournisseur | Non contrôlé |
+| Qui a le droit d'appeler | Conventions | Droits d'accès sur le Security Server du fournisseur | Banc X-Road : droits d'accès appliqués (`passerelle/xroad`). Mode direct : droits d'échange de l'API démarches |
 | Démarche, niveau de garantie | Conventions vérifiées par le nœud détenteur | Hors X-Road : à contrôler par le fournisseur | Non contrôlé |
 
 Les droits d'accès X-Road disent seulement *quel sous-système peut appeler quel service*. La démarche et le niveau de garantie restent à vérifier par l'adaptateur ou le registre du fournisseur.
@@ -127,6 +131,8 @@ En réalité, la Justice a probablement ses propres numéros. Deux solutions son
 Qui fait ce rapprochement, et comment il s'assure qu'il s'agit de la bonne personne : voir §8.
 
 **À demander au jury** ([guide](DITES-LE-NOUS-UNE-FOIS.md), §21, question 2) : les registres fournis partagent-ils un identifiant commun ?
+
+> Au 18/11 : le jury publiera le contrat OpenAPI commun des trois registres et une liste de citoyens fictifs. Ce contrat dira comment une personne est désignée : relire les §6, §7 et §11 à sa publication.
 
 ## 7. Limites de l'identifiant pivot actuel
 
@@ -263,19 +269,48 @@ Selon la pièce, le lien se fait ainsi :
 - **Orchestration** : l'envoi des demandes de liaison et le suivi de leur état (Personne 2).
 - **Registres** : l'enregistrement du lien et de son niveau de confiance (Personne 3).
 
-## 10. État de l'implémentation
+## 10. État de l'implémentation (au 18/11, dans le miroir)
 
 | Élément | État | Responsable |
 |---|---|---|
-| Identifiant pivot et niveau de garantie dans le jeton | Fait (Keycloak) | Personne 3 |
-| Registres interrogeables par identifiant pivot ou par critères, `ambiguous` en cas d'homonymes | Fait (5 registres simulés) | Personne 3 |
-| Adressage d'une organisation : direct ou X-Road | Fait (connecteurs) | Personne 3 |
-| Catalogue des services : « nationalité » donne l'organisation et le code de service | À faire. Aujourd'hui, le backend doit connaître `BF/GOV/JUSTICE/REGISTRES`. | Personne 3 |
-| Routage par commune de l'acte (`ACTE:BOBO:…` vers la mairie de Bobo) | À faire (une seule mairie simulée) | Personne 3 |
-| Définitions des démarches et étapes conditionnelles | À faire | Personne 2 |
-| Conventions, contrôle du niveau de garantie | À faire. Le contrat `registry-request` ne transporte pas encore le niveau de garantie. | Personnes 2 et 3 |
-| Journal visible par l'usager | À faire | Personnes 1 et 2 |
-| Identifiant opaque à la place de `ACTE:…` | Proposition (§7), à décider | Collectif |
-| Lien enregistré par le détenteur après une recherche par critères, avec son niveau de confiance | À faire. Les registres simulés supposent le lien déjà fait. | Personne 3 |
-| Contestation d'une consultation par l'usager | À faire | Personnes 1 et 2 |
-| Déclaration des références à l'inscription et service de liaison | Proposition (§9), à décider | Personnes 1, 2 et 3 |
+| Identité établie une fois | Rattachement du compte à l'acte dans l'API démarches. Vérifie que l'acte existe, pas que la personne en est titulaire (§11.1). Plus de niveau de garantie. | P2 (API), P3 (registre) |
+| Registres interrogeables par pivot, par critères ou par référence de pièce ; `ambiguous` en cas d'homonymes | Fait : 6 registres simulés. Une fiche désignée par référence doit appartenir au titulaire (§11.2). | P3 |
+| Adressage d'une organisation : direct ou X-Road | Fait. Droits d'accès appliqués par le banc X-Road. Un seul demandeur X-Road pour toutes les démarches : à corriger. | P3, P2 |
+| Catalogue des services | Partiel : démarches, questions et registres en base dans l'API démarches ; correspondance « type de référence → registre » codée en dur (`IDENTIFIER_REGISTRIES`). | P2 |
+| Routage par commune de l'acte | À faire : une seule mairie simulée, rattachement codé sur `MAIRIE-OUAGA`. | P3 |
+| Définitions des démarches et étapes conditionnelles | Partiel : concours direct et passeport ; pas d'étape conditionnelle (nationalité seulement si né hors du Burkina). | P2 |
+| Conventions et niveau de garantie | Partiel : droits d'échange par administration (API démarches) et droits X-Road ; aucun contrôle du niveau de garantie. | P2, P3 |
+| Journal visible par l'usager | Fait dans le miroir : espace usager, tiré de `GET /v1/cases/{id}/journal`, refus et blocages compris. | P1, P2 |
+| Identifiant opaque à la place de `ACTE:…` (§7) | Non décidé. Existe de fait pour les comptes sans acte rattaché (`CITIZEN:…`, §11.3). | Collectif |
+| Lien enregistré par le détenteur, avec son niveau de confiance (§8) | À faire. La concordance titulaire–fiche est vérifiée à chaque requête, sans lien enregistré. | P3 |
+| Contestation d'une consultation par l'usager | À faire : bouton simulé dans l'espace usager. | P1, P2 |
+| Déclaration des références (§9) | Fait en version simple : références au profil (chiffrées par l'API) ou saisies par l'agent. Condition « le détenteur vérifie » remplie dans le miroir (§11.2). La plateforme conserve la liste des références (§11.4). | P1, P2, P3 |
+
+## 11. Écarts constatés le 18/11 et corrections
+
+### 11.1 Le rattachement d'identité ne prouve pas la titularité (non corrigé)
+
+`POST /v1/citizen/identity-link` vérifie le format de la référence, un téléphone marqué « vérifié » dans le jeton, l'existence de l'acte à l'état civil, et que la référence n'est pas déjà rattachée à un autre compte. Il ne vérifie pas que la personne connectée est titulaire de l'acte.
+
+Conséquence : avec un téléphone vérifié, on peut rattacher l'acte d'une autre personne tant qu'il est libre. L'agent retrouve ensuite le citoyen par ce téléphone : le fraudeur voit les démarches de la victime, son journal, et peut accorder à sa place. La victime ne peut plus rattacher son propre acte.
+
+Proposition, conforme au §1 : demander un élément que seule la titulaire connaît et que l'état civil compare sans le révéler (date de naissance, nom de la mère), par le service `identity-match` (« correspond : oui ou non ») ; enregistrer un niveau de garantie (2 en ligne, 3 au guichet avec la pièce physique) ; prévoir la révision d'un rattachement contesté.
+
+### 11.2 Une référence de pièce n'était pas rapprochée de la personne (corrigé dans le miroir)
+
+Constat : avec une référence de pièce, l'API démarches envoyait la référence seule, et le registre renvoyait la fiche portant ce numéro. Le casier d'Adama SOMÉ (une condamnation), saisi par erreur dans le dossier d'Awa, a été attribué à Awa (dossier `DOS-2026-004EDC` du miroir). L'inverse est une fraude : un casier vierge d'autrui.
+
+Correction dans le miroir, conforme aux §8 et §9 :
+
+- registres : la fiche trouvée par la référence doit appartenir au titulaire attendu (identifiant pivot, à défaut nom, prénoms et date de naissance), sinon `not_found`, même réponse qu'une référence inconnue ; le contrat `registry-request` exige toujours le titulaire ;
+- API démarches : le titulaire est transmis avec la référence.
+
+Après correction : casier d'Adama saisi pour Awa → `not_found` (`DOS-2026-2FA0A4`) ; références d'Awa → confirmées ; passeport → cinq vérifications confirmées. Tests : registres 41, démarches 29. `main` reste à corriger, à la bascule ou par la Personne 2.
+
+### 11.3 Comptes sans acte rattaché (`CITIZEN:…`)
+
+`PUT /v1/citizen/identifiers` crée un identifiant `CITIZEN:<aléatoire>` quand le compte n'est rattaché à aucun acte : c'est de fait l'identifiant opaque du §7, mais sans identité établie. Les références de ces comptes sont déclarées, jamais vérifiées ; depuis la correction 11.2, les registres ne confirment rien pour eux. À trancher : exiger le rattachement (11.1) avant d'enregistrer des références, comme le fait l'espace usager du miroir, ou transmettre des critères d'identité vérifiés.
+
+### 11.4 La plateforme conserve la liste des références
+
+L'API démarches garde toutes les références de documents des citoyens, chiffrées avec une seule clé. C'est la limite 2 du §9 (« fichier central sensible »). La variante recommandée au §9 (le lien reste chez le détenteur, le numéro n'est pas conservé) n'est pas implémentée. Acceptable pour la démonstration, à dire dans le rapport (conformité à la protection des données personnelles).
