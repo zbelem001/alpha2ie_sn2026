@@ -58,3 +58,47 @@ def test_reductions():
     for broken in ({}, {"birth_date": "18/11/2008"}, {"birth_date": 2008}):
         with pytest.raises(NonConforming):
             adult.reduce(broken, date(2026, 11, 18))
+
+
+# --- Branchements : fichiers relus sans redémarrage ------------------------------------------
+
+import json  # noqa: E402
+
+from consent_service.holders import HolderCatalog  # noqa: E402
+
+
+def write(directory, name: str, content: dict) -> None:
+    (directory / name).write_text(json.dumps(content), encoding="utf-8")
+
+
+def test_a_plug_file_repoints_a_holder_and_keeps_its_rules(tmp_path):
+    catalog = HolderCatalog(overrides=tmp_path)
+    base = catalog.current()["etat-civil"]
+    write(tmp_path, "equipe-b.json", {"holders": {"etat-civil": {"registry_url": "http://equipe-b:8000"}}})
+    plugged = catalog.current()["etat-civil"]
+    assert plugged.registry_url == "http://equipe-b:8000" and plugged.origin == "equipe-b.json"
+    assert plugged.services == base.services and plugged.organization == base.organization
+    assert catalog.current()["justice"].origin == "base"
+
+
+def test_a_plug_file_can_add_a_holder_with_its_rules(tmp_path):
+    write(tmp_path, "equipe-c.yaml", {"holders": {"equipe-c": {
+        "organization": "BF/GOV/EQUIPE-C/ETAT-CIVIL", "name": "État civil de l'équipe C",
+        "registry_url": "http://equipe-c:8000",
+        "services": {"is-adult": {"registry_service": "identity", "adult_from": "birth_date"}},
+    }}})
+    holder = HolderCatalog(overrides=tmp_path).current()["equipe-c"]
+    assert holder.services["is-adult"].reduction() == {"adult_from": "birth_date", "adult_age": 18}
+
+
+def test_changes_are_read_again_and_a_broken_file_is_ignored(tmp_path):
+    catalog = HolderCatalog(overrides=tmp_path)
+    write(tmp_path, "equipe-b.json", {"holders": {"etat-civil": {"registry_url": "http://equipe-b:8000"}}})
+    assert catalog.current()["etat-civil"].registry_url == "http://equipe-b:8000"
+
+    write(tmp_path, "equipe-b.json", {"holders": {"etat-civil": {"services": {"is-adult": {"keep": {"adult": "texte"}}}}}})
+    assert catalog.current()["etat-civil"].registry_url == "http://equipe-b:8000"  # configuration précédente
+    assert catalog.error and "keep" in catalog.error
+
+    (tmp_path / "equipe-b.json").unlink()
+    assert catalog.current()["etat-civil"].registry_url == "http://civil-registry:8000" and catalog.error is None

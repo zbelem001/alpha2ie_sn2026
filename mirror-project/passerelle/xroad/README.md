@@ -48,13 +48,14 @@ Deux Security Servers au lieu d'un par administration : c'est ce qui tient en m�
 | `BF/GOV/CENTRALE/MANAGEMENT` | `ss-registres` | Services de gestion du réseau |
 | `BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL` | `ss-registres` | `identity`, `identity-match`, `is-adult` |
 | `BF/GOV/TRANSPORT/PERMIS` | `ss-registres` | `driving-licence` |
-| `BF/GOV/JUSTICE/REGISTRES` | `ss-registres` | `nationality`, `criminal-record` |
+| `BF/GOV/JUSTICE/REGISTRES` | `ss-registres` | `nationality`, `criminal-record`, `criminal-record-current` |
 | `BF/GOV/POLICE/PERTES` | `ss-registres` | `loss-declaration` |
 | `BF/GOV/TRESOR/PAIEMENTS` | `ss-registres` | `payment-status` |
-| `BF/GOV/ONI/CNIB` | `ss-demandeurs` | Demandeur : démarche CNIB |
-| `BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT` | `ss-demandeurs` | Demandeur : démarche « prise de service » du guide |
+| `BF/GOV/ONI/CNIB` | `ss-demandeurs` | Demandeur (démarche CNIB) et fournisseur : `cnib-status` |
+| `BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT` | `ss-demandeurs` | Demandeur : démarche « concours direct » |
+| `BF/GOV/DIPF/PASSEPORTS` | `ss-demandeurs` | Demandeur : démarche « passeport ordinaire » |
 
-Chaque service REST pointe vers `POST /services/{service}` du registre simulé correspondant.
+Chaque service REST pointe vers la garde de la couche consentement-minimisation, devant le registre simulé : `http://consentement-minimisation:8000/holders/<détenteur>/services/{service}`. En mode X-Road comme en mode direct, rien ne sort de chez le détenteur sans accord valide (en-tête `X-Consent-Id`), et rien que l'utile. Sur un banc configuré avant ce changement (18/11), `xroad-setup` retire l'ancienne adresse de chaque service et le republie à la bonne : relancer `docker compose --profile xroad run --rm xroad-setup`.
 
 ## Droits d'accès (les « conventions » du banc)
 
@@ -62,6 +63,9 @@ Chaque service REST pointe vers `POST /services/{service}` du registre simulé c
 |---|---|
 | `BF/GOV/ONI/CNIB` | `identity`, `identity-match`, `is-adult`, `nationality`, `loss-declaration`, `payment-status` |
 | `BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT` | `is-adult`, `nationality`, `criminal-record` |
+| `BF/GOV/DIPF/PASSEPORTS` | `cnib-status` (ONI), `identity`, `nationality`, `criminal-record-current`, `payment-status` |
+
+Un test de la passerelle (`tests/test_xroad_bench_config.py`) vérifie, sans lancer le banc, que chaque démarche du catalogue a un demandeur déclaré avec tous ses droits, et que chaque service publié passe par la garde et y a une règle.
 
 Tout autre appel est refusé par X-Road, avant même d'atteindre le registre. Par exemple, l'ONI qui demande le casier judiciaire : X-Road renvoie `server.serverproxy.access_denied`, que le connecteur traduit en `refused`. Les droits se modifient dans `CONSUMERS`, en haut du script, puis on relance `docker compose --profile xroad run --rm xroad-setup`.
 
@@ -71,7 +75,8 @@ Tout autre appel est refusé par X-Road, avant même d'atteindre le registre. Pa
 |---|---|
 | `REGISTRY_CONNECTOR` | `xroad` |
 | `XROAD_SECURITY_SERVER_URL` | `http://ss-demandeurs:8080` depuis un conteneur, `http://localhost:8280` depuis la machine |
-| `XROAD_CLIENT_ID` | `BF/GOV/ONI/CNIB` ou `BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT`, selon la démarche |
+| `XROAD_CLIENT_ID` | `BF/GOV/ONI/CNIB` : demandeur par défaut (rattachement d'un compte citoyen) |
+| `XROAD_CLIENTS` | `BF/GOV/FONCTION-PUBLIQUE=BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT` : chaque vérification part avec l'administration de son dossier, traduite en sous-système X-Road (la DIPF est déjà un sous-système) |
 
 ## Vérifier
 
@@ -80,8 +85,11 @@ Depuis la machine :
 ```bash
 curl -s http://localhost:8280/r1/BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL/is-adult \
   -H 'X-Road-Client: BF/GOV/ONI/CNIB' -H 'Content-Type: application/json' \
-  -d '{"subject": {"pivot_id": "ACTE:OUAGA:2004:01234"}}'
+  -d '{"procedure": "concours_direct_preverification", "subject": {"pivot_id": "ACTE:OUAGA:2004:01234"}, "parameters": {}}'
+# → refused : la garde exige un accord (en-tête X-Consent-Id), comme en mode direct
 ```
+
+**Non vérifié** : depuis le 18/11 (fournisseurs derrière la garde, ONI fournisseur, DIPF demandeur), le banc n'a pas été relancé, faute de mémoire (5,3 Go). À confirmer au premier lancement : que X-Road transmet l'en-tête `X-Consent-Id` jusqu'à la garde, et l'étape 7 de `xroad-setup` (rattachement d'Awa par X-Road, puis refus sans accord).
 
 ## Ce qui a été vérifié sur le banc
 

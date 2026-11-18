@@ -23,7 +23,7 @@ from journal_client import JournalUnavailable
 from pydantic import ValidationError
 
 from .consents import ConsentStore, is_active
-from .holders import Holder, NonConforming, ServiceRule, reference_date
+from .holders import Holder, HolderCatalog, NonConforming, ServiceRule, reference_date
 from .models import ConsentRecord
 from .schemas import RegistryRequest
 
@@ -58,7 +58,7 @@ def utc_now_iso() -> str:
 class HolderGuard:
     def __init__(
         self,
-        holders: Mapping[str, Holder],
+        holders: Mapping[str, Holder] | HolderCatalog,
         consents: ConsentStore,
         journal: Any,
         *,
@@ -67,13 +67,23 @@ class HolderGuard:
         timeout: float = 3.0,
         today: Callable[[], date] = reference_date,
     ) -> None:
-        self.holders = dict(holders)
+        # Catalogue relu à chaque appel (branchements), ou détenteurs fixés (tests).
+        self._catalog = holders if isinstance(holders, HolderCatalog) else None
+        self._static = None if self._catalog else dict(holders)
         self._consents = consents
         self._journal = journal
         self._client = client or httpx.Client()
         self._clients = dict(clients or {})
         self._timeout = timeout
         self._today = today
+
+    @property
+    def holders(self) -> dict[str, Holder]:
+        return self._catalog.current() if self._catalog else self._static
+
+    @property
+    def catalog_error(self) -> str | None:
+        return self._catalog.error if self._catalog else None
 
     # Réponse ------------------------------------------------------------------------------
 

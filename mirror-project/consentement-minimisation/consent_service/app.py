@@ -19,7 +19,7 @@ from sqlalchemy import Engine, create_engine
 
 from .consents import ConsentError, ConsentStore, utc_now
 from .guard import HolderGuard
-from .holders import Holder, load_holders, reference_date
+from .holders import Holder, HolderCatalog, reference_date
 from .schemas import Consent, ConsentIn, Envelope, HolderView, RuleView
 from .security import caller_for, parse_tokens
 
@@ -45,9 +45,10 @@ def database_url() -> str:
 
 
 def _holder_view(holder: Holder) -> HolderView:
-    return HolderView(slug=holder.slug, organization=holder.organization, name=holder.name, services=[
+    return HolderView(slug=holder.slug, organization=holder.organization, name=holder.name,
+                      registry_url=holder.registry_url, origin=holder.origin, services=[
         RuleView(service=rule.service, basis=rule.basis, procedures=list(rule.procedures),
-                 registry_service=rule.called_service, transmits=rule.transmits())
+                 registry_service=rule.called_service, reduction=rule.reduction(), transmits=rule.transmits())
         for rule in holder.services.values()
     ])
 
@@ -57,7 +58,7 @@ def create_app(
     engine: Engine | None = None,
     journal: Any = None,
     tokens: Mapping[str, str] | None = None,
-    holders: Mapping[str, Holder] | None = None,
+    holders: Mapping[str, Holder] | HolderCatalog | None = None,
     registry_clients: Mapping[str, httpx.Client] | None = None,
     clock: Callable[[], datetime] = utc_now,
     today: Callable[[], date] = reference_date,
@@ -68,7 +69,8 @@ def create_app(
                          journal, clock)
     store.create_schema()
     callers = dict(tokens) if tokens is not None else parse_tokens(os.environ.get("CONSENT_TOKENS"))
-    guard = HolderGuard(holders if holders is not None else load_holders(), store, journal,
+    # Par défaut : holders.yaml et les fichiers de branchement (HOLDERS_OVERRIDES), relus à chaque appel.
+    guard = HolderGuard(holders if holders is not None else HolderCatalog(), store, journal,
                         clients=registry_clients, timeout=float(os.environ.get("REGISTRY_TIMEOUT_S") or 3),
                         today=today)
 
@@ -88,9 +90,10 @@ def create_app(
     app = FastAPI(title="Couche consentement et minimisation", version="0.1.0", description=DESCRIPTION)
     app.state.store, app.state.guard = store, guard
 
-    @app.get("/health", tags=["santé"], summary="État du service")
+    @app.get("/health", tags=["santé"], summary="État du service (et fichier de branchement refusé, s'il y en a un)")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        guard.holders  # relit les branchements : une erreur récente apparaît ici
+        return {"status": "ok", **({"branchement_error": guard.catalog_error} if guard.catalog_error else {})}
 
     # --- Registre des accords (côté demandeur) ----------------------------------------------
 

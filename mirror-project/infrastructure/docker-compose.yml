@@ -213,6 +213,10 @@ services:
       JOURNAL_TOKEN: ${JOURNAL_TOKEN_CONSENTEMENT:-dev-journal-consentement}
       REGISTRY_TIMEOUT_S: ${REGISTRY_TIMEOUT_S:-3}
       REFERENCE_DATE: ${REFERENCE_DATE:-}
+      # Registres d'autres équipes branchés pendant que la pile tourne (passerelle/brancher.py).
+      HOLDERS_OVERRIDES: /config/branchements
+    volumes:
+      - ./branchements:/config/branchements:ro
     ports:
       - "8109:8000"
     healthcheck:
@@ -246,6 +250,7 @@ services:
       REGISTRY_CONNECTOR: ${REGISTRY_CONNECTOR:-direct}
       # Connecteur direct : chaque détenteur est joint par la garde de la couche consentement-minimisation.
       REGISTRY_ROUTES_FILE: ${REGISTRY_ROUTES_FILE:-/app/passerelle/connectors/routing.detenteurs.yaml}
+      REGISTRY_ROUTES_OVERRIDES: /config/branchements
       REGISTRY_TIMEOUT_S: ${REGISTRY_TIMEOUT_S:-3}
       XROAD_CLIENT_ID: ${XROAD_CLIENT_ID:-BF/GOV/ONI/CNIB}
       XROAD_CLIENTS: ${XROAD_CLIENTS:-}
@@ -270,6 +275,8 @@ services:
       # Registre des accords de la couche consentement-minimisation.
       CONSENT_URL: http://consentement-minimisation:8000
       CONSENT_TOKEN: ${CONSENT_TOKEN_DEMARCHES:-dev-consentement-demarches}
+    volumes:
+      - ./branchements:/config/branchements:ro
     ports:
       - "8000:8000"
     healthcheck:

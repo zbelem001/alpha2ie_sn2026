@@ -67,9 +67,9 @@ Variables : `DATABASE_URL` (base `consentement`, créée au démarrage si elle m
 
 ## Brancher le registre d'une autre équipe
 
-1. Dans `holders.yaml` (ou un autre fichier désigné par `HOLDERS_FILE`) : un détenteur, l'adresse de son registre, et pour chaque service la règle adaptée à ce qu'il renvoie (`keep`, `found`, ou `adult_from` s'il renvoie une date de naissance).
-2. Dans `passerelle/connectors/routing.detenteurs.yaml` : son identifiant X-Road vers `http://consentement-minimisation:8000/holders/<détenteur>`.
-3. Dans la couche démarches : la question et le droit d'échange de la démarche (console d'administration locale).
+Avec l'outil de la passerelle, pile démarrée : `python3 passerelle/brancher.py remplacer etat-civil <adresse> --essai <pivot>` (mode d'emploi : [passerelle/README.md](../passerelle/README.md#brancher-le-registre-dune-autre-équipe)). Il écrit un fichier dans `infrastructure/branchements/` (`HOLDERS_OVERRIDES`), que la garde relit à chaque appel : sans redémarrage, elle interroge le registre de l'autre équipe avec nos règles. `GET /holders` montre l'adresse et l'origine (`base` ou fichier) de chaque détenteur ; un fichier invalide est ignoré et signalé par `GET /health` (`branchement_error`).
+
+Pour un nouveau détenteur (`ajouter`), il reste à créer ses questions et leur droit d'échange dans la couche démarches (console d'administration locale).
 
 Le corps envoyé à son registre est celui du contrat des registres, sans l'accord. Le contrat du jury, une fois publié, peut demander une autre forme d'appel : un adaptateur de plus dans la garde.
 
@@ -79,17 +79,18 @@ Le corps envoyé à son registre est celui du contrat des registres, sans l'acco
 
 ## Tests
 
-`pip install -r requirements-dev.txt -e .`, puis `python -m pytest` : 58 tests, dont :
+`pip install -r requirements-dev.txt -e .`, puis `python -m pytest` : 62 tests, dont :
 
 - registre des accords : décision, remplacement, retrait, expiration, journal, jetons ;
 - garde devant les six registres simulés, en mémoire : seule la réponse utile sort (fiche complète réduite à « retrouvée », paiement sans référence ni montant, majorité calculée sans transmettre la date) ;
 - onze cas de refus, sans appel au registre ;
 - registre en panne ou réponse non conforme : jamais « oui » ; journal injoignable : aucune donnée ;
-- bout en bout connecteur de la passerelle → garde → registre ; spécifications à jour.
+- bout en bout connecteur de la passerelle → garde → registre ; spécifications à jour ;
+- branchements : registre remplacé sans redémarrage, détenteur ajouté, fichier invalide ignoré.
 
 ## Limites
 
 - Une seule instance sert les six détenteurs simulés ; dans l'architecture cible, chaque détenteur exploite sa garde.
-- Mode direct : l'en-tête `X-Road-Client` est déclaratif. Avec X-Road, il est authentifié par les serveurs de sécurité, mais le banc X-Road pointe encore sur les registres, sans la garde (à faire : [passerelle/README.md](../passerelle/README.md)).
+- Mode direct : l'en-tête `X-Road-Client` est déclaratif. Avec X-Road, il est authentifié par les serveurs de sécurité ; le banc publie désormais ses services à l'adresse de la garde, mais n'a pas été relancé pour le vérifier (5,3 Go de mémoire).
 - Jetons de service statiques, pour la démonstration.
 - Les accords enregistrés avant le 18/11 dans l'ancienne table `consents` de la couche démarches ne sont pas repris : les dossiers de démonstration plus anciens n'ont plus d'accord actif.

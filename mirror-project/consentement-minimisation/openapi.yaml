@@ -15,7 +15,7 @@ paths:
     get:
       tags:
       - santé
-      summary: État du service
+      summary: État du service (et fichier de branchement refusé, s'il y en a un)
       operationId: health_health_get
       responses:
         '200':
@@ -521,6 +521,14 @@ components:
         name:
           type: string
           title: Name
+        registry_url:
+          type: string
+          title: Registry Url
+          description: Registre interrogé par la garde
+        origin:
+          type: string
+          title: Origin
+          description: « base » (holders.yaml) ou fichier de branchement
         services:
           items:
             $ref: '#/components/schemas/RuleView'
@@ -531,6 +539,8 @@ components:
       - slug
       - organization
       - name
+      - registry_url
+      - origin
       - services
       title: HolderView
     RuleView:
@@ -552,6 +562,11 @@ components:
         registry_service:
           type: string
           title: Registry Service
+        reduction:
+          additionalProperties: true
+          type: object
+          title: Reduction
+          description: 'Règle de réduction : keep, found ou adult_from'
         transmits:
           type: string
           title: Transmits
@@ -562,6 +577,7 @@ components:
       - basis
       - procedures
       - registry_service
+      - reduction
       - transmits
       title: RuleView
     ScopeItem:

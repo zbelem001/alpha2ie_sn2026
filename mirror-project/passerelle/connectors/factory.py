@@ -2,6 +2,7 @@
 
 REGISTRY_CONNECTOR        direct (défaut) | xroad
 REGISTRY_ROUTES_FILE      connecteur direct : table organisation -> URL (défaut : routing.yaml)
+REGISTRY_ROUTES_OVERRIDES connecteur direct : dossier des fichiers de branchement (routes ajoutées)
 XROAD_SECURITY_SERVER_URL connecteur xroad : URL du serveur de sécurité du demandeur
 XROAD_CLIENT_ID           identifiant X-Road du demandeur (défaut : BF/GOV/ONI/CNIB)
 REGISTRY_TIMEOUT_S        délai d'attente en secondes (défaut : 3)
@@ -14,7 +15,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 
-from .direct import DEFAULT_ROUTES_FILE, HttpRegistryConnector, load_routes
+from .direct import DEFAULT_ROUTES_FILE, HttpRegistryConnector, load_route_overrides, load_routes
 from .http_base import DEFAULT_TIMEOUT_S, BaseHttpConnector
 from .xroad import XRoadConnector
 
@@ -29,6 +30,7 @@ def build_connector(env: Mapping[str, str] | None = None) -> BaseHttpConnector:
 
     if kind == "direct":
         routes = load_routes(env.get("REGISTRY_ROUTES_FILE") or DEFAULT_ROUTES_FILE)
+        routes.update(load_route_overrides(env.get("REGISTRY_ROUTES_OVERRIDES")))
         return HttpRegistryConnector(routes, client_id=client_id, timeout=timeout)
     if kind == "xroad":
         url = env.get("XROAD_SECURITY_SERVER_URL")

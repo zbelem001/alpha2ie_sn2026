@@ -24,11 +24,28 @@ Le paquet installé par la couche démarches (`pip install -e ../passerelle`) ne
 - [openapi.yaml](openapi.yaml) : interface X-Road du Security Server du demandeur, telle que l'appelle le connecteur (`POST /r1/{instance}/{classe}/{membre}/{sous-système}/{service}`), avec la traduction des erreurs X-Road.
 - [notifications.openapi.yaml](notifications.openapi.yaml) : service de notifications simulées, généré depuis `notifications/app.py`.
 - [schemas/](schemas) : contrat des notifications (`notification-request.json`, `notification-response.json`, `sms-reply.json`) ; [examples/notification-exchanges.json](examples/notification-exchanges.json). Les échanges avec les registres suivent le contrat de la couche registres (`../registres/schemas`).
-- Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (74 tests). `requirements-dev.txt` installe aussi `../registres` : les tests d'interopérabilité font tourner les registres en mémoire derrière les connecteurs.
+- Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (87 tests, dont l'outil « brancher un registre » et la cohérence du banc X-Road). `requirements-dev.txt` installe aussi `../registres` : les tests d'interopérabilité font tourner les registres en mémoire derrière les connecteurs.
+
+## Brancher le registre d'une autre équipe
+
+Épreuve en direct. Pile démarrée, depuis `mirror-project/`, sans reconstruire ni redémarrer : [brancher.py](brancher.py) (bibliothèque standard seulement).
+
+```bash
+python3 passerelle/brancher.py liste                      # détenteurs servis par la garde, et leur origine
+python3 passerelle/brancher.py sonder http://192.168.1.42:8000 --regle is-adult=keep:adult --essai ACTE:OUAGA:2004:01234
+python3 passerelle/brancher.py remplacer etat-civil http://192.168.1.42:8000 --essai ACTE:OUAGA:2004:01234
+python3 passerelle/brancher.py retirer etat-civil
+```
+
+- **remplacer** : la garde interroge le registre de l'autre équipe à la place du nôtre, avec les mêmes règles ; nos démarches l'utilisent dès la demande suivante. C'est le cas d'un registre qui respecte le même contrat.
+- **ajouter** : un nouveau détenteur, avec ses règles et sa route (`--organisation`, `--nom`, `--regle service=keep:champ`, `found` ou `adult_from:champ[@service]`). Il reste à créer ses questions dans la couche démarches (console d'administration locale).
+- Avant d'écrire, l'outil sonde le registre : santé, services (`GET /services` ou `--openapi fichier`), et avec `--essai`, un appel par service pour vérifier que la règle de minimisation s'applique (seuls les noms des champs sont affichés). Si un service manque ou si une règle ne s'applique pas, rien n'est écrit (sauf `--force`).
+- Le branchement est un fichier de `infrastructure/branchements/`, monté dans la garde et dans la couche démarches, relu à chaque appel. `--sonde URL` : adresse à sonder depuis la machine, si la garde joint le registre autrement.
+
+Répété le 18/11 sur la pile : second registre d'état civil lancé à part (« équipe B »), sondé (règles applicables), branché ; la démarche d'Awa l'a interrogé à la place du nôtre ; débranché, retour à notre registre.
+
+En mode X-Road, brancher un registre étranger demande en plus de le déclarer comme fournisseur sur le banc (`PROVIDERS` de `xroad/configuration/setup_bench.py`) : non outillé.
 
 ## À faire
 
-- Outil « brancher un registre » pour l'épreuve en direct : déclarer le registre d'une autre équipe dans X-Road à partir de son adresse et de son fichier OpenAPI.
-- Déclarer le registre ONI (`cnib-status`) dans le banc X-Road.
-- Banc X-Road : faire pointer les services des fournisseurs (`setup_bench.py`, `PROVIDERS`) sur la garde (`http://consentement-minimisation:8000/holders/<détenteur>`) au lieu des registres. Sans cela, en mode X-Road, les appels contournent la garde (ni accord vérifié chez le détenteur, ni réduction, ni trace côté détenteur).
-- Demandeurs X-Road : chaque appel part désormais avec l'administration du dossier (traduite par `XROAD_CLIENTS` ; la Fonction publique devient `BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT`, déclaré sur le banc). Reste à déclarer sur le banc un sous-système pour la DIPF (passeports) : sans lui, la démarche passeport est refusée en mode X-Road.
+- Relancer le banc X-Road (5,3 Go) pour vérifier sa nouvelle configuration : services publiés derrière la garde, ONI fournisseur de `cnib-status`, DIPF demandeur ; et que X-Road transmet l'en-tête `X-Consent-Id`.

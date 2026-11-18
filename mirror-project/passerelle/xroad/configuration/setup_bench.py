@@ -56,6 +56,7 @@ MEMBERS = {
     "JUSTICE": "Ministère de la Justice",
     "POLICE": "Police nationale",
     "TRESOR": "Trésor public",
+    "DIPF": "Direction de l'Immigration et de la Police des Frontières",
 }
 
 MANAGEMENT_SUBSYSTEM = ("CENTRALE", "MANAGEMENT")
@@ -67,6 +68,8 @@ class Provider:
     subsystem: str
     base_url: str
     services: tuple[str, ...]
+    # Serveur de sécurité qui héberge le sous-système (l'ONI fournit et demande : ss-demandeurs).
+    host: str = "ss-registres"
 
 
 @dataclass(frozen=True)
@@ -77,12 +80,18 @@ class Consumer:
     allowed: tuple[tuple[str, str, str], ...]
 
 
+# Chaque service est publié à l'adresse de la garde de la couche consentement-minimisation,
+# placée devant le registre : accord vérifié (en-tête X-Consent-Id), réponse réduite, journal.
+GUARD = "http://consentement-minimisation:8000/holders"
+
 PROVIDERS = (
-    Provider("MAIRIE-OUAGA", "ETAT-CIVIL", "http://civil-registry:8000", ("identity", "identity-match", "is-adult")),
-    Provider("TRANSPORT", "PERMIS", "http://transport-registry:8000", ("driving-licence",)),
-    Provider("JUSTICE", "REGISTRES", "http://justice-registry:8000", ("nationality", "criminal-record")),
-    Provider("POLICE", "PERTES", "http://police-registry:8000", ("loss-declaration",)),
-    Provider("TRESOR", "PAIEMENTS", "http://treasury-registry:8000", ("payment-status",)),
+    Provider("MAIRIE-OUAGA", "ETAT-CIVIL", f"{GUARD}/etat-civil", ("identity", "identity-match", "is-adult")),
+    Provider("TRANSPORT", "PERMIS", f"{GUARD}/transport", ("driving-licence",)),
+    Provider("JUSTICE", "REGISTRES", f"{GUARD}/justice", ("nationality", "criminal-record", "criminal-record-current")),
+    Provider("POLICE", "PERTES", f"{GUARD}/police", ("loss-declaration",)),
+    Provider("TRESOR", "PAIEMENTS", f"{GUARD}/tresor", ("payment-status",)),
+    # Registre CNIB de l'ONI : le sous-système ONI/CNIB, déjà demandeur, devient aussi fournisseur.
+    Provider("ONI", "CNIB", f"{GUARD}/oni", ("cnib-status",), host="ss-demandeurs"),
 )
 
 CONSUMERS = (
@@ -109,6 +118,18 @@ CONSUMERS = (
             ("JUSTICE", "REGISTRES", "criminal-record"),
         ),
     ),
+    # Démarche « passeport ordinaire » : CNIB, acte de naissance, nationalité, bulletin n° 3, timbre.
+    Consumer(
+        "DIPF",
+        "PASSEPORTS",
+        (
+            ("ONI", "CNIB", "cnib-status"),
+            ("MAIRIE-OUAGA", "ETAT-CIVIL", "identity"),
+            ("JUSTICE", "REGISTRES", "nationality"),
+            ("JUSTICE", "REGISTRES", "criminal-record-current"),
+            ("TRESOR", "PAIEMENTS", "payment-status"),
+        ),
+    ),
 )
 
 
@@ -125,13 +146,15 @@ SECURITY_SERVERS = (
         host="ss-registres",
         code="SS-REGISTRES",
         owner="CENTRALE",
-        clients=tuple((p.member, p.subsystem) for p in PROVIDERS),
+        clients=tuple((p.member, p.subsystem) for p in PROVIDERS if p.host == "ss-registres"),
     ),
     SecurityServerSpec(
         host="ss-demandeurs",
         code="SS-DEMANDEURS",
         owner="ONI",
-        clients=tuple((c.member, c.subsystem) for c in CONSUMERS),
+        # Demandeurs, et fournisseurs hébergés ici (ONI/CNIB), chacun une fois.
+        clients=tuple(dict.fromkeys([(c.member, c.subsystem) for c in CONSUMERS]
+                                    + [(p.member, p.subsystem) for p in PROVIDERS if p.host == "ss-demandeurs"])),
     ),
 )
 
@@ -590,31 +613,43 @@ def register_clients(cs: Api, ss: Api, spec: SecurityServerSpec) -> None:
             log(f"   {client} déjà enregistré")
 
 
-def publish_services(ss: Api) -> None:
-    log("5. Services REST des registres simulés")
+def publish_services(ss: Api, host: str) -> None:
+    log(f"5. Services REST publiés par {host}")
     for provider in PROVIDERS:
+        if provider.host != host:
+            continue
         client = subsystem_id(provider.member, provider.subsystem)
         published = {
-            service["service_code"]
+            service["service_code"]: (description["id"], description.get("url"))
             for description in ss.get(f"/api/v1/clients/{client}/service-descriptions") or []
             for service in description.get("services", [])
         }
         for code in provider.services:
+            url = f"{provider.base_url}/services/{code}"
             if code in published:
-                continue
+                description_id, current_url = published[code]
+                if current_url == url:
+                    continue
+                # Banc configuré avant la garde : le service pointait sur le registre. Il est republié
+                # à la bonne adresse ; ses droits d'accès sont redonnés à l'étape suivante.
+                ss.request("DELETE", f"/api/v1/service-descriptions/{description_id}")
+                log(f"   {client}/{code} : ancienne adresse retirée ({current_url})")
             description = ss.post(
                 f"/api/v1/clients/{client}/service-descriptions",
-                json={"url": f"{provider.base_url}/services/{code}", "type": "REST", "rest_service_code": code},
+                json={"url": url, "type": "REST", "rest_service_code": code},
             )
             ss.put(f"/api/v1/service-descriptions/{description['id']}/enable")
-            log(f"   {client}/{code} publié")
+            log(f"   {client}/{code} publié : {url}")
 
 
-def grant_access(ss: Api) -> None:
+def grant_access(servers: dict[str, Api]) -> None:
     log("6. Droits d'accès (conventions du banc)")
+    hosts = {(p.member, p.subsystem): p.host for p in PROVIDERS}
     for consumer in CONSUMERS:
         consumer_id = subsystem_id(consumer.member, consumer.subsystem)
         for member, subsystem, code in consumer.allowed:
+            # Les droits se donnent sur le serveur de sécurité qui héberge le fournisseur.
+            ss = servers[hosts[(member, subsystem)]]
             provider = subsystem_id(member, subsystem)
             path = f"/api/v1/clients/{provider}/service-clients/{consumer_id}/access-rights"
 
@@ -634,18 +669,28 @@ def grant_access(ss: Api) -> None:
 
 
 def smoke_test() -> None:
-    log("7. Vérification de bout en bout")
-    url = f"http://ss-demandeurs:8080/r1/{INSTANCE}/{MEMBER_CLASS}/MAIRIE-OUAGA/ETAT-CIVIL/is-adult"
-    payload = {"request_id": "xroad-setup", "subject": {"pivot_id": "ACTE:OUAGA:2004:01234"}}
+    log("7. Vérification de bout en bout (X-Road, puis garde, puis registre)")
+    base = f"http://ss-demandeurs:8080/r1/{INSTANCE}/{MEMBER_CLASS}/MAIRIE-OUAGA/ETAT-CIVIL"
+    client = {"X-Road-Client": f"{INSTANCE}/{MEMBER_CLASS}/ONI/CNIB"}
+    # Preuve de titularité demandée par le citoyen lui-même : ouverte sans accord enregistré.
+    proof = {"request_id": "xroad-setup", "procedure": "citizen_identity_link", "parameters": {},
+             "subject": {"pivot_id": "ACTE:OUAGA:2004:01234", "last_name": "KABORE", "first_names": "Awa",
+                         "birth_date": "2004-03-12", "mother_name": "COMPAORE Salimata"}}
 
     def call() -> dict[str, Any]:
-        response = httpx.post(url, json=payload, headers={"X-Road-Client": f"{INSTANCE}/{MEMBER_CLASS}/ONI/CNIB"}, timeout=30)
+        response = httpx.post(f"{base}/identity-match", json=proof, headers=client, timeout=30)
         if response.status_code != 200 or response.json().get("status") != "ok":
             raise ApiError(f"HTTP {response.status_code} {response.headers.get('X-Road-Error', '')} {response.text[:200]}")
         return response.json()
 
     body = eventually("premier appel via X-Road", call, tries=30, delay=10)
-    log(f"   ONI/CNIB -> état civil/is-adult : {body['status']}, adult = {body['data']['adult']}")
+    log(f"   ONI/CNIB -> état civil/identity-match : {body['status']}, match = {body['data']['match']}")
+
+    payload = {"request_id": "xroad-setup-sans-accord", "procedure": "concours_direct_preverification",
+               "subject": {"pivot_id": "ACTE:OUAGA:2004:01234"}, "parameters": {}}
+    without_consent = httpx.post(f"{base}/is-adult", json=payload, headers=client, timeout=30).json()
+    log(f"   ONI/CNIB -> état civil/is-adult sans accord : {without_consent.get('status')} "
+        f"({without_consent.get('message')}) — refus de la garde")
 
     refused = httpx.post(
         f"http://ss-demandeurs:8080/r1/{INSTANCE}/{MEMBER_CLASS}/JUSTICE/REGISTRES/criminal-record",
@@ -668,8 +713,10 @@ def main() -> int:
         setup_management_services(cs, registres, registres_spec)
         for spec, ss in servers.values():
             register_clients(cs, ss, spec)
-        publish_services(registres)
-        grant_access(registres)
+        apis = {host: ss for host, (_, ss) in servers.items()}
+        for host, ss in apis.items():
+            publish_services(ss, host)
+        grant_access(apis)
         smoke_test()
     except ApiError as exc:
         log(f"ÉCHEC : {exc}")

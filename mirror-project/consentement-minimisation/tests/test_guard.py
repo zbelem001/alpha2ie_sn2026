@@ -202,3 +202,33 @@ def test_the_rules_are_public(client):
     assert rules["identity"]["transmits"] == "fiche retrouvée : oui"
     assert rules["identity-match"]["basis"] == "citizen_request"
     assert holders["justice"]["organization"] == JUSTICE
+
+
+def test_a_plugged_registry_answers_through_the_guard_without_restart(app, client, granted, tmp_path):
+    """Épreuve « brancher le registre d'une autre équipe » : même garde, mêmes règles, autre registre."""
+    from consent_service.holders import HolderCatalog
+    from registries.civil_registry.app import create_app as create_civil
+
+    from .conftest import TODAY
+
+    ours, theirs = TestClient(create_civil(today=lambda: TODAY)), TestClient(create_civil(today=lambda: TODAY))
+    calls = []
+
+    def route(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.host)
+        target = theirs if request.url.host == "equipe-b" else ours
+        reply = target.request(request.method, request.url.path, content=request.content, headers=request.headers)
+        return httpx.Response(reply.status_code, content=reply.content, headers=reply.headers)
+
+    guard = app.state.guard
+    guard._catalog, guard._static, guard._clients = HolderCatalog(overrides=tmp_path), None, {}
+    guard._client = httpx.Client(transport=httpx.MockTransport(route))
+
+    assert ask(client, "etat-civil", "is-adult", registry_body(), consent_id=granted["id"])[1]["data"] == {"adult": True}
+    (tmp_path / "equipe-b.json").write_text('{"holders": {"etat-civil": {"registry_url": "http://equipe-b:8000"}}}')
+    _, envelope = ask(client, "etat-civil", "is-adult", registry_body(request_id="r-2"), consent_id=granted["id"])
+    assert envelope["data"] == {"adult": True}
+    assert calls == ["civil-registry", "equipe-b"]
+    view = {holder["slug"]: holder for holder in client.get("/holders").json()}["etat-civil"]
+    assert view["registry_url"] == "http://equipe-b:8000" and view["origin"] == "equipe-b.json"
+    assert view["services"][0]["reduction"] == {"keep": {"adult": "boolean"}}

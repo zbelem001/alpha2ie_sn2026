@@ -129,6 +129,7 @@ class RuleView(BaseModel):
     basis: Literal["consent", "citizen_request"]
     procedures: list[str]
     registry_service: str
+    reduction: dict[str, Any] = Field(description="Règle de réduction : keep, found ou adult_from")
     transmits: str = Field(description="Ce qui sort de chez le détenteur, en clair")
 
 
@@ -136,4 +137,6 @@ class HolderView(BaseModel):
     slug: str
     organization: str
     name: str
+    registry_url: str = Field(description="Registre interrogé par la garde")
+    origin: str = Field(description="« base » (holders.yaml) ou fichier de branchement")
     services: list[RuleView]
