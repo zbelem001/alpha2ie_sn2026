@@ -15,6 +15,7 @@ La carte du jury ne nomme pas cette couche : c'est l'orchestration des démarche
 - Service `demarches` de `mirror-project/compose.yaml` (port 8000), construit depuis `mirror-project/` ([Dockerfile](Dockerfile)).
 - Variables du journal : `JOURNAL_URL` (`http://journal:8000` dans Docker), `JOURNAL_TOKEN` (jeton de service `demarches`).
 - Variables des accords : `CONSENT_URL` (`http://consentement-minimisation:8000`), `CONSENT_TOKEN`, `XROAD_CLIENTS` (« administration=sous-système X-Road », facultatif) ; `REGISTRY_ROUTES_FILE` désigne dans Docker `passerelle/connectors/routing.detenteurs.yaml`, pour joindre chaque détenteur par la garde.
+- Reprise automatique (couche [résilience](../resilience/README.md), `app/retry.py`) : toutes les `REGISTRY_RETRY_INTERVAL_S` secondes (15 dans Docker, 0 : désactivée), reprise des dossiers en attente d'un registre qui ont un accord actif, au plus `REGISTRY_RETRY_MAX_ATTEMPTS` tentatives par demande.
 - Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (43 tests ; le journal y est remplacé par `journal_client.MemoryJournal`, le registre des accords tourne en mémoire).
 
 ## Démarche lancée par le citoyen

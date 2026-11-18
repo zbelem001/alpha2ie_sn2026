@@ -1,0 +1,4 @@
+# Tests de panne : la couche démarches (avec la passerelle, le journal et la couche
+# consentement-minimisation qu'elle installe) et les registres simulés, tous en mémoire.
+-r ../demarches/requirements-dev.txt
+-e ../registres
