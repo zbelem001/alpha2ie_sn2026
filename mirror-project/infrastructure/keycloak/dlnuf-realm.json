@@ -11,6 +11,43 @@
   },
   "clientScopes": [
     {
+      "name": "basic",
+      "description": "Identité stable du compte : sub, preferred_username, name. Sans elle, le backend retombait sur jti, qui change à chaque jeton.",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false" },
+      "protocolMappers": [
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": { "access.token.claim": "true", "introspection.token.claim": "true" }
+        },
+        {
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "full name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-full-name-mapper",
+          "consentRequired": false,
+          "config": { "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true", "introspection.token.claim": "true" }
+        }
+      ]
+    },
+    {
       "name": "administration-code",
       "protocol": "openid-connect",
       "protocolMappers": [
@@ -135,7 +172,7 @@
       "serviceAccountsEnabled": false,
       "redirectUris": ["http://localhost:3000/*", "http://localhost:8000/*"],
       "webOrigins": ["http://localhost:3000", "http://localhost:8000"],
-      "defaultClientScopes": ["administration-code", "citizen-ref", "citizen-phone-number", "backend-audience", "application-roles"]
+      "defaultClientScopes": ["basic", "administration-code", "citizen-ref", "citizen-phone-number", "backend-audience", "application-roles"]
     }
   ],
   "users": [
