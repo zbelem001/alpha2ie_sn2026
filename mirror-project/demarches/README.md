@@ -11,6 +11,10 @@ La carte du jury ne nomme pas cette couche : c'est l'orchestration des démarche
 - Service `demarches` de `mirror-project/compose.yaml` (port 8000), construit depuis `mirror-project/` ([Dockerfile](Dockerfile)).
 - Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (28 tests).
 
+## Démarche lancée par le citoyen
+
+`POST /v1/citizen/cases` (rôle citoyen, compte rattaché à un acte) : le citoyen choisit une démarche publiée et autorise ses vérifications dans le même geste ; l'administration qui propose la démarche est la demandeuse (ses droits d'échange s'appliquent), l'accord est enregistré au journal, puis les vérifications partent aussitôt. Les vérifications (`_run_checks`) sont communes avec le guichet (`POST /v1/cases/{id}/checks`). C'est ce qui rend une démarche complète possible sans la couche bonus du guichet.
+
 ## Spécification
 
 [openapi.yaml](openapi.yaml) est une copie conforme de `contracts/openapi/backend.yaml` (racine du dépôt). Elle n'est pas valide en l'état (à corriger dans l'original) :

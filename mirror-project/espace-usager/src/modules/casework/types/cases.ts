@@ -16,6 +16,7 @@ export type ApiCase = {
 export type AgentCase = ApiCase & { consent: ConsentView };
 export type Procedure = {
   code: string; title: string; purpose: string; version: number; consentDays: number; active: boolean; published: boolean;
+  questions?: { code: string; description: string; required: boolean }[];
   checks: { questionCode: string; required: boolean; document: DocumentRequirement }[];
 };
 export type AssistedChallenge = { caseId: string; code?: string; phone: string; expiresAt: number; resendAt: number; message: string; mode?: string };

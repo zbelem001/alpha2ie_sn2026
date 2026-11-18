@@ -15,7 +15,9 @@ from app.api import (
     ConsentCreate,
     DocumentIdentifierInput,
     IdentityLinkCreate,
+    CitizenCaseCreate,
     create_case,
+    start_citizen_case,
     execute_checks,
     link_citizen_identity,
     get_citizen_identifiers,
@@ -466,6 +468,45 @@ def test_document_reference_is_sent_with_the_expected_holder(db: Session, monkey
 
     monkeypatch.setattr(connectors, "build_connector", lambda: RegistryConnector())
     assert execute_checks(case_id, agent, db)["status"] == "completed"
+
+
+def test_citizen_can_start_a_procedure_without_an_agent(db: Session, monkeypatch):
+    """Démarche lancée depuis l'espace usager : accord enregistré, vérifications aussitôt, sans guichet."""
+    owner, _, procedure = add_procedure(db)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234", display_name="Awa KABORE")
+
+    class SuccessfulConnector:
+        def query(self, organization, service, payload):
+            assert payload["subject"] == {"pivot_id": "ACTE:OUAGA:2004:01234"}
+            return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
+
+    monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
+    result = start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)
+
+    assert result["status"] == "completed"
+    assert result["checks"][0]["status"] == "confirmed"
+    case = db.get(Case, UUID(result["id"]))
+    assert case.requester_administration_id == owner.id and case.consent_channel == "web"
+    events = db.scalars(select(AuditEvent).where(AuditEvent.case_id == case.id).order_by(AuditEvent.occurred_at)).all()
+    assert [event.event_type for event in events][:2] == ["case_created", "consent_recorded"]
+    assert events[0].actor_type == "citizen"
+    assert any(event.event_type == "registry_check" and event.outcome == "confirmed" for event in events)
+
+
+def test_citizen_start_requires_link_confirmation_and_published_procedure(db: Session):
+    add_procedure(db)
+    linked = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    unlinked = Principal("other-sub", frozenset({"citizen"}), None, None)
+    cases = [
+        (CitizenCaseCreate(procedure_code="passeport_ordinaire_precheck", confirmed=False), linked, 422),
+        (CitizenCaseCreate(procedure_code="passeport_ordinaire_precheck", confirmed=True), unlinked, 403),
+        (CitizenCaseCreate(procedure_code="demarche_inconnue", confirmed=True), linked, 404),
+    ]
+    for body, principal, expected in cases:
+        with pytest.raises(HTTPException) as refused:
+            start_citizen_case(body, principal, db)
+        assert refused.value.status_code == expected
+    assert db.scalar(select(func.count()).select_from(Case)) == 0
 
 
 def test_sms_cannot_be_recorded_as_consent_channel():

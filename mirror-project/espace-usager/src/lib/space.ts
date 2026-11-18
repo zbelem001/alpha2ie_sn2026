@@ -14,8 +14,9 @@ type Space = {
 export const SPACE: Space = {
   roles: ["citizen"],
   home: { citizen: "/usager" },
-  // Routes de l'API démarches (/v1/…) que le relais accepte pour le citoyen.
-  backendRoutes: /^(cases|citizen|notifications)(\/|$)/,
+  // Routes de l'API démarches (/v1/…) que le relais accepte pour le citoyen (catalogue compris,
+  // pour lancer une démarche depuis son espace).
+  backendRoutes: /^(cases|citizen|notifications|procedures)(\/|$)/,
   // Compte fictif du realm de démonstration (infrastructure/keycloak/dlnuf-realm.json).
   demoAccounts: [{ label: "Citoyenne (Awa)", username: "citoyen-demo", password: "CitoyenDemo-2026!" }],
 };

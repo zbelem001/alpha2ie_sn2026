@@ -5,7 +5,8 @@ Couche obligatoire de la carte du jury. Responsable : Personne 1.
 Application Next.js du citoyen, construite à partir d'une copie de `frontend/` (le dossier d'origine reste inchangé) et branchée sur Keycloak et l'API démarches. Le citoyen :
 
 - rattache une fois son compte à son acte de naissance, avec une preuve vérifiée par l'état civil (nom, prénoms, date de naissance, nom de la mère ; jamais conservés) ;
-- répond aux demandes d'accord des administrations (démarches « à distance ») ;
+- **lance lui-même une démarche**, sans guichet ni pièce à fournir : il choisit la démarche, voit les informations qui seront vérifiées, autorise ces vérifications, et le résultat arrive aussitôt (`POST /v1/citizen/cases`) ;
+- répond aux demandes d'accord des administrations (démarches ouvertes au guichet, « à distance ») ;
 - suit ses démarches et le résultat de chaque vérification (« Mes démarches ») ;
 - retrouve chaque consultation de ses informations, refus et blocages compris (« Historique des consultations », tiré du journal de traçabilité) ;
 - enregistre au besoin les références de ses documents (profil, chiffré par l'API).
@@ -33,7 +34,7 @@ Compte de démonstration : `citoyen-demo` / `CitoyenDemo-2026!` (Awa, téléphon
 ## Fonctionnement
 
 - **Session côté serveur** (`src/lib/server/auth.ts`, `src/app/api/auth/*`) : l'identifiant et le mot de passe sont échangés contre des jetons Keycloak, gardés dans des cookies `httpOnly` et renouvelés automatiquement. Le navigateur ne voit jamais de jeton.
-- **Relais** (`src/app/api/backend/[...path]`) : le navigateur appelle `/api/backend/…`, l'application ajoute le jeton et transmet à `/v1/…`. Seules les routes `cases`, `citizen` et `notifications` sont relayées (`src/lib/space.ts`).
+- **Relais** (`src/app/api/backend/[...path]`) : le navigateur appelle `/api/backend/…`, l'application ajoute le jeton et transmet à `/v1/…`. Seules les routes `cases`, `citizen`, `notifications` et `procedures` (catalogue) sont relayées (`src/lib/space.ts`).
 - **Pages protégées** (`src/proxy.ts`) : sans session, `/usager` renvoie vers la connexion. L'API démarches vérifie de toute façon chaque jeton.
 - **Journal** (`src/lib/journal.ts`) : l'état de l'accord et les consultations sont tirés de `GET /v1/cases/{id}/journal`.
 - La liste se rafraîchit toutes les 15 secondes : une demande ouverte au guichet apparaît sans recharger.

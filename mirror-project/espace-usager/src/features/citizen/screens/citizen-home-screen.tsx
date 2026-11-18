@@ -7,6 +7,7 @@ import { FlashInfo } from "@/components/shared/flash-info";
 import { CitizenHeader } from "@/features/citizen/components/citizen-header";
 import { AuthorizationRequest } from "@/features/citizen/components/authorization-request";
 import { IdentityLinkForm } from "@/features/citizen/components/identity-link-form";
+import { StartProcedure } from "@/features/citizen/components/start-procedure";
 import { useCitizenSpace, type CitizenCase } from "@/features/citizen/hooks/use-citizen-space";
 import { getSession } from "@/lib/api";
 import styles from "@/features/citizen/styles/home.module.css";
@@ -68,6 +69,11 @@ export function CitizenHomeScreen() {
 
         {space.requests.map((request) => <AuthorizationRequest key={request.id} request={request} onDecision={(decision) => respond(request.id, decision)} />)}
         {space.atDesk.map((item) => <p key={item.id} className={styles.notice} role="status">{item.requester} vous demande votre accord pour « {item.procedureTitle} » : il sera recueilli au guichet, avec un code reçu par SMS.</p>)}
+
+        {space.link?.linked && <StartProcedure onStart={async (code, title) => {
+          await space.startCase(code);
+          setNotice(`Votre démarche « ${title} » est faite : le résultat est dans « Mes démarches », et chaque consultation dans l’historique.`);
+        }} />}
 
         {space.cases.length > 0 && <section className={styles.journal} aria-labelledby="cases-title">
           <div className={styles.journalHeading}><h2 id="cases-title">Mes démarches</h2><span>{space.cases.length} démarche{space.cases.length === 1 ? "" : "s"}</span></div>

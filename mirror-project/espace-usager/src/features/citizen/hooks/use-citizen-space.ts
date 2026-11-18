@@ -54,6 +54,11 @@ export function useCitizenSpace() {
     await load();
   }
 
+  async function startCase(procedureCode: string) {
+    await api("citizen/cases", { body: { procedureCode, confirmed: true } });
+    await load();
+  }
+
   async function linkIdentity(proof: IdentityProof) {
     await sendIdentityProof(proof);
     await load();
@@ -65,5 +70,5 @@ export function useCitizenSpace() {
   const requests = cases.filter((item) => item.channel === "web" && item.consent.status === "pending" && !["completed", "rejected"].includes(item.status));
   const atDesk = cases.filter((item) => item.channel === "assisted" && item.consent.status === "pending" && !["completed", "rejected"].includes(item.status));
 
-  return { loading, error, expired, link, cases, consultations, requests, atDesk, respond, linkIdentity, reload: load };
+  return { loading, error, expired, link, cases, consultations, requests, atDesk, respond, startCase, linkIdentity, reload: load };
 }

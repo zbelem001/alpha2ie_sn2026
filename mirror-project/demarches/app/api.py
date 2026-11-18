@@ -994,6 +994,23 @@ def list_cases(
     return [_serialize_case(db, case) for case in cases]
 
 
+def _add_registry_requests(db: Session, case: Case, links: list[ProcedureQuestion], submitted_identifiers: dict[str, str]) -> None:
+    """Une demande par vérification de la démarche, avec la référence de pièce chiffrée s'il y en a une."""
+    for link in links:
+        question = db.get(Question, link.question_id)
+        identifier_type = QUESTION_IDENTIFIER_TYPES.get(question.code)
+        identifier_value = submitted_identifiers.get(identifier_type) if identifier_type else None
+        try:
+            encrypted_identifier = encrypt_identifier(identifier_value) if identifier_value else None
+        except IdentifierVaultError as error:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Le chiffrement des identifiants n’est pas configuré") from error
+        db.add(RegistryRequest(case_id=case.id, question_id=question.id, status="queued",
+                               idempotency_key=f"{case.id}:{question.code}",
+                               lookup_identifier_type=identifier_type if identifier_value else None,
+                               lookup_identifier_ciphertext=encrypted_identifier))
+
+
 @router.post("/cases", status_code=status.HTTP_201_CREATED)
 def create_case(
     body: CaseCreate,
@@ -1029,19 +1046,7 @@ def create_case(
                 status="received", consent_channel=body.consent_channel)
     db.add(case)
     db.flush()
-    for link in links:
-        question = db.get(Question, link.question_id)
-        identifier_type = QUESTION_IDENTIFIER_TYPES.get(question.code)
-        identifier_value = submitted_identifiers.get(identifier_type) if identifier_type else None
-        try:
-            encrypted_identifier = encrypt_identifier(identifier_value) if identifier_value else None
-        except IdentifierVaultError as error:
-            db.rollback()
-            raise HTTPException(status_code=503, detail="Le chiffrement des identifiants n’est pas configuré") from error
-        db.add(RegistryRequest(case_id=case.id, question_id=question.id, status="queued",
-                               idempotency_key=f"{case.id}:{question.code}",
-                               lookup_identifier_type=identifier_type if identifier_value else None,
-                               lookup_identifier_ciphertext=encrypted_identifier))
+    _add_registry_requests(db, case, links, submitted_identifiers)
     _add_event(db, case, "case_created", procedure.code, outcome="received", actor_type="agent",
                actor_ref=requester.code)
     db.flush()
@@ -1560,6 +1565,14 @@ def execute_checks(
 ):
     case = _case_or_404(db, case_id)
     _authorize_case_access(case, db, principal)
+    return _run_checks(case, db)
+
+
+def _run_checks(case: Case, db: Session) -> dict:
+    """Vérifications d'un dossier : accord du citoyen, droits d'échange, registres, journal.
+
+    Commun au guichet (POST /cases/{id}/checks) et aux démarches lancées par le citoyen.
+    """
     now = datetime.now(timezone.utc)
     consent = db.scalar(select(Consent).where(Consent.case_id == case.id)
                         .order_by(Consent.created_at.desc()))
@@ -1568,7 +1581,7 @@ def execute_checks(
         select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == case.procedure_id)).all()}
     consent_ids = set()
     if (consent and consent.status == "granted" and
-            (consent.expires_at is None or consent.expires_at > now)):
+            (consent.expires_at is None or _utc(consent.expires_at) > now)):
         consent_ids = set(db.scalars(select(ConsentQuestion.question_id).where(ConsentQuestion.consent_id == consent.id)).all())
     if consent is None or not consent_ids:
         _add_event(db, case, "checks_blocked", "consentement absent ou expiré", outcome="blocked")
@@ -1711,6 +1724,64 @@ def execute_checks(
     db.commit()
     return {"case_id": str(case.id), "status": case.status,
             "checks": [_serialize_check(db, item) for item in requests]}
+
+
+class CitizenCaseCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    procedure_code: str = Field(min_length=1, max_length=64, validation_alias=AliasChoices("procedure_code", "procedureCode"))
+    # Dans le même geste, le citoyen autorise les vérifications listées de la démarche.
+    confirmed: bool
+
+
+@router.post("/citizen/cases", status_code=status.HTTP_201_CREATED)
+def start_citizen_case(
+    body: CitizenCaseCreate,
+    principal: Principal = Depends(require_role("citizen")),
+    db: Session = Depends(get_db),
+):
+    """Démarche lancée par le citoyen depuis son espace, sans guichet et sans pièce à fournir.
+
+    L'administration qui propose la démarche est la demandeuse : ses droits d'échange
+    s'appliquent. L'accord du citoyen est enregistré, puis les vérifications partent aussitôt.
+    """
+    if not body.confirmed:
+        raise HTTPException(status_code=422, detail="Confirmez que vous autorisez les vérifications de cette démarche")
+    if not principal.citizen_ref or not principal.citizen_ref.startswith("ACTE:"):
+        raise HTTPException(status_code=403, detail="Rattachez d’abord votre compte à votre acte de naissance")
+    procedure = db.scalar(select(Procedure).where(
+        Procedure.code == body.procedure_code,
+        Procedure.active.is_(True),
+        Procedure.published.is_(True),
+    ))
+    requester = db.get(Administration, procedure.owner_administration_id) if procedure else None
+    if procedure is None or requester is None or not requester.active:
+        raise HTTPException(status_code=404, detail="Démarche inconnue ou non publiée")
+    links = db.scalars(select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == procedure.id)
+                       .order_by(ProcedureQuestion.position)).all()
+    if not links:
+        raise HTTPException(status_code=409, detail="La démarche ne contient aucune vérification")
+    _, submitted_identifiers = _citizen_reference_for_case(
+        db, principal, CaseCreate(procedure_code=procedure.code, subject_ref=principal.citizen_ref)
+    )
+    case = Case(procedure_id=procedure.id, requester_administration_id=requester.id,
+                subject_ref=principal.citizen_ref, applicant_name=(principal.display_name or "Citoyen")[:100],
+                status="received", consent_channel="web")
+    db.add(case)
+    db.flush()
+    _add_registry_requests(db, case, links, submitted_identifiers)
+    _add_event(db, case, "case_created", procedure.code, outcome="received", actor_type="citizen")
+    db.commit()
+    question_codes = [db.get(Question, link.question_id).code for link in links]
+    record_consent(
+        case.id,
+        ConsentCreate(decision="granted", question_codes=question_codes, notice_version="espace-usager-v1", channel="web"),
+        principal,
+        db,
+    )
+    db.refresh(case)
+    _run_checks(case, db)
+    db.refresh(case)
+    return _serialize_case(db, case)
 
 
 @router.get("/cases/{case_id}/journal")
