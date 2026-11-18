@@ -1,5 +1,5 @@
 /* Écran de connexion : charte de docs/charte-graphique.md (variables dans src/app/globals.css).
-   Formulaire dans une carte givrée, champs et bouton en pilules, armoiries à droite. */
+   Formulaire dans une carte givrée, champs et bouton en pilules, armoiries à droite à la hauteur de la carte. */
 
 .auth-space {
   display: flex;
@@ -11,7 +11,9 @@
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
+  /* Logo, espace, carte et armoiries, espace : la troisième rangée prend la hauteur de la carte,
+     les deux espaces égaux la centrent dans la page. */
+  grid-template-rows: auto 1fr auto 1fr;
   gap: 24px clamp(24px, 4vw, 56px);
   width: 100%;
   max-width: var(--largeur);
@@ -68,6 +70,7 @@
 /* ---------- Formulaire : carte givrée ---------- */
 
 .auth-space .login-panel {
+  grid-row: 3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -266,21 +269,27 @@
   white-space: nowrap;
 }
 
-/* ---------- Armoiries à droite du formulaire ---------- */
+/* ---------- Armoiries à droite du formulaire, à la hauteur de la carte ---------- */
 
+/* Le panneau occupe la rangée de la carte ; l'image, hors du flux, ne compte pas dans sa hauteur. */
 .auth-space .visual-panel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  grid-row: 3;
+  position: relative;
   min-width: 0;
 }
 
-/* Le cartouche des armoiries tient lieu de carte : même ombre que les cartes givrées. */
+/* Le cartouche tient lieu de carte, avec la même ombre que les cartes givrées. Son cadre
+   (1 019 px sur les 1 081 de l'image) s'aligne sur les bords haut et bas de la carte ; la pointe
+   dépasse dessous. Il suit la carte quand elle s'allonge (message d'erreur) ; dans une colonne
+   trop étroite, l'image rétrécit et reste alignée en haut. */
 .auth-space .login-arms {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: min(640px, calc(100svh - 200px));
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100% * 1081 / 1019);
+  object-fit: contain;
+  object-position: top;
   filter: drop-shadow(0 8px 24px rgb(20 22 26 / 0.1));
   animation: auth-rise 520ms var(--courbe) both;
 }
@@ -298,12 +307,15 @@
 }
 
 @media (max-width: 640px) {
+  /* Carte en haut, juste sous le logo. */
   .auth-space .login-page {
+    grid-template-rows: auto 1fr;
     padding-top: 16px;
     padding-bottom: 28px;
   }
 
   .auth-space .login-panel {
+    grid-row: auto;
     align-items: flex-start;
   }
 
