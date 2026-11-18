@@ -14,10 +14,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "FurtArt | Connexion",
-    template: "%s | FurtArt",
+    default: "Espace usager | Dites-le-nous une fois",
+    template: "%s | Dites-le-nous une fois",
   },
-  description: "Connectez-vous à votre espace FurtArt",
+  description: "Mon espace citoyen : mes démarches, mes accords et les consultations de mes informations.",
 };
 
 export const viewport: Viewport = {

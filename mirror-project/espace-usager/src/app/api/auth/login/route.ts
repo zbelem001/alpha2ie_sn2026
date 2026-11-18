@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const role = spaceRole(claims);
     if (!role) return Response.json({ detail: "Ce compte n’a pas accès à cet espace." }, { status: 403 });
     await storeTokens(tokens, isSecureRequest(request));
-    return Response.json({ role, home: SPACE.home[role], name: claims.name ?? claims.preferred_username ?? username });
+    return Response.json({ role, home: SPACE.home[role] ?? "/", name: claims.name ?? claims.preferred_username ?? username });
   } catch (error) {
     if (error instanceof IdentityUnavailableError) {
       return Response.json({ detail: "Le service d’identité est indisponible. Réessayez dans un instant." }, { status: 503 });

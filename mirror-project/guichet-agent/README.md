@@ -1,11 +1,35 @@
-# Couche guichet agent (bonus)
+# Couche guichet agent
 
-Responsable : Personne 1. Couche **bonus** de la carte du jury : à traiter après l'espace usager.
+Couche bonus de la carte du jury. Responsable : Personne 1.
 
-## Où se trouve le code aujourd'hui
+Application Next.js de l'agent, construite à partir d'une copie de `frontend/` (le dossier d'origine reste inchangé) et branchée sur Keycloak et l'API démarches. L'agent, sans demander aucune pièce :
 
-Dans l'application de la couche espace usager : `espace-usager/src/app/(agent)` (route `/guichet`). Les écrans d'administration locale (`(administration)`) et de la Centrale (`(trust-center)`) ne correspondent à aucune couche de la carte.
+- ouvre le dossier d'un citoyen pour une démarche de son administration (catalogue `GET /v1/procedures`) ;
+- recueille l'accord : au guichet avec le code reçu par SMS (simulé), ou à distance depuis l'espace usager ;
+- lance les vérifications et voit le résultat minimisé de chacune (« oui », « non », « indisponible », « à examiner ») ; un registre indisponible est réinterrogé automatiquement tant que l'accord est valide.
 
-## À livrer
+## Lancer
 
-Séparer le guichet de l'espace usager si le temps le permet, avec sa spécification et ses tests.
+Avec tout le miroir : `docker compose up -d --build` depuis `mirror-project/`, puis http://localhost:3001.
+
+En développement (Keycloak et l'API démarches démarrés par le Compose du miroir) :
+
+```bash
+npm ci
+npm run dev        # http://localhost:3001
+npm run build && npm run lint
+```
+
+Comptes de démonstration : `agent-demo` / `AgentDemo-2026!` (Fonction publique, démarche « concours direct ») et `agent-passeport-demo` / `PassportDemo-2026!` (DIPF, démarche « passeport »). Citoyenne du parcours : Awa, téléphone 70 00 00 01 ; ses références de documents fictives sont `ACTE-DEMO-OUAGA-2004-01234`, `NAT-DEMO-OUAGA-2004-01234`, `CASIER-DEMO-OUAGA-2004-01234`, `CNIB-DEMO-OUAGA-2004-01234`, et `PAY-2026-0004` pour le timbre du passeport (le Trésor vérifie que le paiement correspond à la démarche).
+
+Variables serveur : les mêmes que [l'espace usager](../espace-usager/README.md#lancer) ; `NEXT_PUBLIC_CITIZEN_SPACE_URL` (défaut `http://localhost:3000`, fixée à la construction) donne le lien vers l'espace usager.
+
+## Fonctionnement
+
+Même socle que l'espace usager : session côté serveur (cookies `httpOnly`), relais `/api/backend/…` limité ici aux routes `procedures` et `cases` (`src/lib/space.ts`), pages protégées par `src/proxy.ts`. L'état de l'accord de chaque dossier est tiré de son journal ; la liste se rafraîchit toutes les 10 secondes, pour voir arriver l'accord donné à distance.
+
+## Écarts avec `frontend/`
+
+- Retirés : espace citoyen (application `espace-usager/`), console d'administration locale, Centrale, simulations dans le navigateur.
+- Les références de documents se saisissent à l'ouverture du dossier : l'API démarches n'a pas de route pour les modifier ensuite.
+- Le catalogue renvoyé par l'API contient aussi les démarches d'autres administrations ; l'API refuse ensuite l'ouverture (message affiché). À filtrer côté API (P2).

@@ -65,6 +65,12 @@ services:
       KC_DB_USERNAME: ${POSTGRES_USER:-dlnuf}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-dlnuf-dev}
       KC_HEALTH_ENABLED: "true"
+      # Adresse publique unique : l'émetteur (iss) des jetons est toujours
+      # http://localhost:8180/realms/dlnuf, que le jeton soit demandé par le navigateur ou
+      # par un conteneur (les interfaces joignent Keycloak par http://keycloak:8080).
+      # L'API démarches n'accepte que cet émetteur (KEYCLOAK_ISSUER).
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_HOST_PORT:-8180}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports:
       - "${KEYCLOAK_HOST_PORT:-8180}:8080"
     volumes:
@@ -216,6 +222,47 @@ services:
       justice-registry:
         condition: service_healthy
       oni-registry:
+        condition: service_healthy
+
+  # --- Interfaces : espace usager (obligatoire) et guichet agent (bonus) -------------------
+  # Applications Next.js : connexion Keycloak et relais vers l'API démarches côté serveur.
+
+  espace-usager:
+    build:
+      context: ../espace-usager
+    restart: unless-stopped
+    environment: &interface-env
+      BACKEND_URL: http://demarches:8000
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-dlnuf}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-dlnuf-api}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    depends_on:
+      demarches:
+        condition: service_healthy
+
+  guichet-agent:
+    build:
+      context: ../guichet-agent
+    restart: unless-stopped
+    environment: *interface-env
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    depends_on:
+      demarches:
         condition: service_healthy
 
 volumes:

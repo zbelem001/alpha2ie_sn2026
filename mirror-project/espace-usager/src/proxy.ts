@@ -8,4 +8,4 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/usager/:path*", "/guichet/:path*"] };
+export const config = { matcher: ["/usager/:path*"] };

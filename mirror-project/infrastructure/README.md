@@ -19,6 +19,8 @@ docker compose ps
 | `justice-registry`, `police-registry`, `treasury-registry`, `oni-registry` | Registres fictifs | 8103, 8104, 8105, 8106 |
 | `notifications` | SMS et e-mails simulés : boîte d'envoi et téléphone du citoyen ([passerelle/README.md](../passerelle/README.md)) | 8107 |
 | `demarches` | API métier (couche démarches, copie du backend) | 8000 |
+| `espace-usager` | Interface du citoyen (Next.js), branchée sur Keycloak et l'API démarches | 3000 |
+| `guichet-agent` | Interface de l'agent (Next.js), branchée sur Keycloak et l'API démarches | 3001 |
 
 Les ports 5432 et 8080 ne sont pas utilisés côté machine, car ils sont souvent déjà occupés.
 
@@ -46,4 +48,4 @@ Pendant la panne, le connecteur répond `unavailable` ; il n'invente jamais de r
 
 ## À venir
 
-- Service `espace-usager` (application Next.js), pas encore dans le Compose.
+- Rien pour l'instant : toutes les couches du miroir démarrent avec `docker compose up -d --build`.
