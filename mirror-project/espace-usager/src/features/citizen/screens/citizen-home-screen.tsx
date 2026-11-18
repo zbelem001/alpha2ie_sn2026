@@ -53,7 +53,7 @@ export function CitizenHomeScreen() {
       <FlashInfo />
       <CitizenHeader help={help} onHelp={() => setHelp(!help)} />
 
-      <main className={styles.main}>
+      <main className={styles.main} id="contenu">
         <div className={styles.accountLine}><span>Espace citoyen</span><span>{name ? `Bonjour ${name}` : "Mon espace"}</span></div>
         <div className={styles.intro}>
           <h1>Mes consultations</h1>

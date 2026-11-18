@@ -34,7 +34,7 @@ export function AgentWorkspaceScreen() {
   return <div className={styles.page}>
     <FlashInfo />
     <header className={styles.header}><Link href="/guichet" className={styles.brand} onClick={(event) => { event.preventDefault(); setWorkspaceKey((value) => value + 1); }}><Image src="/Coat_of_arms_of_Burkina_Faso_(2025-present)%20(1).svg" alt="Armoiries du Burkina Faso" width={44} height={54} /><span><small>BURKINA FASO</small><strong>Dites-le-nous une fois</strong></span></Link><div className={styles.agentIdentity}><span>{agent.name}</span><strong>{agent.service}</strong></div><button className={styles.exit} type="button" onClick={quit} aria-label="Quitter le guichet"><LogOut size={18} aria-hidden="true" /><span>Quitter</span></button></header>
-    <main className={styles.main}>
+    <main className={styles.main} id="contenu">
       <div className={styles.accountLine}><span>Guichet agent</span><span>{agent.service}</span></div>
       <CaseWorkspace key={workspaceKey} />
     </main>

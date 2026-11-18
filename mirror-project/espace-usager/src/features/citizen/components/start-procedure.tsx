@@ -57,7 +57,7 @@ export function StartProcedure({ onStart }: { onStart: (procedureCode: string, t
         <p><label><input type="checkbox" checked={confirmed} disabled={busy} onChange={(e) => { setConfirmed(e.target.checked); setError(""); }} /> J’autorise ces vérifications pour cette démarche.</label></p>
       </div>}
       {error && <p role="alert">{error}</p>}
-      <button className={styles.primary} type="submit" disabled={busy || !selected}>{busy ? "Vérifications en cours…" : "Lancer la démarche"}</button>
+      <button className={styles.accent} type="submit" disabled={busy || !selected}>{busy ? "Vérifications en cours…" : "Lancer la démarche"}</button>
     </form>
   </section>;
 }

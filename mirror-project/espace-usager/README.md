@@ -33,6 +33,8 @@ Compte de démonstration : `citoyen-demo` / `CitoyenDemo-2026!` (Awa, téléphon
 | `KEYCLOAK_URL` | `http://localhost:8180` | Keycloak (`http://keycloak:8080` dans Docker) |
 | `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID` | `dlnuf`, `dlnuf-api` | Realm et client |
 
+Charte graphique (commune avec le guichet) : [docs/charte-graphique.md](../docs/charte-graphique.md).
+
 ## Spécification et tests
 
 - [openapi.yaml](openapi.yaml) : routes de l'application (connexion, session, déconnexion, relais vers l'API démarches avec la liste des routes relayées).

@@ -55,7 +55,7 @@ export function LoginScreen() {
           </div>
           {error && <p className="form-error access-form-error" role="alert">{error}</p>}
           <button type="submit" className="login-button" disabled={loading} aria-busy={loading}>
-            <span>{loading ? "PATIENTEZ…" : "SE CONNECTER"}</span>
+            <span>{loading ? "Patientez…" : "Se connecter"}</span>
             <span className="login-button-arrow"><ArrowRight size={20} aria-hidden="true" /></span>
           </button>
         </form>

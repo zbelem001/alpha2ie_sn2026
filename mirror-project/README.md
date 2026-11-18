@@ -47,6 +47,7 @@ L'environnement d'origine se lance depuis la branche `main` (`git checkout main`
 - Signalement d'une consultation par le citoyen (« Je ne reconnais pas cette consultation » ou demande de correction) : inscrit au journal, toujours affiché après rechargement, visible au guichet (étiquette « Signalement » dans la liste, détail dans le dossier) ; second signalement identique refusé, signalement par un autre citoyen ou d'un événement qui n'est pas une consultation refusé (Chrome et tests de l'API).
 - Démarche « passeport » (`agent-passeport-demo`) : cinq vérifications confirmées (ONI, état civil, Justice, Trésor) ; ouverture d'une démarche d'une autre administration refusée (403).
 - Sécurité : le casier d'un tiers saisi pour Awa donne « introuvable » au lieu de lui être attribué ; le rattachement d'un acte exige la preuve de titularité (refus identique pour une preuve fausse et un acte inexistant, homonyme refusé, essais limités), testé aussi dans Chrome.
+- Charte graphique ([docs/charte-graphique.md](docs/charte-graphique.md)) : l'esprit de `DESIGN.md` avec les couleurs des armoiries, sur les deux interfaces. Tests de bout en bout passés, aucune page ne déborde en largeur (390 et 1 366 px), audit axe-core WCAG 2.1 A et AA sans violation ; contrastes sur les surfaces givrées calculés à la main.
 - Non vérifié : banc X-Road lancé depuis `passerelle/` (vérifié depuis `interoperability/`).
 
 ## Règles jusqu'à la bascule

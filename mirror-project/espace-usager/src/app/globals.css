@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-outfit);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
+  --font-heading: var(--font-outfit);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,83 +48,107 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Charte (docs/charte-graphique.md) : l'esprit de DESIGN.md (cartes blanches givrées sur un
+   fond dégradé chaud, pilules, beaucoup d'air) avec les couleurs des armoiries du Burkina Faso,
+   relevées dans public/Coat_of_arms_of_Burkina_Faso_(2025-present) (1).svg. Thème clair seulement. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Armoiries */
+  --vert-faso: #183624;        /* vert sombre : primaire (boutons, onglet actif, focus) ; blanc dessus 13,2:1 */
+  --vert-faso-survol: #245236; /* blanc dessus 9,0:1 */
+  --vert-armoiries: #316d49;   /* icônes, liens, succès ; 6,2:1 sur blanc */
+  --vert-drapeau: #009e49;     /* pastilles et filets, jamais pour du texte */
+  --or: #e7bc03;               /* or du mil : action phare, texte vert sombre dessus (7,3:1), jamais blanc */
+  --or-survol: #d6ad00;        /* vert sombre dessus 6,2:1 */
+  --or-sombre: #987c02;        /* pastilles sur fond or */
+  --or-etoile: #fcd116;        /* jaune-or de l'étoile : accents et focus sur fond vert (9,0:1) */
+  --or-doux: #fbf0c4;          /* fonds « en attente » */
+  --surlignage: #fdf7e3;       /* encadrés d'information */
+  --rouge-drapeau: #ef2b2d;    /* pastilles et filets, jamais pour du texte */
+  --rouge: #b3141c;            /* erreurs et actions destructives ; 6,9:1 sur blanc */
+  --rouge-sombre: #8f1016;
 
-  /* Couleurs de la marque */
-  --brand-navy: #1b2a6b;
-  --brand-ink: #17213f;
-  --brand-teal: #2da497;
-  --brand-teal-dark: #238a7f;
-  --brand-yellow: #ffd34f;
-  --brand-orange: #f5a064;
-  --brand-danger: #d64545;
-  --brand-line: #dfe5e4;
+  /* Neutres : l'argent des étalons */
+  --texte: #1a1a1a;
+  --texte-secondaire: #5a6a60; /* 5,7:1 sur blanc */
+  --fond: #edefe9;             /* couleur de repli du fond de page */
+  --carte: #ffffff;
+  --fond-discret: #f3f2ec;
+  --fond-attenue: #f0f0e9;
+  --bordure: #e3e3db;          /* séparateurs et contours décoratifs */
+  --bordure-champ: #7f8c83;    /* contour des champs : 3,5:1 sur blanc, 3,3:1 sur la zone dorée du fond */
+  --texte-sur-vert: #f7f6f1;
+  --texte-sur-vert-secondaire: #c5d5ca;
+
+  /* États : couleur, fond et texte des badges ; jamais la couleur seule, toujours un libellé */
+  --succes: #316d49;
+  --succes-fond: #e1f0e6;
+  --succes-texte: #245236;
+  --erreur: #b3141c;
+  --erreur-fond: #fce8e8;
+  --erreur-texte: #a3131a;
+  --avertissement-fond: #fbf0c4;
+  --avertissement-texte: #6e5600;
+  --en-cours-fond: rgb(24 54 36 / 0.1);
+  --en-cours-texte: #183624;
+
+  /* Formes, surfaces, mise en page, mouvement */
+  --rayon: 1rem;
+  --rayon-carte: 1.75rem;
+  --rayon-pilule: 999px;
+  --surface-fond: rgb(255 255 255 / 0.72);
+  --surface-bordure: rgb(255 255 255 / 0.8);
+  --surface-flou: blur(18px);
+  --champ-fond: rgb(255 255 255 / 0.8);
+  --ombre-carte: 0 1px 2px rgb(20 22 26 / 0.04), 0 8px 24px -12px rgb(20 22 26 / 0.08);
+  --anneau: 0 0 0 3px rgb(24 54 36 / 0.18);
+  --largeur: 90rem;
+  --marge: 16px;
+  --courbe: cubic-bezier(0.23, 1, 0.32, 1);
+  --duree: 160ms;
+  --police-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+  /* Gris vert en haut à gauche qui se fond en crème dorée en bas à droite, lueur de l'or du mil. */
+  --fond-page:
+    radial-gradient(60rem 40rem at 100% 100%, #f8e8b0 0%, transparent 70%),
+    radial-gradient(50rem 30rem at 80% 0%, #f2f1e2 0%, transparent 60%),
+    linear-gradient(135deg, #e3eae4 0%, #eeefe9 55%, #f6ecd0 100%);
+
+  /* shadcn/ui, sur les mêmes couleurs */
+  --background: var(--fond);
+  --foreground: var(--texte);
+  --card: var(--carte);
+  --card-foreground: var(--texte);
+  --popover: var(--carte);
+  --popover-foreground: var(--texte);
+  --primary: var(--vert-faso);
+  --primary-foreground: #ffffff;
+  --secondary: var(--fond-discret);
+  --secondary-foreground: var(--texte);
+  --muted: var(--fond-attenue);
+  --muted-foreground: var(--texte-secondaire);
+  --accent: var(--or);
+  --accent-foreground: var(--vert-faso);
+  --destructive: var(--rouge);
+  --border: var(--bordure);
+  --input: var(--bordure-champ);
+  --ring: var(--vert-faso);
+  --chart-1: var(--vert-faso);
+  --chart-2: var(--vert-armoiries);
+  --chart-3: var(--or);
+  --chart-4: var(--rouge);
+  --chart-5: var(--texte-secondaire);
+  --radius: 1rem;
+  --sidebar: var(--carte);
+  --sidebar-foreground: var(--texte);
+  --sidebar-primary: var(--vert-faso);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--fond-attenue);
+  --sidebar-accent-foreground: var(--texte);
+  --sidebar-border: var(--bordure);
+  --sidebar-ring: var(--vert-faso);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+@media (min-width: 640px) {
+  :root { --marge: 32px; }
 }
 
 @layer base {
@@ -134,15 +158,66 @@
 
   html {
     min-height: 100%;
+    background-color: var(--fond);
     -webkit-text-size-adjust: 100%;
   }
 
   body {
     margin: 0;
-    background: #ffffff;
-    color: var(--brand-ink);
-    font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI",
-      Roboto, Arial, sans-serif;
+    background: var(--fond-page);
+    background-color: var(--fond);
+    color: var(--texte);
+    font-family: var(--font-outfit), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--vert-faso);
+    outline-offset: 3px;
+  }
+
+  ::placeholder {
+    color: var(--texte-secondaire);
+    opacity: 1;
+  }
+
+  ::selection {
+    background: var(--or-doux);
+    color: var(--texte);
+  }
+}
+
+/* Lien « Aller au contenu » : premier élément atteint au clavier sur chaque page. */
+.skip-link {
+  position: absolute;
+  z-index: 100;
+  top: 8px;
+  left: 8px;
+  padding: 10px 20px;
+  border-radius: var(--rayon-pilule);
+  background: var(--vert-faso);
+  color: var(--texte-sur-vert);
+  font-weight: 500;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform var(--duree) var(--courbe);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+  outline: 3px solid var(--or-etoile);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

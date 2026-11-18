@@ -25,6 +25,8 @@ Comptes de démonstration : `agent-demo` / `AgentDemo-2026!` (Fonction publique,
 
 Variables serveur : les mêmes que [l'espace usager](../espace-usager/README.md#lancer) ; `NEXT_PUBLIC_CITIZEN_SPACE_URL` (défaut `http://localhost:3000`, fixée à la construction) donne le lien vers l'espace usager.
 
+Charte graphique (commune avec l'espace usager) : [docs/charte-graphique.md](../docs/charte-graphique.md).
+
 ## Spécification et tests
 
 - [openapi.yaml](openapi.yaml) : routes de l'application (connexion, session, déconnexion, relais vers l'API démarches, limité à `procedures` et `cases`).
