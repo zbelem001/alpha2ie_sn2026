@@ -24,6 +24,13 @@ Comptes de démonstration : `agent-demo` / `AgentDemo-2026!` (Fonction publique,
 
 Variables serveur : les mêmes que [l'espace usager](../espace-usager/README.md#lancer) ; `NEXT_PUBLIC_CITIZEN_SPACE_URL` (défaut `http://localhost:3000`, fixée à la construction) donne le lien vers l'espace usager.
 
+## Spécification et tests
+
+- [openapi.yaml](openapi.yaml) : routes de l'application (connexion, session, déconnexion, relais vers l'API démarches, limité à `procedures` et `cases`).
+- Tests (Playwright, `npm ci` d'abord) :
+  - `npm run test:unit` : routes relayées, accord tiré du journal ;
+  - `npm run test:e2e` : parcours dans Chrome contre le miroir démarré : pages protégées, compte citoyen refusé, dossier au guichet sans pièce (accord par code simulé, vérifications, dossier retrouvé par la recherche). Prérequis : compte d'Awa rattaché à son acte (les tests de l'espace usager s'en chargent).
+
 ## Fonctionnement
 
 Même socle que l'espace usager : session côté serveur (cookies `httpOnly`), relais `/api/backend/…` limité ici aux routes `procedures` et `cases` (`src/lib/space.ts`), pages protégées par `src/proxy.ts`. L'état de l'accord de chaque dossier est tiré de son journal ; la liste se rafraîchit toutes les 10 secondes, pour voir arriver l'accord donné à distance.

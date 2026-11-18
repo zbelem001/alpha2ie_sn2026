@@ -1,0 +1,292 @@
+openapi: 3.1.0
+info:
+  title: Couche espace usager — routes de l'application
+  version: 0.1.0
+  description: 'Routes servies par l''application elle-même (Next.js, côté serveur). Le navigateur n''appelle que ces routes
+    : la connexion échange l''identifiant et le mot de passe contre des jetons Keycloak, gardés dans des cookies httpOnly
+    ; le relais ajoute le jeton et transmet à l''API démarches (../demarches/openapi.yaml). Rôle admis : citizen. Routes relayées
+    : cases, citizen, notifications, procedures (catalogue).'
+servers:
+- url: http://localhost:3000
+paths:
+  /api/auth/login:
+    post:
+      summary: Se connecter (compte Keycloak du realm dlnuf)
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - username
+              - password
+              properties:
+                username:
+                  type: string
+                  minLength: 1
+                password:
+                  type: string
+                  minLength: 1
+      responses:
+        '200':
+          description: 'Connecté. Cookies de session posés (httpOnly). Page d''arrivée : /usager.'
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: dlnuf_access, dlnuf_refresh (httpOnly, SameSite=Lax)
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - role
+                - home
+                - name
+                properties:
+                  role:
+                    type: string
+                    const: citizen
+                  home:
+                    type: string
+                    example: /usager
+                  name:
+                    type: string
+        '400':
+          description: Identifiant ou mot de passe manquant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Identifiant ou mot de passe incorrect
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Compte sans le rôle de cet espace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service d'identité indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/session:
+    get:
+      summary: Session en cours (jeton renouvelé si nécessaire)
+      operationId: session
+      responses:
+        '200':
+          description: État de la session
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - type: object
+                  required:
+                  - authenticated
+                  properties:
+                    authenticated:
+                      const: false
+                - type: object
+                  required:
+                  - authenticated
+                  - role
+                  - name
+                  - username
+                  properties:
+                    authenticated:
+                      const: true
+                    role:
+                      const: citizen
+                    name:
+                      type: string
+                    username:
+                      type: string
+                    administrationCode:
+                      type:
+                      - string
+                      - 'null'
+        '503':
+          description: Service d'identité indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/logout:
+    post:
+      summary: Se déconnecter (session Keycloak fermée, cookies effacés)
+      operationId: logout
+      responses:
+        '200':
+          description: Déconnecté
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    const: true
+  /api/backend/{path}:
+    parameters:
+    - name: path
+      in: path
+      required: true
+      description: 'Route de l''API démarches, sans /v1/. Seules ces routes sont relayées : cases, citizen, notifications,
+        procedures (catalogue).'
+      schema:
+        type: string
+        pattern: ^(cases|citizen|notifications|procedures)(/.*)?$
+    get:
+      summary: Relais GET vers /v1/{path} de l'API démarches, avec le jeton de la session
+      operationId: relay_get
+      security:
+      - session: []
+      responses:
+        default:
+          description: Réponse de l'API démarches, transmise telle quelle (voir ../demarches/openapi.yaml)
+        '401':
+          description: 'Pas de session : se reconnecter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Route non disponible dans cet espace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service d'identité ou API démarches indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Relais POST vers /v1/{path} de l'API démarches, avec le jeton de la session
+      operationId: relay_post
+      security:
+      - session: []
+      responses:
+        default:
+          description: Réponse de l'API démarches, transmise telle quelle (voir ../demarches/openapi.yaml)
+        '401':
+          description: 'Pas de session : se reconnecter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Route non disponible dans cet espace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service d'identité ou API démarches indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Relais PUT vers /v1/{path} de l'API démarches, avec le jeton de la session
+      operationId: relay_put
+      security:
+      - session: []
+      responses:
+        default:
+          description: Réponse de l'API démarches, transmise telle quelle (voir ../demarches/openapi.yaml)
+        '401':
+          description: 'Pas de session : se reconnecter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Route non disponible dans cet espace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service d'identité ou API démarches indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Relais PATCH vers /v1/{path} de l'API démarches, avec le jeton de la session
+      operationId: relay_patch
+      security:
+      - session: []
+      responses:
+        default:
+          description: Réponse de l'API démarches, transmise telle quelle (voir ../demarches/openapi.yaml)
+        '401':
+          description: 'Pas de session : se reconnecter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Route non disponible dans cet espace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service d'identité ou API démarches indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Relais DELETE vers /v1/{path} de l'API démarches, avec le jeton de la session
+      operationId: relay_delete
+      security:
+      - session: []
+      responses:
+        default:
+          description: Réponse de l'API démarches, transmise telle quelle (voir ../demarches/openapi.yaml)
+        '401':
+          description: 'Pas de session : se reconnecter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Route non disponible dans cet espace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service d'identité ou API démarches indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Error:
+      type: object
+      required:
+      - detail
+      properties:
+        detail:
+          type: string
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: dlnuf_access
+      description: Jeton d'accès Keycloak, cookie httpOnly posé par /api/auth/login, renouvelé par le jeton de rafraîchissement
+        (dlnuf_refresh).

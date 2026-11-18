@@ -12,8 +12,8 @@ La carte du jury impose un dossier par couche : registres, passerelle d'échange
 | [passerelle/](passerelle/README.md) | Passerelle d'échange | `interoperability/connectors`, `xroad`, `notifications` | P3 | Fonctionne seul | [openapi.yaml](passerelle/openapi.yaml), [notifications](passerelle/notifications.openapi.yaml) | 72 |
 | [consentement-minimisation/](consentement-minimisation/README.md) | Consentement et minimisation | À extraire de `demarches/app/api.py` | À désigner (P2 ?) | README seulement | — | — |
 | [journal/](journal/README.md) | Journal de traçabilité | À extraire de `demarches/app/api.py` | À désigner (P2 ?) | README seulement | — | — |
-| [espace-usager/](espace-usager/README.md) | Espace usager | `frontend/`, partie citoyen | P1 | Branché sur Keycloak et l'API démarches (port 3000) | — (consomme l'API démarches) | build, lint, parcours dans Chrome |
-| [guichet-agent/](guichet-agent/README.md) | Guichet agent (bonus) | `frontend/`, partie agent | P1 | Branché sur Keycloak et l'API démarches (port 3001) | — (consomme l'API démarches) | build, lint, parcours dans Chrome |
+| [espace-usager/](espace-usager/README.md) | Espace usager | `frontend/`, partie citoyen | P1 | Branché sur Keycloak et l'API démarches (port 3000) | [openapi.yaml](espace-usager/openapi.yaml) (routes de l'application) | Playwright : 8 unitaires, 6 de bout en bout |
+| [guichet-agent/](guichet-agent/README.md) | Guichet agent (bonus) | `frontend/`, partie agent | P1 | Branché sur Keycloak et l'API démarches (port 3001) | [openapi.yaml](guichet-agent/openapi.yaml) (routes de l'application) | Playwright : 4 unitaires, 3 de bout en bout |
 | [resilience/](resilience/README.md) | Résilience (bonus) | Répartie (connecteurs, `execute_checks`, banc X-Road) | À désigner (P3 ?) | README seulement | — | — |
 | [demarches/](demarches/README.md) | (orchestration, hors carte) | `backend/` | P2 | Fonctionne | [openapi.yaml](demarches/openapi.yaml), copie non valide de `contracts/openapi/backend.yaml` | 28 |
 

@@ -32,6 +32,13 @@ Compte de démonstration : `citoyen-demo` / `CitoyenDemo-2026!` (Awa, téléphon
 | `KEYCLOAK_URL` | `http://localhost:8180` | Keycloak (`http://keycloak:8080` dans Docker) |
 | `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID` | `dlnuf`, `dlnuf-api` | Realm et client |
 
+## Spécification et tests
+
+- [openapi.yaml](openapi.yaml) : routes de l'application (connexion, session, déconnexion, relais vers l'API démarches avec la liste des routes relayées).
+- Tests (Playwright, `npm ci` d'abord) :
+  - `npm run test:unit` : logique sans navigateur (accord et consultations tirés du journal, routes relayées) ;
+  - `npm run test:e2e` : parcours dans Chrome contre le miroir démarré (`docker compose up -d` dans `mirror-project/`) : pages protégées, refus d'un mauvais mot de passe et d'un compte agent, démarche faite par le citoyen seul puis consultations retrouvées (scénario de la vidéo), retrait de l'accord, déconnexion. Chrome installé est utilisé ; sinon `npx playwright install chromium` et `PLAYWRIGHT_CHANNEL=chromium`.
+
 ## Fonctionnement
 
 - **Session côté serveur** (`src/lib/server/auth.ts`, `src/app/api/auth/*`) : l'identifiant et le mot de passe sont échangés contre des jetons Keycloak, gardés dans des cookies `httpOnly` et renouvelés automatiquement. Le navigateur ne voit jamais de jeton.
