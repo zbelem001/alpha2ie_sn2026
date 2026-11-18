@@ -66,7 +66,7 @@ IDENTIFIER_REGISTRIES = {
     "criminal_record_number": "BF/GOV/JUSTICE/REGISTRES",
     "nationality_reference": "BF/GOV/JUSTICE/REGISTRES",
     "payment_reference": "BF/GOV/TRESOR/PAIEMENTS",
-    "loss_report_number": "BF/GOV/POLICE/DECLARATIONS",
+    "loss_report_number": "BF/GOV/POLICE/PERTES",
 }
 QUESTION_IDENTIFIER_TYPES = {
     "candidate_minimum_age": "birth_act_number",
