@@ -56,18 +56,21 @@ export function useAgentWorkspace() {
   }, []);
 
   // Reprise automatique : un registre indisponible est réinterrogé, tant que l'accord est valide.
+  // Le minuteur dépend du dossier en attente et de ses tentatives, pas de la liste : le
+  // rafraîchissement régulier (10 s) ne doit pas le relancer avant qu'il se déclenche (15 s).
+  const waiting = cases.find((item) => item.checks.some((check) => check.status === "unavailable") && consentIsActive(item.consent));
+  const waitingId = waiting?.id ?? "";
+  const waitingAttempts = waiting ? waiting.checks.map((check) => check.attemptCount).join(",") : "";
   useEffect(() => {
-    if (busy) return;
-    const waiting = cases.find((item) => item.checks.some((check) => check.status === "unavailable") && consentIsActive(item.consent));
-    if (!waiting) return;
+    if (busy || !waitingId) return;
     const timer = setTimeout(async () => {
       setBusy("auto");
-      try { await agentCaseService.runChecks(waiting.id); await refresh(); }
+      try { await agentCaseService.runChecks(waitingId); await refresh(); }
       catch (cause) { setError(messageOf(cause, "La reprise n’a pas abouti.")); }
       finally { setBusy(""); }
     }, AUTO_RETRY_MS);
     return () => clearTimeout(timer);
-  }, [cases, busy, refresh]);
+  }, [waitingId, waitingAttempts, busy, refresh]);
 
   async function task(name: string, action: () => Promise<void>) {
     if (busy) return;
