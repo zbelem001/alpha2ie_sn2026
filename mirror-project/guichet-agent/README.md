@@ -2,7 +2,7 @@
 
 Couche bonus de la carte du jury. Responsable : Personne 1.
 
-Application Next.js de l'agent, construite à partir d'une copie de `frontend/` (le dossier d'origine reste inchangé) et branchée sur Keycloak et l'API démarches. L'agent, sans demander aucune pièce :
+Application Next.js de l'agent, construite à partir d'une copie de `frontend/` (le dossier d'origine reste sur `main`, inchangé) et branchée sur Keycloak et l'API démarches. L'agent, sans demander aucune pièce :
 
 - ouvre le dossier d'un citoyen pour une démarche de son administration (catalogue `GET /v1/procedures`) ;
 - recueille l'accord : au guichet avec le code reçu par SMS (simulé), ou à distance depuis l'espace usager ;

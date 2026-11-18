@@ -72,11 +72,11 @@ Le statut `ok` doit contenir la clé de réponse attendue. Les statuts autres qu
 
 ## 6. Démarrer et contrôler le catalogue
 
-Après modification du seed, depuis la racine du dépôt :
+Après modification du seed, depuis `mirror-project/` :
 
 ```bash
-docker compose up -d --build backend
-docker compose exec backend python -m scripts.seed_demo
+docker compose up -d --build demarches
+docker compose exec demarches python -m scripts.seed_demo
 ```
 
 Le seed doit pouvoir être exécuté plusieurs fois sans créer de doublons. Pour une modification des tables ou des contraintes, ajouter une migration Alembic revue par l’équipe ; ne pas modifier le schéma à la main ni confondre une modification du catalogue avec une migration.

@@ -1,6 +1,6 @@
 # Infrastructure du miroir
 
-Responsable : Personne 3. Copie de `infrastructure/` (racine du dépôt), adaptée aux dossiers de couche du miroir.
+Responsable : Personne 3. Copie de `infrastructure/` (branche `main`), adaptée aux dossiers de couche du miroir.
 
 ```bash
 # depuis mirror-project/

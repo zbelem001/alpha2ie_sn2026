@@ -2,7 +2,7 @@
 
 Couche obligatoire de la carte du jury. Responsable : Personne 1.
 
-Application Next.js du citoyen, construite à partir d'une copie de `frontend/` (le dossier d'origine reste inchangé) et branchée sur Keycloak et l'API démarches. Le citoyen :
+Application Next.js du citoyen, construite à partir d'une copie de `frontend/` (le dossier d'origine reste sur `main`, inchangé) et branchée sur Keycloak et l'API démarches. Le citoyen :
 
 - rattache une fois son compte à son acte de naissance, avec une preuve vérifiée par l'état civil (nom, prénoms, date de naissance, nom de la mère ; jamais conservés) ;
 - **lance lui-même une démarche**, sans guichet ni pièce à fournir : il choisit la démarche, voit les informations qui seront vérifiées, autorise ces vérifications, et le résultat arrive aussitôt (`POST /v1/citizen/cases`) ;

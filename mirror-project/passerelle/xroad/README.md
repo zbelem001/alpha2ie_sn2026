@@ -6,7 +6,7 @@ Le banc fait passer les appels du backend vers les registres simulés par X-Road
 
 ## Démarrer
 
-Depuis la racine du dépôt :
+Depuis `mirror-project/` :
 
 ```bash
 docker compose --profile xroad up -d --build        # démarre et configure le banc, avec le reste

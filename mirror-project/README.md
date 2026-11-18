@@ -2,11 +2,11 @@
 
 La carte du jury impose un dossier par couche : registres, passerelle d'échange, consentement et minimisation, journal de traçabilité, espace usager (obligatoires), guichet agent et résilience (bonus). Chaque couche a sa spécification OpenAPI et ses tests.
 
-**Principe retenu : on recopie, on ne déplace pas.** Tout le miroir est dans ce dossier, construit à partir de copies, et se lance seul. À la racine du dépôt, l'organisation d'origine (`frontend/`, `backend/`, `interoperability/`, `infrastructure/`…) reste en place et inchangée, et `main` n'est pas touché. Si le miroir est validé, son contenu remplace l'ancienne organisation sur `main`.
+**Principe retenu : on recopie, on ne déplace pas.** Tout le miroir est dans ce dossier, construit à partir de copies, et se lance seul. L'organisation d'origine (`frontend/`, `backend/`, `interoperability/`, `infrastructure/`…) reste sur `main`, qui n'est pas touché ; depuis le 18/11, cette branche ne la contient plus, pour ne pas avoir chaque fichier en double. Si le miroir est validé, son contenu remplace l'ancienne organisation sur `main`.
 
 ## Contenu
 
-| Dossier | Couche de la carte | Copié depuis (racine du dépôt) | Responsable | État | OpenAPI | Tests |
+| Dossier | Couche de la carte | Copié depuis (`main`) | Responsable | État | OpenAPI | Tests |
 |---|---|---|---|---|---|---|
 | [registres/](registres/README.md) | Registres | `interoperability/registries`, `mock_registry` | P3 | Fonctionne seul | [openapi.yaml](registres/openapi.yaml), à remplacer par le contrat du jury | 43 |
 | [passerelle/](passerelle/README.md) | Passerelle d'échange | `interoperability/connectors`, `xroad`, `notifications` | P3 | Fonctionne seul | [openapi.yaml](passerelle/openapi.yaml), [notifications](passerelle/notifications.openapi.yaml) | 72 |
@@ -19,7 +19,7 @@ La carte du jury impose un dossier par couche : registres, passerelle d'échange
 
 Pas de dossier `contracts/` : chaque contrat est dans la couche qui en est responsable (`registres/schemas`, `passerelle/schemas`, `consentement-minimisation/schemas`, `demarches/schemas` et chaque `openapi.yaml`).
 
-Également copiés depuis la racine, pour que le miroir soit complet : `infrastructure/` (PostgreSQL, realm Keycloak, Compose), `docs/` et `.env.example`.
+Également copiés depuis `main`, pour que le miroir soit complet : `infrastructure/` (PostgreSQL, realm Keycloak, Compose), `docs/` et `.env.example`.
 
 ## Lancer
 
@@ -34,7 +34,7 @@ Interfaces : http://localhost:3000 (espace usager, compte `citoyen-demo` / `Cito
 
 Machine de 8 à 11 Go de mémoire : construire d'abord les deux interfaces l'une après l'autre (`docker compose build espace-usager && docker compose build guichet-agent`), puis `docker compose up -d`. Construites en parallèle avec le reste de la pile, elles ont fait tuer Docker Desktop par manque de mémoire (constaté le 18/11).
 
-L'environnement d'origine se lance toujours depuis la racine du dépôt. Les deux utilisent les mêmes ports : arrêter l'un (`docker compose down`, dans son dossier) avant de lancer l'autre. Leurs conteneurs et volumes sont séparés (projets `dlnuf` et `dlnuf-couches`).
+L'environnement d'origine se lance depuis la branche `main` (`git checkout main`, puis `docker compose up -d --build` à la racine). Les deux utilisent les mêmes ports : arrêter l'un (`docker compose down`, dans son dossier) avant de lancer l'autre. Leurs conteneurs et volumes sont séparés (projets `dlnuf` et `dlnuf-couches`).
 
 ## Vérifié le 17 et le 18/11/2026
 
@@ -51,7 +51,7 @@ L'environnement d'origine se lance toujours depuis la racine du dépôt. Les deu
 
 ## Règles jusqu'à la bascule
 
-- **`main` gelé** : uniquement des corrections urgentes. Toute correction faite dans un dossier d'origine doit être recopiée dans le dossier correspondant du miroir.
+- **`main` gelé** : uniquement des corrections urgentes. Toute correction faite dans un dossier d'origine doit être recopiée dans le dossier correspondant du miroir : cette branche ne contenant plus les dossiers d'origine, elle se recopie à la main et ne se fusionne pas.
 - On travaille dans `mirror-project/`, sur la branche `mirror-project` (ou des branches qui en partent).
 
 ## Critères pour basculer `main`
@@ -61,7 +61,7 @@ L'environnement d'origine se lance toujours depuis la racine du dépôt. Les deu
 3. Les démarches marchent de bout en bout.
 4. Chaque couche obligatoire a son dossier, son `openapi.yaml` et ses tests.
 
-Bascule : remplacer le contenu de la racine du dépôt par celui de `mirror-project/` (suppression de `frontend/`, `backend/`, `interoperability/` et de l'ancien Compose), puis Pull Request de `mirror-project` vers `main`.
+Bascule : les dossiers d'origine sont déjà retirés de cette branche ; remonter le contenu de `mirror-project/` à la racine, puis Pull Request de `mirror-project` vers `main`, qui y supprimera `frontend/`, `backend/`, `interoperability/`, `contracts/` et l'ancien Compose.
 
 ## Points à trancher ou à corriger
 

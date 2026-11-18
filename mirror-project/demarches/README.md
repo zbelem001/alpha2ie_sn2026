@@ -2,7 +2,7 @@
 
 Responsable : Personne 2.
 
-Copie de `backend/` (branche `mirror-project`), qui installe les connecteurs depuis `../passerelle` au lieu de `../interoperability`. Le dossier d'origine reste en place.
+Copie de `backend/` (le dossier d'origine reste sur `main`), qui installe les connecteurs depuis `../passerelle` au lieu de `../interoperability`.
 
 La carte du jury ne nomme pas cette couche : c'est l'orchestration des démarches (catalogue, dossiers, vérifications). Elle contient aussi, pour l'instant, le code de deux couches obligatoires à extraire : [consentement-minimisation](../consentement-minimisation/README.md) et [journal](../journal/README.md).
 
@@ -26,7 +26,7 @@ Seule une consultation d'un registre (`registry_check`) peut être signalée, un
 
 ## Spécification
 
-[openapi.yaml](openapi.yaml) : contrat de l'API du miroir, issu de `contracts/openapi/backend.yaml` (racine du dépôt) et complété avec les routes ajoutées dans le miroir (`POST /v1/citizen/cases`, signalement, preuve du rattachement). Il couvre toutes les routes de l'application (comparaison faite avec la liste des routes FastAPI) et passe `openapi-spec-validator`. Trois erreurs de l'original y sont corrigées : deux descriptions coupées par une virgule (lignes 71 et 291) et le schéma `Error`, référencé mais rangé parmi les réponses.
+[openapi.yaml](openapi.yaml) : contrat de l'API du miroir, issu de `contracts/openapi/backend.yaml` (branche `main`) et complété avec les routes ajoutées dans le miroir (`POST /v1/citizen/cases`, signalement, preuve du rattachement). Il couvre toutes les routes de l'application (comparaison faite avec la liste des routes FastAPI) et passe `openapi-spec-validator`. Trois erreurs de l'original y sont corrigées : deux descriptions coupées par une virgule (lignes 71 et 291) et le schéma `Error`, référencé mais rangé parmi les réponses.
 
 `schemas/citizen.json` et `schemas/request.json` : schémas réservés (vides), à définir.
 
