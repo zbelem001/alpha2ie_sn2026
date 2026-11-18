@@ -158,6 +158,9 @@ class Case(Base):
 
 
 class Consent(Base):
+    """Ancien registre des accords, plus écrit ni lu : les accords sont dans la couche
+    consentement-minimisation. Conservé pour les migrations et les bases existantes."""
+
     __tablename__ = "consents"
     __table_args__ = (
         CheckConstraint("status IN ('granted','refused','revoked','expired')", name="ck_consents_status"),
@@ -177,6 +180,9 @@ class Consent(Base):
 
 
 class ConsentQuestion(Base):
+    """Ancien registre des accords, plus écrit ni lu : les accords sont dans la couche
+    consentement-minimisation. Conservé pour les migrations et les bases existantes."""
+
     __tablename__ = "consent_questions"
     __table_args__ = (UniqueConstraint("consent_id", "question_id"),)
 
@@ -267,6 +273,11 @@ class RequestAttempt(Base):
 
 
 class AuditEvent(Base):
+    """Ancien journal des dossiers, plus écrit ni lu : les événements sont dans la couche journal (journal/).
+
+    Conservé pour les migrations (0001, 0007) et les bases existantes.
+    """
+
     __tablename__ = "audit_events"
     __table_args__ = (
         CheckConstraint(

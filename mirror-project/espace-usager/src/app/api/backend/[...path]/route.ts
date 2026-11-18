@@ -1,5 +1,5 @@
 // Relais vers l'API démarches : ajoute le jeton de la session, que le navigateur ne voit jamais.
-import { BACKEND_URL, currentAccessToken, IdentityUnavailableError, isSecureRequest } from "@/lib/server/auth";
+import { BACKEND_URL, currentAccessToken, decodeClaims, IdentityUnavailableError, isSecureRequest, spaceRole } from "@/lib/server/auth";
 import { SPACE } from "@/lib/space";
 
 type Context = { params: Promise<{ path: string[] }> };
@@ -20,7 +20,10 @@ async function forward(request: Request, { params }: Context) {
     }
     throw error;
   }
-  if (!token) return Response.json({ detail: "Session expirée. Reconnectez-vous." }, { status: 401 });
+  // Seul un jeton d'un rôle admis dans cet espace est relayé (l'API vérifie de son côté chaque jeton).
+  if (!token || !spaceRole(decodeClaims(token))) {
+    return Response.json({ detail: "Session expirée. Reconnectez-vous." }, { status: 401 });
+  }
 
   const hasBody = !["GET", "HEAD"].includes(request.method);
   const target = `${BACKEND_URL}/v1/${path.map(encodeURIComponent).join("/")}${new URL(request.url).search}`;

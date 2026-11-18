@@ -46,7 +46,7 @@ Charte graphique (commune avec le guichet) : [docs/charte-graphique.md](../docs/
 
 ## Fonctionnement
 
-- **Session côté serveur** (`src/lib/server/auth.ts`, `src/app/api/auth/*`) : l'identifiant et le mot de passe sont échangés contre des jetons Keycloak, gardés dans des cookies `httpOnly` et renouvelés automatiquement. Le navigateur ne voit jamais de jeton.
+- **Session côté serveur** (`src/lib/server/auth.ts`, `src/app/api/auth/*`) : l'identifiant et le mot de passe sont échangés contre des jetons Keycloak, gardés dans des cookies `httpOnly` et renouvelés automatiquement. Le navigateur ne voit jamais de jeton. Les cookies sont propres à chaque application (`dlnuf_usager_*` ici, `dlnuf_guichet_*` au guichet) : un navigateur ne distingue pas les ports, et avec des noms communs, se connecter au guichet effaçait la session citoyenne (corrigé le 18/11). Durées (Keycloak) : jeton d'accès 5 min, renouvelé tant que l'application est ouverte ; session close après 30 min sans renouvellement, 10 h au plus.
 - **Relais** (`src/app/api/backend/[...path]`) : le navigateur appelle `/api/backend/…`, l'application ajoute le jeton et transmet à `/v1/…`. Seules les routes `cases`, `citizen`, `notifications` et `procedures` (catalogue) sont relayées (`src/lib/space.ts`).
 - **Pages protégées** (`src/proxy.ts`) : sans session, `/usager` renvoie vers la connexion. L'API démarches vérifie de toute façon chaque jeton.
 - **Journal** (`src/lib/journal.ts`) : l'état de l'accord, les consultations et les signalements sont tirés de `GET /v1/cases/{id}/journal` ; un signalement y est rattaché à sa consultation par `correlation_id`.

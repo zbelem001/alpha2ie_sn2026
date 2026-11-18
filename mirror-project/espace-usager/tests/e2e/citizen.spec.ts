@@ -93,6 +93,16 @@ test("le citoyen retire son accord", async ({ page }) => {
   await expect(entry.locator("p").filter({ hasText: "Votre accord" })).toContainText("Vous avez retiré votre accord");
 });
 
+test("le profil ne propose que les références utiles, toutes facultatives", async ({ page }) => {
+  await openSpace(page);
+  await page.getByRole("link", { name: "Mon profil" }).click();
+  await expect(page.getByText("tous les champs ci-dessous sont facultatifs")).toBeVisible();
+  await expect(page.getByText("Numéro de CNIB")).toBeVisible();
+  // Compte rattaché à l'acte : ni la référence de l'acte (doublon), ni la déclaration de perte (aucune démarche).
+  await expect(page.getByText("Référence de l’acte de naissance")).toHaveCount(0);
+  await expect(page.getByText("Numéro de déclaration de perte")).toHaveCount(0);
+});
+
 test("la déconnexion ferme la session", async ({ page }) => {
   await openSpace(page);
   await page.getByRole("button", { name: "Quitter et revenir à la connexion" }).click();

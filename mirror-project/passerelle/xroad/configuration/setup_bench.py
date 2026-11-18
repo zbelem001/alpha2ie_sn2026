@@ -549,19 +549,26 @@ def publish_services(host: str, ss: Api) -> None:
             continue
         client = subsystem_id(provider.member, provider.subsystem)
         published = {
-            service["service_code"]
+            service["service_code"]: (description["id"], description.get("url"))
             for description in ss.get(f"/api/v1/clients/{client}/service-descriptions") or []
             for service in description.get("services", [])
         }
         for code in provider.services:
+            url = f"{provider.base_url}/services/{code}"
             if code in published:
-                continue
+                description_id, current_url = published[code]
+                if current_url == url:
+                    continue
+                # Banc configuré avant la garde : le service pointait sur le registre. Il est republié
+                # à la bonne adresse ; ses droits d'accès sont redonnés à l'étape suivante.
+                ss.request("DELETE", f"/api/v1/service-descriptions/{description_id}")
+                log(f"   {client}/{code} : ancienne adresse retirée ({current_url})")
             description = ss.post(
                 f"/api/v1/clients/{client}/service-descriptions",
-                json={"url": f"{provider.base_url}/services/{code}", "type": "REST", "rest_service_code": code},
+                json={"url": url, "type": "REST", "rest_service_code": code},
             )
             ss.put(f"/api/v1/service-descriptions/{description['id']}/enable")
-            log(f"   {client}/{code} publié")
+            log(f"   {client}/{code} publié : {url}")
 
 
 def grant_access(servers: dict) -> None:
@@ -590,18 +597,28 @@ def grant_access(servers: dict) -> None:
 
 
 def smoke_test() -> None:
-    log("7. Vérification de bout en bout")
-    url = f"http://ss-demandeurs:8080/r1/{INSTANCE}/{MEMBER_CLASS}/MAIRIE-OUAGA/ETAT-CIVIL/is-adult"
-    payload = {"request_id": "xroad-setup", "subject": {"pivot_id": "ACTE:OUAGA:2004:01234"}}
+    log("7. Vérification de bout en bout (X-Road, puis garde, puis registre)")
+    base = f"http://ss-demandeurs:8080/r1/{INSTANCE}/{MEMBER_CLASS}/MAIRIE-OUAGA/ETAT-CIVIL"
+    client = {"X-Road-Client": f"{INSTANCE}/{MEMBER_CLASS}/ONI/CNIB"}
+    # Preuve de titularité demandée par le citoyen lui-même : ouverte sans accord enregistré.
+    proof = {"request_id": "xroad-setup", "procedure": "citizen_identity_link", "parameters": {},
+             "subject": {"pivot_id": "ACTE:OUAGA:2004:01234", "last_name": "KABORE", "first_names": "Awa",
+                         "birth_date": "2004-03-12", "mother_name": "COMPAORE Salimata"}}
 
     def call() -> dict[str, Any]:
-        response = httpx.post(url, json=payload, headers={"X-Road-Client": f"{INSTANCE}/{MEMBER_CLASS}/ONI/CNIB"}, timeout=30)
+        response = httpx.post(f"{base}/identity-match", json=proof, headers=client, timeout=30)
         if response.status_code != 200 or response.json().get("status") != "ok":
             raise ApiError(f"HTTP {response.status_code} {response.headers.get('X-Road-Error', '')} {response.text[:200]}")
         return response.json()
 
     body = eventually("premier appel via X-Road", call, tries=30, delay=10)
-    log(f"   ONI/CNIB -> état civil/is-adult : {body['status']}, adult = {body['data']['adult']}")
+    log(f"   ONI/CNIB -> état civil/identity-match : {body['status']}, match = {body['data']['match']}")
+
+    payload = {"request_id": "xroad-setup-sans-accord", "procedure": "concours_direct_preverification",
+               "subject": {"pivot_id": "ACTE:OUAGA:2004:01234"}, "parameters": {}}
+    without_consent = httpx.post(f"{base}/is-adult", json=payload, headers=client, timeout=30).json()
+    log(f"   ONI/CNIB -> état civil/is-adult sans accord : {without_consent.get('status')} "
+        f"({without_consent.get('message')}) — refus de la garde")
 
     refused = httpx.post(
         f"http://ss-demandeurs:8080/r1/{INSTANCE}/{MEMBER_CLASS}/JUSTICE/REGISTRES/criminal-record",

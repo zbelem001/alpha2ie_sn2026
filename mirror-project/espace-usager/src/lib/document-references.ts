@@ -17,6 +17,15 @@ export function documentForQuestion(code: string): DocumentRequirement {
   const requirement = DOCUMENT_TYPES.find((item) => item.key === key);
   return requirement ? { ...requirement } : { key: "birth", label: "Référence du document", provider: "Administration", hint: "Référence unique du document requis" };
 }
+/**
+ * Références proposées au profil du citoyen.
+ * Compte rattaché à un acte (ACTE:…) : les registres le retrouvent par cet acte ; la référence de
+ * l'acte ferait doublon, et aucune démarche ne demande la déclaration de perte.
+ */
+export function profileDocumentTypes(subjectRef: string | null): DocumentRequirement[] {
+  const hidden = subjectRef?.startsWith("ACTE:") ? new Set(["birth", "loss"]) : new Set<string>();
+  return DOCUMENT_TYPES.filter((doc) => !hidden.has(doc.key));
+}
 export function requirementsFor(checks: { questionCode: string; document?: DocumentRequirement }[]) {
   return [...new Map(checks.map((check) => { const doc = check.document ?? documentForQuestion(check.questionCode); return [doc.key, doc]; })).values()];
 }

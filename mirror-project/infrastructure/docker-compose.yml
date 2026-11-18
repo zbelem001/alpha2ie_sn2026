@@ -12,6 +12,9 @@
 #   docker compose start justice-registry
 #
 # Notifications simulées : boîte d'envoi sur http://localhost:8107
+#
+# Journal de traçabilité : http://localhost:8108 (lecture avec le jeton auditeur, voir journal/README.md)
+# Consentement et minimisation : http://localhost:8109/holders (règles de chaque détenteur)
 
 name: dlnuf-couches
 
@@ -221,6 +224,65 @@ services:
       # 8107 : le 8106 est pris par le registre ONI.
       - "8107:8000"
 
+  # --- Journal de traçabilité (couche obligatoire) -------------------------------------
+  # Événements chaînés, en ajout seul ; base « journal » créée au démarrage si elle manque.
+
+  journal:
+    build:
+      context: ../journal
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dlnuf}:${POSTGRES_PASSWORD:-dlnuf-dev}@postgres:5432/journal
+      # Jetons de démonstration (.env.example) : « couche=jeton », séparés par des virgules.
+      JOURNAL_WRITE_TOKENS: demarches=${JOURNAL_TOKEN_DEMARCHES:-dev-journal-demarches},consentement-minimisation=${JOURNAL_TOKEN_CONSENTEMENT:-dev-journal-consentement}
+      JOURNAL_READ_TOKENS: demarches=${JOURNAL_TOKEN_DEMARCHES:-dev-journal-demarches},auditeur=${JOURNAL_TOKEN_AUDITEUR:-dev-journal-auditeur}
+    ports:
+      - "8108:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # --- Consentement et minimisation (couche obligatoire) ----------------------------------
+  # Registre des accords, et garde placée devant chaque registre : la passerelle joint chaque
+  # détenteur par elle (passerelle/connectors/routing.detenteurs.yaml). Base « consentement »
+  # créée au démarrage si elle manque.
+
+  consentement-minimisation:
+    build:
+      context: ..
+      dockerfile: consentement-minimisation/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dlnuf}:${POSTGRES_PASSWORD:-dlnuf-dev}@postgres:5432/consentement
+      CONSENT_TOKENS: demarches=${CONSENT_TOKEN_DEMARCHES:-dev-consentement-demarches}
+      JOURNAL_URL: http://journal:8000
+      JOURNAL_TOKEN: ${JOURNAL_TOKEN_CONSENTEMENT:-dev-journal-consentement}
+      REGISTRY_TIMEOUT_S: ${REGISTRY_TIMEOUT_S:-3}
+      REFERENCE_DATE: ${REFERENCE_DATE:-}
+      # Registres d'autres équipes branchés pendant que la pile tourne (passerelle/brancher.py).
+      HOLDERS_OVERRIDES: /config/branchements
+    volumes:
+      - ./branchements:/config/branchements:ro
+    ports:
+      - "8109:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      journal:
+        condition: service_healthy
+
   # --- Applications ----------------------------------------------------------------------
 
   demarches:
@@ -240,6 +302,9 @@ services:
       KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-dlnuf-admin-api}
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
       REGISTRY_CONNECTOR: ${REGISTRY_CONNECTOR:-direct}
+      # Connecteur direct : chaque détenteur est joint par la garde de la couche consentement-minimisation.
+      REGISTRY_ROUTES_FILE: ${REGISTRY_ROUTES_FILE:-/app/passerelle/connectors/routing.detenteurs.yaml}
+      REGISTRY_ROUTES_OVERRIDES: /config/branchements
       REGISTRY_TIMEOUT_S: ${REGISTRY_TIMEOUT_S:-3}
       XROAD_CLIENT_ID: ${XROAD_CLIENT_ID:-BF/GOV/ONI/CNIB}
       XROAD_SECURITY_SERVER_URL: ${XROAD_SECURITY_SERVER_URL:-}
@@ -264,6 +329,14 @@ services:
       INFOBIP_2FA_CONSENT_MESSAGE_ID: ${INFOBIP_2FA_CONSENT_MESSAGE_ID:-}
       INFOBIP_2FA_REGISTRATION_MESSAGE_ID: ${INFOBIP_2FA_REGISTRATION_MESSAGE_ID:-}
       CITIZEN_IDENTIFIER_ENCRYPTION_KEY: ${CITIZEN_IDENTIFIER_ENCRYPTION_KEY:-}
+      # Couche journal : chaque événement de dossier y est inscrit avant la validation de l'action.
+      JOURNAL_URL: http://journal:8000
+      JOURNAL_TOKEN: ${JOURNAL_TOKEN_DEMARCHES:-dev-journal-demarches}
+      # Registre des accords de la couche consentement-minimisation.
+      CONSENT_URL: http://consentement-minimisation:8000
+      CONSENT_TOKEN: ${CONSENT_TOKEN_DEMARCHES:-dev-consentement-demarches}
+    volumes:
+      - ./branchements:/config/branchements:ro
     ports:
       - "8000:8000"
     healthcheck:

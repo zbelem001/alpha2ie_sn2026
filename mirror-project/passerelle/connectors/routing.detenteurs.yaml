@@ -1,0 +1,10 @@
+# Connecteur direct de la pile du miroir : chaque détenteur est joint par la garde de la couche
+# consentement-minimisation (accord vérifié, réponse réduite à l'utile, journal), jamais en direct.
+# Choisi par REGISTRY_ROUTES_FILE (infrastructure/docker-compose.yml). Hors Docker :
+# routing.detenteurs.local.yaml. Registres en direct, sans garde : routing.yaml.
+BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL: http://consentement-minimisation:8000/holders/etat-civil
+BF/GOV/TRANSPORT/PERMIS: http://consentement-minimisation:8000/holders/transport
+BF/GOV/JUSTICE/REGISTRES: http://consentement-minimisation:8000/holders/justice
+BF/GOV/ONI/CNIB: http://consentement-minimisation:8000/holders/oni
+BF/GOV/POLICE/PERTES: http://consentement-minimisation:8000/holders/police
+BF/GOV/TRESOR/PAIEMENTS: http://consentement-minimisation:8000/holders/tresor

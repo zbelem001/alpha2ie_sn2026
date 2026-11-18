@@ -1,0 +1,72 @@
+# Détenteurs servis par la garde de la couche consentement-minimisation (consent_service/holders.py).
+# Pour chaque service : la base de l'appel et la réduction appliquée à la réponse du registre.
+# Rien d'autre que le résultat de la réduction ne sort de chez le détenteur.
+#
+# Brancher le registre d'une autre équipe : ajouter un détenteur (adresse de son registre et règles
+# selon ce que renvoient ses services), puis sa route dans
+# passerelle/connectors/routing.detenteurs.yaml. Autre fichier : variable HOLDERS_FILE.
+
+holders:
+  etat-civil:
+    organization: BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL
+    name: Mairie de Ouagadougou — état civil
+    registry_url: http://civil-registry:8000
+    services:
+      is-adult:
+        keep: {adult: boolean}
+      identity:
+        # Le registre renvoie la fiche complète (noms, date et lieu de naissance…) :
+        # seule sort l'information « acte retrouvé ».
+        found: true
+      identity-match:
+        # Le citoyen prouve lui-même qu'il est titulaire de l'acte (rattachement de son compte).
+        basis: citizen_request
+        procedures: [citizen_identity_link]
+        keep: {match: boolean}
+
+  justice:
+    organization: BF/GOV/JUSTICE/REGISTRES
+    name: Justice — nationalité et casier
+    registry_url: http://justice-registry:8000
+    services:
+      nationality:
+        keep: {burkinabe: boolean}
+      criminal-record:
+        keep: {clean: boolean}
+      criminal-record-current:
+        keep: {valid: boolean}
+
+  oni:
+    organization: BF/GOV/ONI/CNIB
+    name: ONI — registre CNIB
+    registry_url: http://oni-registry:8000
+    services:
+      cnib-status:
+        keep: {valid: boolean}
+
+  tresor:
+    organization: BF/GOV/TRESOR/PAIEMENTS
+    name: Trésor — paiements
+    registry_url: http://treasury-registry:8000
+    services:
+      payment-status:
+        # Le registre renvoie aussi la référence et le montant du paiement : ils ne sortent pas.
+        keep: {paid: boolean}
+
+  transport:
+    organization: BF/GOV/TRANSPORT/PERMIS
+    name: Transport — permis de conduire
+    registry_url: http://transport-registry:8000
+    services:
+      driving-licence:
+        # Ni les catégories ni la date d'expiration.
+        keep: {valid: boolean}
+
+  police:
+    organization: BF/GOV/POLICE/PERTES
+    name: Police — déclarations de perte
+    registry_url: http://police-registry:8000
+    services:
+      loss-declaration:
+        # Ni la référence ni la date de la déclaration.
+        keep: {declared: boolean}

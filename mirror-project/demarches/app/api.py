@@ -15,17 +15,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from connectors.administrations import load_administrations
 
+from app.consents import ConsentRefused, ConsentServiceUnavailable, consents, requester_client
 from app.database.connection import get_db
+from app.journal import JournalUnavailable, journal
 from app.database.models import (
     Administration,
-    AuditEvent,
     Case,
     ConsentOtpChallenge,
     RegistrationOtpChallenge,
     CitizenDocumentIdentifier,
     CitizenIdentityLink,
-    Consent,
-    ConsentQuestion,
     Notification,
     Permission,
     Procedure,
@@ -68,7 +67,7 @@ IDENTIFIER_REGISTRIES = {
     "criminal_record_number": "BF/GOV/JUSTICE/REGISTRES",
     "nationality_reference": "BF/GOV/JUSTICE/REGISTRES",
     "payment_reference": "BF/GOV/TRESOR/PAIEMENTS",
-    "loss_report_number": "BF/GOV/POLICE/DECLARATIONS",
+    "loss_report_number": "BF/GOV/POLICE/PERTES",
 }
 QUESTION_IDENTIFIER_TYPES = {
     "candidate_minimum_age": "birth_act_number",
@@ -259,38 +258,93 @@ def _add_event(
     registry: Registry | None = None,
     categories: list[str] | None = None,
     correlation_id: str | None = None,
-) -> AuditEvent:
-    previous = db.scalar(
-        select(AuditEvent).where(AuditEvent.case_id == case.id).order_by(AuditEvent.occurred_at.desc())
-    )
-    occurred_at = datetime.now(timezone.utc)
-    fields = {
-        "case_id": str(case.id),
+    details: dict | None = None,
+) -> dict:
+    """Inscrit l'événement dans la couche journal (journal/), avant la validation de l'opération.
+
+    Si le journal ne l'inscrit pas, la transaction est annulée et la requête échoue (503) :
+    aucune action sur un dossier sans sa trace. Le journal numérote et chaîne les événements.
+    `details` complète ou remplace les champs déduits (ex. registre d'une consultation signalée).
+    """
+    requester = db.get(Administration, case.requester_administration_id) if case.requester_administration_id else None
+    holder = db.get(Administration, registry.administration_id) if registry else None
+    procedure = db.get(Procedure, case.procedure_id)
+    event = {
         "event_type": event_type,
+        "subject_ref": case.subject_ref,
+        "case_id": str(case.id),
+        "procedure_code": procedure.code if procedure else None,
+        "actor_type": actor_type,
+        "actor_ref": actor_ref,
+        "requester_code": requester.code if requester else None,
+        "requester_name": requester.name if requester else None,
+        "holder_code": holder.code if holder else None,
+        "holder_name": holder.name if holder else None,
+        "registry_code": registry.code if registry else None,
+        "question_code": question.code if question else None,
+        "service_code": question.service_code if question else None,
+        "purpose": purpose[:200],
         "outcome": outcome,
-        "occurred_at": occurred_at.isoformat(),
-        "previous_hash": previous.event_hash if previous else None,
+        "data_categories": categories,
+        "correlation_id": correlation_id,
+        **(details or {}),
     }
-    event_hash = hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()
-    event = AuditEvent(
-        case_id=case.id,
-        subject_ref=case.subject_ref,
-        actor_type=actor_type,
-        actor_ref=actor_ref,
-        requester_administration_id=case.requester_administration_id,
-        registry_id=registry.id if registry else None,
-        question_id=question.id if question else None,
-        event_type=event_type,
-        outcome=outcome,
-        purpose=purpose,
-        data_categories=categories,
-        occurred_at=occurred_at,
-        correlation_id=correlation_id,
-        previous_hash=previous.event_hash if previous else None,
-        event_hash=event_hash,
-    )
-    db.add(event)
-    return event
+    try:
+        return journal().append(event)
+    except JournalUnavailable as error:
+        db.rollback()
+        logger.warning("Journal indisponible, opération annulée : %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail="Journal de traçabilité indisponible : l’opération est annulée pour ne pas perdre sa trace",
+        ) from error
+
+
+def _active_consent(case: Case) -> dict | None:
+    """Accord actif du dossier, lu dans le registre des accords (couche consentement-minimisation)."""
+    try:
+        return consents().active(str(case.id))
+    except ConsentServiceUnavailable as error:
+        raise HTTPException(status_code=503, detail="Registre des accords indisponible") from error
+
+
+def _record_decision(db: Session, case: Case, *, decision: str, questions: list[Question], channel: str,
+                     notice_version: str, expires_at: datetime | None, evidence_ref: str | None = None) -> dict:
+    """Fait enregistrer la décision du citoyen par le registre des accords, qui l'inscrit au journal.
+
+    Le périmètre est exact : pour chaque question, le détenteur et le service qui y répondent.
+    """
+    requester = db.get(Administration, case.requester_administration_id)
+    procedure = db.get(Procedure, case.procedure_id)
+    scope = []
+    for question in questions:
+        registry = db.get(Registry, question.registry_id)
+        holder = db.get(Administration, registry.administration_id)
+        scope.append({"question_code": question.code, "holder_code": holder.code, "service_code": question.service_code})
+    try:
+        return consents().record({
+            "case_id": str(case.id), "subject_ref": case.subject_ref,
+            "requester_code": requester.code, "requester_name": requester.name,
+            "procedure_code": procedure.code, "decision": decision, "channel": channel,
+            "notice_version": notice_version, "expires_at": expires_at.isoformat() if expires_at else None,
+            "evidence_ref": evidence_ref, "scope": scope,
+        })
+    except ConsentRefused as refused:
+        raise HTTPException(status_code=refused.status_code, detail=refused.detail) from refused
+    except ConsentServiceUnavailable as error:
+        raise HTTPException(
+            status_code=503, detail="Registre des accords indisponible : la décision n’est pas enregistrée",
+        ) from error
+
+
+def _journal_entry(event: dict) -> dict:
+    """Événement du journal tel que le lisent l'espace usager et le guichet (schéma AuditEvent)."""
+    return {"id": event["id"], "occurred_at": event["occurred_at"], "event_type": event["event_type"],
+            "requester": event.get("requester_name"), "registry": event.get("registry_code"),
+            "question_code": event.get("question_code"), "purpose": event["purpose"],
+            "outcome": event.get("outcome"), "data_categories": event.get("data_categories"),
+            # Rattache un signalement du citoyen à la consultation qu'il vise.
+            "correlation_id": event.get("correlation_id")}
 
 
 def _check_payload(db: Session, request: RegistryRequest) -> dict:
@@ -1181,12 +1235,7 @@ def request_assisted_consent_otp(
         raise HTTPException(status_code=422, detail="Aucun numéro international n’est rattaché au citoyen")
 
     now = datetime.now(timezone.utc)
-    latest_consent = db.scalar(
-        select(Consent).where(Consent.case_id == case.id).order_by(Consent.created_at.desc())
-    )
-    if latest_consent and latest_consent.status == "granted" and (
-        latest_consent.expires_at is None or _utc(latest_consent.expires_at) > now
-    ):
+    if _active_consent(case) is not None:
         raise HTTPException(status_code=409, detail="Un accord valide existe déjà pour ce dossier")
 
     scope, scope_digest = _consent_scope(db, case)
@@ -1287,12 +1336,7 @@ def change_consent_channel(
     if case.status in {"completed", "rejected", "cancelled"}:
         raise HTTPException(status_code=409, detail="Le parcours de consentement est clôturé pour ce dossier")
 
-    latest_consent = db.scalar(
-        select(Consent).where(Consent.case_id == case.id).order_by(Consent.created_at.desc())
-    )
-    if latest_consent and latest_consent.status == "granted" and (
-        latest_consent.expires_at is None or _utc(latest_consent.expires_at) > datetime.now(timezone.utc)
-    ):
+    if _active_consent(case) is not None:
         raise HTTPException(status_code=409, detail="Un consentement actif existe déjà pour ce dossier")
 
     if body.consent_channel == case.consent_channel:
@@ -1428,58 +1472,28 @@ def verify_assisted_consent_otp(
         raise HTTPException(status_code=400, detail="Code incorrect")
 
     scope, _ = _consent_scope(db, case)
-    links = {link.question_id for link, _ in scope}
     procedure = db.get(Procedure, case.procedure_id)
     consent_days = procedure.consent_days if procedure else 30
-    previous_grants = db.scalars(select(Consent).where(
-        Consent.case_id == case.id,
-        Consent.status == "granted",
-    )).all()
-    for previous in previous_grants:
-        previous.status = "revoked"
-        previous.revoked_at = now
-
     simulated_verification = challenge.code_digest is not None
-    consent = Consent(
-        case_id=case.id,
-        subject_ref=case.subject_ref,
-        status="granted",
-        granted_at=now,
-        expires_at=now + timedelta(days=consent_days),
-        notice_version="consent-assisted-v1",
-        channel="assisted",
-        evidence_ref=f"consent-otp-simulated:{challenge.id}" if simulated_verification
-        else f"consent-otp:{challenge.id}",
-        created_at=now,
+    # Le registre des accords remplace l'accord précédent du dossier et inscrit celui-ci au journal.
+    consent = _record_decision(
+        db, case, decision="granted", questions=[question for _, question in scope], channel="assisted",
+        notice_version="consent-assisted-v1", expires_at=now + timedelta(days=consent_days),
+        evidence_ref=f"consent-otp-simulated:{challenge.id}" if simulated_verification else f"consent-otp:{challenge.id}",
     )
-    db.add(consent)
-    db.flush()
-    for question_id in links:
-        db.add(ConsentQuestion(consent_id=consent.id, question_id=question_id))
     challenge.delivery_status = "consumed"
     challenge.consumed_at = now
     challenge.code_digest = None
     challenge.provider_pin_id = None
-    _add_event(
-        db,
-        case,
-        "consent_recorded",
-        "consentement saisi après validation OTP simulée; aucun téléphone vérifié"
-        if simulated_verification else "consentement confirmé par code à usage unique reçu par SMS",
-        outcome="granted",
-        actor_type="citizen",
-        actor_ref=case.subject_ref,
-    )
     db.commit()
-    db.refresh(consent)
     return {
-        "id": str(consent.id),
+        "id": consent["id"],
         "case_id": str(case.id),
-        "status": consent.status,
-        "channel": consent.channel,
+        "status": consent["status"],
+        "channel": consent["channel"],
         "question_codes": [question.code for _, question in scope],
-        "granted_at": consent.granted_at,
-        "expires_at": consent.expires_at,
+        "granted_at": consent["granted_at"],
+        "expires_at": consent["expires_at"],
     }
 
 
@@ -1576,31 +1590,17 @@ def record_consent(
     else:
         expires_at = now + timedelta(days=consent_days)
 
-    previous_grants = db.scalars(select(Consent).where(
-        Consent.case_id == case.id, Consent.status == "granted"
-    )).all()
-    for previous in previous_grants:
-        previous.status = "revoked"
-        previous.revoked_at = now
-
-    consent = Consent(case_id=case.id, subject_ref=case.subject_ref, status=body.decision,
-                      granted_at=now if body.decision == "granted" else None,
-                      expires_at=expires_at, notice_version=body.notice_version, channel=body.channel,
-                      created_at=now)
-    db.add(consent)
-    db.flush()
-    for code in body.question_codes:
-        db.add(ConsentQuestion(consent_id=consent.id, question_id=allowed[code]))
-    _add_event(db, case, "consent_recorded", "consentement pour la démarche",
-               outcome=body.decision, actor_type="citizen", actor_ref=case.subject_ref)
-    db.commit()
-    db.refresh(consent)
-    return {"id": str(consent.id), "case_id": str(case.id), "caseId": str(case.id), "status": consent.status,
-            "question_codes": body.question_codes, "notice_version": consent.notice_version,
-            "channel": consent.channel, "granted_at": consent.granted_at,
-            "questionCodes": body.question_codes, "noticeVersion": consent.notice_version,
-            "grantedAt": consent.granted_at, "revoked_at": consent.revoked_at,
-            "expires_at": consent.expires_at, "expiresAt": consent.expires_at}
+    # Le registre des accords remplace l'accord précédent du dossier et inscrit la décision au journal.
+    consent = _record_decision(
+        db, case, decision=body.decision, questions=[db.get(Question, allowed[code]) for code in body.question_codes],
+        channel=body.channel, notice_version=body.notice_version, expires_at=expires_at,
+    )
+    return {"id": consent["id"], "case_id": str(case.id), "caseId": str(case.id), "status": consent["status"],
+            "question_codes": body.question_codes, "notice_version": consent["notice_version"],
+            "channel": consent["channel"], "granted_at": consent["granted_at"],
+            "questionCodes": body.question_codes, "noticeVersion": consent["notice_version"],
+            "grantedAt": consent["granted_at"], "revoked_at": consent["revoked_at"],
+            "expires_at": consent["expires_at"], "expiresAt": consent["expires_at"]}
 
 
 @router.delete("/cases/{case_id}/consent")
@@ -1612,18 +1612,18 @@ def revoke_consent(
     case = _case_or_404(db, case_id)
     if not _citizen_matches_case(principal, case.subject_ref):
         raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut révoquer son consentement")
-    consent = db.scalar(select(Consent).where(Consent.case_id == case.id)
-                        .order_by(Consent.created_at.desc()))
-    if (consent is None or consent.status != "granted" or
-            (consent.expires_at is not None and consent.expires_at <= datetime.now(timezone.utc))):
+    active = _active_consent(case)
+    if active is None:
         raise HTTPException(status_code=404, detail="Aucun consentement actif")
-    consent.status = "revoked"
-    consent.revoked_at = datetime.now(timezone.utc)
-    _add_event(db, case, "consent_revoked", "retrait du consentement", outcome="revoked",
-               actor_type="citizen", actor_ref=case.subject_ref)
-    db.commit()
-    return {"id": str(consent.id), "case_id": str(case.id), "status": consent.status,
-            "revoked_at": consent.revoked_at}
+    try:
+        # Le registre des accords inscrit le retrait au journal.
+        revoked = consents().revoke(active["id"])
+    except ConsentRefused as refused:
+        raise HTTPException(status_code=404, detail="Aucun consentement actif") from refused
+    except ConsentServiceUnavailable as error:
+        raise HTTPException(status_code=503, detail="Registre des accords indisponible : l’accord n’est pas retiré") from error
+    return {"id": revoked["id"], "case_id": str(case.id), "status": revoked["status"],
+            "revoked_at": revoked["revoked_at"]}
 
 
 @router.post("/cases/{case_id}/checks")
@@ -1697,16 +1697,13 @@ def _run_checks(case: Case, db: Session) -> dict:
     Commun au guichet (POST /cases/{id}/checks) et aux démarches lancées par le citoyen.
     """
     now = datetime.now(timezone.utc)
-    consent = db.scalar(select(Consent).where(Consent.case_id == case.id)
-                        .order_by(Consent.created_at.desc()))
+    # Accord actif, lu dans le registre des accords ; la garde du détenteur le revérifie à chaque appel.
+    consent = _active_consent(case)
     requests = db.scalars(select(RegistryRequest).where(RegistryRequest.case_id == case.id)).all()
     links = {link.question_id: link for link in db.scalars(
         select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == case.procedure_id)).all()}
-    consent_ids = set()
-    if (consent and consent.status == "granted" and
-            (consent.expires_at is None or _utc(consent.expires_at) > now)):
-        consent_ids = set(db.scalars(select(ConsentQuestion.question_id).where(ConsentQuestion.consent_id == consent.id)).all())
-    if consent is None or not consent_ids:
+    consented_questions = {item["question_code"] for item in consent["scope"]} if consent else set()
+    if consent is None or not consented_questions:
         _add_event(db, case, "checks_blocked", "consentement absent ou expiré", outcome="blocked")
         if case.status in {"received", "in_progress", "pending"}:
             case.status = "pending"
@@ -1741,7 +1738,7 @@ def _run_checks(case: Case, db: Session) -> dict:
             (Permission.valid_from.is_(None) | (Permission.valid_from <= now)),
             (Permission.valid_until.is_(None) | (Permission.valid_until > now)),
         ))
-        if not question.active or permission is None or question.id not in consent_ids:
+        if not question.active or permission is None or question.code not in consented_questions:
             request.status = "blocked"
             _add_event(db, case, "check_blocked", "consentement ou autorisation absent", outcome="blocked", question=question)
             continue
@@ -1810,7 +1807,9 @@ def _run_checks(case: Case, db: Session) -> dict:
         db.add(attempt)
         db.commit()
         try:
-            reply = connector.query(registry_info["organization"], question.service_code, registry_info["payload"])
+            # La référence de l'accord voyage en en-tête (X-Consent-Id) : la garde du détenteur la vérifie.
+            reply = connector.query(registry_info["organization"], question.service_code, registry_info["payload"],
+                                    client_id=client_id, consent_id=consent["id"])
         except Exception:
             reply = {"status": "unavailable", "data": None, "message": "Registre indisponible", "transport_id": None}
         transport_status = reply.get("status")
@@ -1841,7 +1840,8 @@ def _run_checks(case: Case, db: Session) -> dict:
         attempt.transport_id = reply.get("transport_id")
         _add_event(db, case, "registry_check", question.description, outcome=request.status,
                    actor_type="administration", question=question, registry=registry_info["registry"],
-                   categories=[question.code], correlation_id=str(request.id))
+                   categories=[question.code], correlation_id=str(request.id),
+                   details={"consent_id": consent["id"]})
         db.commit()
 
     required_states = [request.status for request in requests if links[request.question_id].required]
@@ -1934,19 +1934,14 @@ def get_journal(
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
+    """Événements du dossier, lus dans la couche journal (ordre d'inscription)."""
     case = _case_or_404(db, case_id)
     _authorize_case_access(case, db, principal)
-    events = db.scalars(select(AuditEvent).where(AuditEvent.case_id == case.id)
-                        .order_by(AuditEvent.occurred_at)).all()
-    return [{"id": str(event.id), "occurred_at": event.occurred_at,
-             "event_type": event.event_type, "requester": db.get(Administration, event.requester_administration_id).name
-             if event.requester_administration_id else None,
-             "registry": db.get(Registry, event.registry_id).code if event.registry_id else None,
-             "question_code": db.get(Question, event.question_id).code if event.question_id else None,
-             "purpose": event.purpose, "outcome": event.outcome,
-             "data_categories": event.data_categories,
-             # Rattache un signalement du citoyen à la consultation qu'il vise.
-             "correlation_id": event.correlation_id} for event in events]
+    try:
+        events = journal().search(case_id=str(case.id))
+    except JournalUnavailable as error:
+        raise HTTPException(status_code=503, detail="Journal de traçabilité indisponible") from error
+    return [_journal_entry(event) for event in events]
 
 
 class ConsultationReport(BaseModel):
@@ -1976,26 +1971,25 @@ def report_consultation(
     case = _case_or_404(db, case_id)
     if not _citizen_matches_case(principal, case.subject_ref):
         raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut signaler une consultation")
-    reported = db.get(AuditEvent, event_id)
-    if reported is None or reported.case_id != case.id:
-        raise HTTPException(status_code=404, detail="Consultation introuvable dans ce dossier")
-    if reported.event_type != "registry_check":
-        raise HTTPException(status_code=422, detail="Seule la consultation d’un registre peut être signalée")
     event_type = REPORT_EVENTS[body.reason]
-    already = db.scalar(select(AuditEvent).where(
-        AuditEvent.case_id == case.id,
-        AuditEvent.event_type == event_type,
-        AuditEvent.correlation_id == str(reported.id),
-    ))
-    if already is not None:
+    try:
+        reported = journal().get(str(event_id))
+        if reported is None or reported.get("case_id") != str(case.id):
+            raise HTTPException(status_code=404, detail="Consultation introuvable dans ce dossier")
+        if reported["event_type"] != "registry_check":
+            raise HTTPException(status_code=422, detail="Seule la consultation d’un registre peut être signalée")
+        already = journal().search(case_id=str(case.id), event_type=event_type, correlation_id=str(event_id), limit=1)
+    except JournalUnavailable as error:
+        raise HTTPException(status_code=503, detail="Journal de traçabilité indisponible") from error
+    if already:
         raise HTTPException(status_code=409, detail="Ce signalement a déjà été envoyé pour cette consultation")
-    question = db.get(Question, reported.question_id) if reported.question_id else None
-    registry = db.get(Registry, reported.registry_id) if reported.registry_id else None
     purpose = ("consultation non reconnue par le citoyen" if body.reason == "not_me"
                else "correction demandée à l’administration source")
+    # Le signalement désigne le même registre et la même question que la consultation visée.
+    consulted = {key: reported.get(key) for key in
+                 ("holder_code", "holder_name", "registry_code", "question_code", "service_code")}
     event = _add_event(db, case, event_type, purpose, outcome="open", actor_type="citizen",
-                       actor_ref=case.subject_ref, question=question, registry=registry,
-                       correlation_id=str(reported.id))
+                       actor_ref=case.subject_ref, correlation_id=str(event_id), details=consulted)
     db.commit()
-    return {"id": str(event.id), "case_id": str(case.id), "event_id": str(reported.id),
-            "reason": body.reason, "status": "open", "reported_at": event.occurred_at}
+    return {"id": event["id"], "case_id": str(case.id), "event_id": str(event_id),
+            "reason": body.reason, "status": "open", "reported_at": event["occurred_at"]}

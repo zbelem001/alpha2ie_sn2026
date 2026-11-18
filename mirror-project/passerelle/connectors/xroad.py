@@ -54,6 +54,10 @@ class XRoadConnector(BaseHttpConnector):
         super().__init__(client_id=client_id, timeout=timeout, client=client)
         self.security_server_url = security_server_url.rstrip("/")
 
+    def _check_client(self, client_id: str) -> None:
+        # Demandeur propre à l'appel : un sous-système X-Road déclaré, comme celui du connecteur.
+        _check_identifier(client_id, 4, "Identifiant client")
+
     def _url(self, organization: str, service: str) -> str:
         administration = load_administrations().get(organization)
         if administration:

@@ -1,0 +1,6 @@
+# Couche résilience (bonus) : pas de service propre, des tests de panne qui traversent les couches.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# La couche démarches n'est pas un paquet installable : son dossier est ajouté au chemin.
+pythonpath = [".", "../demarches"]
+addopts = "-q"

@@ -20,7 +20,10 @@ async function forward(request: Request, { params }: Context) {
     }
     throw error;
   }
-  if (!token) return Response.json({ detail: "Session expirée. Reconnectez-vous." }, { status: 401 });
+  // Seul un jeton d'un rôle admis dans cet espace est relayé (l'API vérifie de son côté chaque jeton).
+  if (!token || !spaceRole(decodeClaims(token))) {
+    return Response.json({ detail: "Session expirée. Reconnectez-vous." }, { status: 401 });
+  }
 
   {
     const roles = decodeClaims(token).realm_access?.roles;

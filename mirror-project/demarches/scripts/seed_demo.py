@@ -1,5 +1,6 @@
 """Insert or refresh the public-service competition pre-check demo catalog."""
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal
 from app.database.models import (
@@ -125,6 +126,106 @@ QUESTION_DOCUMENTS = {
     "passport_fiscal_stamp_paid": ("payment", "Référence du timbre fiscal", "Numéro du reçu ou de la transaction"),
     "loss_declared": ("loss", "Numéro de déclaration de perte", "Référence de la déclaration"),
 }
+
+
+def seed(db: Session) -> None:
+    """Crée ou met à jour le catalogue de démonstration dans la session donnée (idempotent).
+
+    Utilisé au démarrage (main) et par les tests de panne de la couche résilience.
+    """
+    administrations = {}
+    for code, name in ADMINISTRATIONS.items():
+        row = db.scalar(select(Administration).where(Administration.code == code))
+        if row is None:
+            row = Administration(code=code, name=name)
+            db.add(row)
+            db.flush()
+        administrations[code] = row
+
+    registry_codes = {definition[1] for definition in QUESTION_DEFINITIONS}
+    registries = {}
+    for code in registry_codes:
+        row = db.scalar(select(Registry).where(Registry.administration_id == administrations[code].id,
+                                              Registry.code == "main"))
+        if row is None:
+            row = Registry(administration_id=administrations[code].id, code="main", name=f"Registre — {administrations[code].name}")
+            db.add(row)
+            db.flush()
+        elif row.name == "Registre":
+            row.name = f"Registre — {administrations[code].name}"
+        registries[code] = row
+
+    questions = {}
+    for code, registry_code, service, response, description, *_ in QUESTION_DEFINITIONS:
+        row = db.scalar(select(Question).where(Question.code == code))
+        if row is None:
+            row = Question(code=code, registry_id=registries[registry_code].id,
+                           service_code=service, response_key=response, description=description)
+            db.add(row)
+        else:
+            row.registry_id = registries[registry_code].id
+            row.service_code = service
+            row.response_key = response
+            row.description = description
+            row.active = True
+        db.flush()
+        questions[code] = row
+
+    legacy_procedure = db.scalar(select(Procedure).where(Procedure.code == "prise_de_service"))
+    if legacy_procedure is not None:
+        legacy_procedure.active = False
+
+    for definition in DEMO_PROCEDURES:
+        requester_id = administrations[definition["owner"]].id
+        procedure = db.scalar(select(Procedure).where(Procedure.code == definition["code"]))
+        if procedure is None:
+            procedure = Procedure(
+                code=definition["code"],
+                owner_administration_id=requester_id,
+                title=definition["title"],
+                purpose=definition["purpose"],
+                consent_days=30,
+                published=True,
+                config_version=definition.get("config_version", 1),
+            )
+            db.add(procedure)
+        else:
+            procedure.owner_administration_id = requester_id
+            procedure.title = definition["title"]
+            procedure.purpose = definition["purpose"]
+            procedure.consent_days = 30
+            procedure.published = True
+            procedure.config_version = definition.get("config_version", procedure.config_version)
+            procedure.active = True
+        db.flush()
+
+        for question_code, position, required in definition["questions"]:
+            question = questions[question_code]
+            link = db.scalar(select(ProcedureQuestion).where(
+                ProcedureQuestion.procedure_id == procedure.id,
+                ProcedureQuestion.question_id == question.id,
+            ))
+            if link is None:
+                link = ProcedureQuestion(procedure_id=procedure.id, question_id=question.id)
+                db.add(link)
+            link.required = required
+            link.position = position
+            document = QUESTION_DOCUMENTS.get(question_code)
+            if document:
+                link.document_type, link.document_label, link.document_hint = document
+
+            permission = db.scalar(select(Permission).where(
+                Permission.requester_administration_id == requester_id,
+                Permission.question_id == question.id,
+            ))
+            if permission is None:
+                permission = Permission(
+                    requester_administration_id=requester_id,
+                    question_id=question.id,
+                )
+                db.add(permission)
+            permission.active = True
+            permission.status = "approved"
 
 
 def main() -> None:

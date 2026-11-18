@@ -8,7 +8,9 @@ import styles from "@/features/citizen/styles/home.module.css";
 type Profile = { linked: boolean; subject_ref: string | null; references: DocumentReferences };
 
 // Références de documents enregistrées au profil (GET/PUT /v1/citizen/identifiers), chiffrées
-// par l'API démarches. Elles servent aux prochaines démarches si l'administration en a besoin.
+// par l'API démarches. Toutes facultatives : elles sont jointes d'office aux prochaines démarches,
+// pour que le registre retrouve une pièce précise. Les références masquées (profileDocumentTypes)
+// gardent leur valeur enregistrée : l'enregistrement reprend tous les types.
 export function DocumentProfile() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [values, setValues] = useState<DocumentReferences>({});
@@ -36,7 +38,7 @@ export function DocumentProfile() {
     <h2>Mes références administratives</h2>
     <p>Renseignez uniquement les identifiants uniques des documents détenus auprès de chaque administration.</p>
     <form onSubmit={(e) => { e.preventDefault(); if (!busy) void save(); }}>
-      <DocumentFields prefix="profile" requirements={[...DOCUMENT_TYPES]} values={values} onChange={setValues} disabled={busy} />
+      <DocumentFields prefix="profile" requirements={profileDocumentTypes(profile.subject_ref)} values={values} onChange={setValues} disabled={busy} />
       <button className={styles.primary} type="submit" disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer mon profil"}</button>
       <p role="status">{notice}</p>
     </form>

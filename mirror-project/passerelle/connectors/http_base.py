@@ -40,6 +40,9 @@ class BaseHttpConnector:
     def _url(self, organization: str, service: str) -> str:
         raise NotImplementedError
 
+    def _check_client(self, client_id: str) -> None:
+        """Lève RoutingError si l'identifiant du demandeur ne convient pas au transport."""
+
     def _transport_failure(
         self, organization: str, service: str, request_id: str, response: httpx.Response
     ) -> dict[str, Any] | None:
@@ -48,7 +51,21 @@ class BaseHttpConnector:
 
     # Contrat RegistryConnector -------------------------------------------------------
 
-    def query(self, organization: str, service: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def query(
+        self,
+        organization: str,
+        service: str,
+        payload: dict[str, Any],
+        *,
+        client_id: str | None = None,
+        consent_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Interroge un service. Le corps reste celui du contrat des registres ; deux en-têtes :
+
+        - X-Road-Client : demandeur de cet appel (client_id), par défaut celui du connecteur ;
+        - X-Consent-Id : accord du citoyen sur lequel repose l'appel, vérifié côté détenteur
+          par la couche consentement-minimisation (un registre l'ignore).
+        """
         body = dict(payload)
         if not isinstance(body.get("request_id"), str) or not body["request_id"]:
             body["request_id"] = str(uuid.uuid4())
@@ -61,6 +78,14 @@ class BaseHttpConnector:
 
         if not SERVICE_CODE.match(service):
             return answer(Status.INVALID_REQUEST, f"Code de service invalide : {service!r}")
+        requester = client_id or self.client_id
+        try:
+            self._check_client(requester)
+        except RoutingError as exc:
+            return answer(Status.INVALID_REQUEST, str(exc))
+        headers = {"X-Road-Client": requester}
+        if consent_id:
+            headers["X-Consent-Id"] = consent_id
         try:
             url = self._url(organization, service)
         except RoutingError as exc:
@@ -70,7 +95,7 @@ class BaseHttpConnector:
             response = self._client.post(
                 url,
                 json=body,
-                headers={"X-Road-Client": self.client_id},
+                headers=headers,
                 timeout=self.timeout,
             )
         except httpx.TimeoutException:

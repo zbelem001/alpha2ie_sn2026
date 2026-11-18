@@ -8,3 +8,7 @@ PyJWT[crypto]>=2.10,<3.0
 cryptography>=44,<47
 httpx>=0.27,<1.0
 -e ../passerelle
+# Client de la couche journal (journal_client) : chaque événement de dossier y est inscrit.
+-e ../journal
+# Client du registre des accords (consent_client), couche consentement-minimisation.
+-e ../consentement-minimisation
