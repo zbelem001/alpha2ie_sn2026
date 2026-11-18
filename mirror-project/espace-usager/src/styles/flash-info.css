@@ -1,4 +1,5 @@
-/* Bandeau d'annonces : rouge de l'écu, foncé pour le contraste (blanc dessus 6,9:1). */
+
+
 .flash-info {
   position: relative;
   z-index: 5;
@@ -9,8 +10,8 @@
   width: 100%;
   overflow: hidden;
   color: #fff;
-  background: var(--rouge);
-  font-size: 0.8125rem;
+  background: #b82032;
+  font-size: 0.75rem;
 }
 .flash-info-label {
   display: flex;
@@ -19,10 +20,10 @@
   flex-shrink: 0;
   gap: 8px;
   padding: 0 clamp(12px, 2vw, 28px);
-  background: var(--rouge-sombre);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  background: #971b2a;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
 }
 .flash-info-window { flex: 1; min-width: 0; overflow: hidden; }
 .flash-info-track { display: flex; width: max-content; animation: flash-scroll 35s linear infinite; }
@@ -30,7 +31,7 @@
 .flash-info-messages li { padding: 0 32px; white-space: nowrap; line-height: 1.5; }
 .flash-info-messages li + li { border-left: 1px solid rgb(255 255 255 / 35%); }
 .flash-info-toggle { display: grid; flex: 0 0 42px; align-self: stretch; place-items: center; border: 0; border-left: 1px solid rgb(255 255 255 / 20%); color: inherit; background: transparent; cursor: pointer; }
-.flash-info-toggle:hover { background: var(--rouge-sombre); }
+.flash-info-toggle:hover { background: #971b2a; }
 .flash-info-toggle:focus-visible { outline: 2px solid #fff; outline-offset: -5px; }
 .flash-info:hover .flash-info-track,
 .flash-info:focus-within .flash-info-track,

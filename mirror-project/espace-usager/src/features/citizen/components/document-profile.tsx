@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { DocumentFields } from "@/components/shared/document-fields";
-import { IdentityLinkForm, linkIdentity } from "@/features/citizen/components/identity-link-form";
 import { DOCUMENT_TYPES, cleanReferences, type DocumentReferences } from "@/lib/document-references";
 import { api } from "@/lib/api";
 import styles from "@/features/citizen/styles/home.module.css";
@@ -33,9 +32,9 @@ export function DocumentProfile() {
     finally { setBusy(false); }
   }
   if (!profile) return <div className={styles.profilePanel}><p role="status">{notice || "Chargement…"}</p></div>;
-  if (!profile.linked) return <IdentityLinkForm onLink={async (proof) => { await linkIdentity(proof); await load(); }} />;
   return <div className={styles.profilePanel}>
-    <p>Compte rattaché à l’acte de naissance <strong>{profile.subject_ref}</strong>.</p>
+    <h2>Mes références administratives</h2>
+    <p>Renseignez uniquement les identifiants uniques des documents détenus auprès de chaque administration.</p>
     <form onSubmit={(e) => { e.preventDefault(); if (!busy) void save(); }}>
       <DocumentFields prefix="profile" requirements={[...DOCUMENT_TYPES]} values={values} onChange={setValues} disabled={busy} />
       <button className={styles.primary} type="submit" disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer mon profil"}</button>

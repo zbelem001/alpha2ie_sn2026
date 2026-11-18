@@ -12,12 +12,12 @@ from app.database.models import (
 )
 
 ADMINISTRATIONS = {
-    "BF/GOV/FONCTION-PUBLIQUE": "Fonction publique (demandeur de démonstration)",
+    "BF/GOV/FONCTION-PUBLIQUE": "Fonction publique",
     "BF/GOV/DIPF/PASSEPORTS": "Direction de l’Immigration et de la Police des Frontières (passeports)",
     "BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL": "Mairie de Ouagadougou — état civil",
     "BF/GOV/JUSTICE/REGISTRES": "Justice — nationalité et casier",
-    "BF/GOV/ONI/CNIB": "ONI — registre CNIB simulé",
-    "BF/GOV/TRESOR/PAIEMENTS": "Trésor — paiements simulés",
+    "BF/GOV/ONI/CNIB": "Office national d’identification",
+    "BF/GOV/TRESOR/PAIEMENTS": "Trésor public",
 }
 
 QUESTION_DEFINITIONS = [
@@ -136,6 +136,7 @@ def main() -> None:
                 row = Administration(code=code, name=name)
                 db.add(row)
                 db.flush()
+            row.name = name
             administrations[code] = row
 
         registry_codes = {definition[1] for definition in QUESTION_DEFINITIONS}

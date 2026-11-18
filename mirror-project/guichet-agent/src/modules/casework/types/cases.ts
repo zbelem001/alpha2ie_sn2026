@@ -11,6 +11,7 @@ export type ApiCase = {
   procedureTitle: string; procedurePurpose: string; procedureVersion: number; consentDays: number;
   channel: ConsentChannel; status: CaseStatus; authorizationId: string;
   checks: AgentCheck[];
+  identifierStatus?: { complete: boolean; missing: DocumentRequirement[] } | null;
 };
 /** Dossier affiché : celui de l'API, avec l'accord et les signalements du citoyen tirés de son journal. */
 export type AgentCase = ApiCase & { consent: ConsentView; reports: Report[] };
@@ -26,5 +27,6 @@ export type AgentCaseService = {
   requestConsent: (id: string, channel: ConsentChannel) => Promise<AgentCase>;
   sendCode: (id: string, resend?: boolean) => Promise<AssistedChallenge>;
   verifyCode: (id: string, code: string) => Promise<void>;
+  saveIdentifiers: (id: string, references: DocumentReferences) => Promise<void>;
   runChecks: (id: string) => Promise<AgentCase>;
 };

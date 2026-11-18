@@ -1,3 +1,5 @@
+> Accès actuel : numéro national et PIN, sans comptes préconfigurés sur le formulaire. Voir [le parcours téléphone](../docs/acces-telephone.md). Les comptes nommés cités ci-dessous décrivent les anciennes validations.
+
 # Couche guichet agent
 
 Couche bonus de la carte du jury. Responsable : Personne 1.

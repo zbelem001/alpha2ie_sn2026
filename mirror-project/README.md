@@ -1,3 +1,5 @@
+> Interfaces : design de `main` rétabli, accès par numéro → OTP/PIN relié à Keycloak. Voir [accès téléphone](docs/acces-telephone.md). Les comptes nommés des anciennes validations ne passent plus par le formulaire.
+
 # Miroir : architecture par couche (branche `mirror-project`)
 
 La carte du jury impose un dossier par couche : registres, passerelle d'échange, consentement et minimisation, journal de traçabilité, espace usager (obligatoires), guichet agent et résilience (bonus). Chaque couche a sa spécification OpenAPI et ses tests.
@@ -30,7 +32,11 @@ docker compose up -d --build                   # architecture par couche
 docker compose --profile xroad up -d --build   # avec le banc X-Road
 ```
 
-Interfaces : http://localhost:3000 (espace usager, compte `citoyen-demo` / `CitoyenDemo-2026!`) et http://localhost:3001 (guichet agent, compte `agent-demo` / `AgentDemo-2026!`).
+La configuration de démonstration est prête dans `.env.example` ; PostgreSQL initialise automatiquement les bases, les comptes techniques et les 100 citoyens fictifs cohérents. La première commande lance toute la pile locale sans étape manuelle préalable.
+
+Interfaces : http://localhost:3000 (espace usager) et http://localhost:3001 (guichet agent).
+
+Comptes administrateurs injectés : Fonction publique `70000000`, passeport `60000000`, administrateur passeport `50000000`; PIN commun `1234`. Tous utilisent le rôle `local-admin`.
 
 Machine de 8 à 11 Go de mémoire : construire d'abord les deux interfaces l'une après l'autre (`docker compose build espace-usager && docker compose build guichet-agent`), puis `docker compose up -d`. Construites en parallèle avec le reste de la pile, elles ont fait tuer Docker Desktop par manque de mémoire (constaté le 18/11).
 

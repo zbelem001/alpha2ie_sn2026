@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { consentFromJournal, consultationsFromJournal, reportsFromJournal, requesterFromJournal, type ConsentView, type Consultation, type JournalEvent, type ReportKind } from "@/lib/journal";
 import type { ApiCase } from "@/modules/casework/types/cases";
-import { linkIdentity as sendIdentityProof, type IdentityProof } from "@/features/citizen/components/identity-link-form";
 
 const REFRESH_MS = 15_000;
 
@@ -22,7 +21,6 @@ export function useCitizenSpace() {
     try {
       const current = await api<IdentityLink>("citizen/identity-link");
       setLink(current);
-      if (!current.linked) { setCases([]); return; }
       const items = await api<ApiCase[]>("cases");
       setCases(await Promise.all(items.map(async (item) => {
         const events = await api<JournalEvent[]>(`cases/${item.id}/journal`);
@@ -64,16 +62,6 @@ export function useCitizenSpace() {
     await load();
   }
 
-  async function startCase(procedureCode: string) {
-    await api("citizen/cases", { body: { procedureCode, confirmed: true } });
-    await load();
-  }
-
-  async function linkIdentity(proof: IdentityProof) {
-    await sendIdentityProof(proof);
-    await load();
-  }
-
   const reports = cases.flatMap((item) => reportsFromJournal(item.events));
   const consultations: Consultation[] = cases.flatMap((item) => consultationsFromJournal(item, item.events))
     .sort((a, b) => b.dateTime.localeCompare(a.dateTime));
@@ -81,5 +69,5 @@ export function useCitizenSpace() {
   const requests = cases.filter((item) => item.channel === "web" && item.consent.status === "pending" && !["completed", "rejected"].includes(item.status));
   const atDesk = cases.filter((item) => item.channel === "assisted" && item.consent.status === "pending" && !["completed", "rejected"].includes(item.status));
 
-  return { loading, error, expired, link, cases, consultations, requests, atDesk, reports, respond, startCase, revokeConsent, report, linkIdentity, reload: load };
+  return { loading, error, expired, link, cases, consultations, requests, atDesk, reports, respond, revokeConsent, report, reload: load };
 }

@@ -18,6 +18,6 @@ export function CaseWorkspace() {
       {workspace.error && <p className={styles.errorBanner} role="alert">{workspace.error}</p>}
       {view === "list" && <CaseList cases={workspace.cases} loading={workspace.loading} onOpen={workspace.openCase} />}
       {view === "new" && <NewCaseForm busy={Boolean(busy)} procedures={workspace.procedures} onCreate={workspace.create} />}
-      {view === "case" && selected && <CaseDetail key={selected.id} item={selected} challenge={workspace.challenge} busy={busy} focusSection={workspace.selectedSection} onSendCode={workspace.sendCode} onVerifyCode={workspace.verifyCode} onChangeChannel={workspace.changeChannel} onRunChecks={workspace.runChecks} />}
+      {view === "case" && selected && <CaseDetail key={selected.id} item={selected} challenge={workspace.challenge} busy={busy} focusSection={workspace.selectedSection} onSendCode={workspace.sendCode} onVerifyCode={workspace.verifyCode} onChangeChannel={workspace.changeChannel} onSaveIdentifiers={workspace.saveIdentifiers} onRunChecks={workspace.runChecks} />}
   </>;
 }

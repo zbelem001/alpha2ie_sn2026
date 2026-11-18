@@ -12,6 +12,8 @@ export async function POST(request: Request) {
   const password = typeof body.password === "string" ? body.password : "";
   if (!username || !password) return Response.json({ detail: "Identifiant et mot de passe requis." }, { status: 400 });
 
+  if (!/^[0-9]{8}$/.test(username) || !/^[0-9]{4,6}$/.test(password)) return Response.json({ detail: "Numero ou code PIN invalide." }, { status: 400 });
+
   try {
     const tokens = await passwordGrant(username, password);
     if (!tokens) return Response.json({ detail: "Identifiant ou mot de passe incorrect." }, { status: 401 });

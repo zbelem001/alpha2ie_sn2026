@@ -38,6 +38,6 @@ export function AgentWorkspaceScreen() {
       <div className={styles.accountLine}><span>Guichet agent</span><span>{agent.service}</span></div>
       <CaseWorkspace key={workspaceKey} />
     </main>
-    <footer className={styles.footer}><span>{agent.service}</span><span>Démonstration · registres simulés, consentements et SMS simulés</span></footer>
+    <footer className={styles.footer}><span>{agent.service}</span><span>Consignations et consentements</span></footer>
   </div>;
 }

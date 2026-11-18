@@ -1,5 +1,5 @@
 export const DOCUMENT_TYPES = [
-  { key: "cnib", label: "Numéro de CNIB", provider: "ONI", hint: "Ex. fictif : CNIB-123456" },
+  { key: "cnib", label: "Numéro de CNIB", provider: "ONI", hint: "Référence inscrite sur la pièce CNIB" },
   { key: "birth", label: "Référence de l’acte de naissance", provider: "État civil", hint: "Numéro, année et centre d’état civil si nécessaires" },
   { key: "nationality", label: "Numéro du certificat de nationalité", provider: "Justice", hint: "Référence du certificat dans le registre concerné" },
   { key: "criminal", label: "Numéro du casier judiciaire", provider: "Justice", hint: "Référence du bulletin dans le registre concerné" },
@@ -9,7 +9,7 @@ export const DOCUMENT_TYPES = [
 export type DocumentRequirement = { key: string; label: string; provider: string; hint: string };
 export type DocumentReferences = Record<string, string>;
 export function documentForQuestion(code: string): DocumentRequirement {
-  const keys: Record<string, string> = { passport_cnib_valid: "cnib", passport_birth_act_found: "birth", passport_nationality: "nationality", passport_criminal_record_current: "criminal", passport_fiscal_stamp_paid: "payment", loss_declared: "loss" };
+  const keys: Record<string, string> = { candidate_minimum_age: "birth", candidate_nationality: "nationality", criminal_record_indicator: "criminal", passport_cnib_valid: "cnib", passport_birth_act_found: "birth", passport_nationality: "nationality", passport_criminal_record_current: "criminal", passport_fiscal_stamp_paid: "payment", loss_declared: "loss" };
   return { ...DOCUMENT_TYPES.find((item) => item.key === keys[code])! };
 }
 export function requirementsFor(checks: { questionCode: string; document?: DocumentRequirement }[]) {

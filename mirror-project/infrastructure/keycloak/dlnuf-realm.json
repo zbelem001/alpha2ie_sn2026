@@ -177,26 +177,26 @@
   ],
   "users": [
     {
-      "username": "agent-demo",
+      "username": "70000000",
       "firstName": "Agent",
       "lastName": "Demo",
       "email": "agent-demo@example.test",
       "enabled": true,
       "emailVerified": true,
-      "attributes": { "administration_code": ["BF/GOV/FONCTION-PUBLIQUE"] },
-      "credentials": [{ "type": "password", "value": "AgentDemo-2026!", "temporary": false }],
-      "realmRoles": ["agent"]
+      "attributes": { "administration_code": ["BF/GOV/FONCTION-PUBLIQUE"], "account_kind": ["local-admin"], "phone_number": ["+22670000000"], "phone_number_verified": ["false"] },
+      "credentials": [{ "type": "password", "value": "1234", "temporary": false }],
+      "realmRoles": ["local-admin"]
     },
     {
-      "username": "agent-passeport-demo",
+      "username": "60000000",
       "firstName": "Agent Passeport",
       "lastName": "Demo",
       "email": "agent-passeport-demo@example.test",
       "enabled": true,
       "emailVerified": true,
-      "attributes": { "administration_code": ["BF/GOV/DIPF/PASSEPORTS"] },
-      "credentials": [{ "type": "password", "value": "PassportDemo-2026!", "temporary": false }],
-      "realmRoles": ["agent"]
+      "attributes": { "administration_code": ["BF/GOV/DIPF/PASSEPORTS"], "account_kind": ["local-admin"], "phone_number": ["+22660000000"], "phone_number_verified": ["false"] },
+      "credentials": [{ "type": "password", "value": "1234", "temporary": false }],
+      "realmRoles": ["local-admin"]
     },
     {
       "username": "citoyen-demo",
@@ -210,14 +210,14 @@
       "realmRoles": ["citizen"]
     },
     {
-      "username": "admin-passeport-demo",
+      "username": "50000000",
       "firstName": "Administrateur local",
       "lastName": "Passeport Demo",
-      "email": "admin-passeport-demo@example.test",
+      "email": "50000000@example.test",
       "enabled": true,
       "emailVerified": true,
-      "attributes": { "administration_code": ["BF/GOV/DIPF/PASSEPORTS"] },
-      "credentials": [{ "type": "password", "value": "AdminPasseport-2026!", "temporary": false }],
+      "attributes": { "administration_code": ["BF/GOV/DIPF/PASSEPORTS"], "account_kind": ["local-admin"], "phone_number": ["+22650000000"], "phone_number_verified": ["false"] },
+      "credentials": [{ "type": "password", "value": "1234", "temporary": false }],
       "realmRoles": ["local-admin"]
     }
   ]

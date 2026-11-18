@@ -8,7 +8,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-`mirror-project/compose.yaml` inclut `infrastructure/docker-compose.yml` et le banc X-Road de la passerelle. Les valeurs par défaut viennent de `.env.example` ; pour les changer, copier ce fichier en `.env`.
+`mirror-project/compose.yaml` inclut `infrastructure/docker-compose.yml` et le banc X-Road de la passerelle. `.env.example` contient une configuration locale de démonstration complète. Pour un environnement partagé, copier ce fichier en `.env` puis remplacer les mots de passe et secrets.
 
 | Service | Rôle | Port sur la machine |
 |---|---|---|

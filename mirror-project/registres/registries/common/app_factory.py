@@ -67,6 +67,12 @@ def create_registry_app(
 
     @app.get("/health")
     def health() -> dict[str, str]:
+        if os.getenv("REGISTRY_DATABASE_URL"):
+            from .database import DatabaseRecords
+            try:
+                DatabaseRecords(os.environ["REGISTRY_DATABASE_URL"]).ping()
+            except Exception:
+                return JSONResponse(status_code=503, content={"status": "unavailable", "registry": definition.name})
         return {"status": "up", "registry": definition.name, "organization": organization}
 
     @app.get("/services")

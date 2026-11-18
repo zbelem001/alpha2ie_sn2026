@@ -433,7 +433,7 @@ def test_agent_can_find_citizen_by_document_identifier(db: Session, monkeypatch)
             }
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
-    monkeypatch.setattr(connectors, "build_connector", lambda: RegistryConnector())
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: RegistryConnector())
     result = execute_checks(UUID(created["id"]), agent, db)
     assert result["status"] == "completed"
     assert request.lookup_identifier_ciphertext is None
@@ -469,7 +469,7 @@ def test_document_reference_is_sent_with_the_expected_holder(db: Session, monkey
             assert payload["parameters"] == {"identifier_type": "cnib_number", "document_identifier": "CNIB-DEMO-123456"}
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
-    monkeypatch.setattr(connectors, "build_connector", lambda: RegistryConnector())
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: RegistryConnector())
     assert execute_checks(case_id, agent, db)["status"] == "completed"
 
 
@@ -483,7 +483,7 @@ def test_citizen_can_start_a_procedure_without_an_agent(db: Session, monkeypatch
             assert payload["subject"] == {"pivot_id": "ACTE:OUAGA:2004:01234"}
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
-    monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: SuccessfulConnector())
     result = start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)
 
     assert result["status"] == "completed"
@@ -520,7 +520,7 @@ def test_citizen_reports_a_consultation_once_and_the_requester_sees_it(db: Sessi
         def query(self, organization, service, payload):
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
-    monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: SuccessfulConnector())
     case_id = UUID(start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)["id"])
     consultation = db.scalar(select(AuditEvent).where(AuditEvent.case_id == case_id, AuditEvent.event_type == "registry_check"))
 
@@ -546,7 +546,7 @@ def test_only_the_citizen_can_report_and_only_a_registry_consultation(db: Sessio
         def query(self, organization, service, payload):
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
-    monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: SuccessfulConnector())
     case_id = UUID(start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)["id"])
     created = db.scalar(select(AuditEvent).where(AuditEvent.case_id == case_id, AuditEvent.event_type == "case_created"))
     consultation = db.scalar(select(AuditEvent).where(AuditEvent.case_id == case_id, AuditEvent.event_type == "registry_check"))
@@ -616,7 +616,7 @@ def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Sessi
         def query(self, organization, service, payload):
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
-    monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: SuccessfulConnector())
     result = execute_checks(case_id, agent, db)
 
     assert result["status"] == "completed"
@@ -748,7 +748,7 @@ def test_registry_boolean_must_be_a_boolean(
         def query(self, organization, service, payload):
             return {"status": "ok", "data": {"valid": response_value}, "transport_id": "test-transport"}
 
-    monkeypatch.setattr(connectors, "build_connector", lambda: RegistryConnector())
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: RegistryConnector())
     result = execute_checks(case_id, agent, db)
 
     check = result["checks"][0]
@@ -784,7 +784,7 @@ def test_unavailable_registry_can_be_retried_without_duplicate_request(db: Sessi
             return {"status": "ok", "data": {"valid": True}, "transport_id": "retry-succeeded"}
 
     connector = IntermittentConnector()
-    monkeypatch.setattr(connectors, "build_connector", lambda: connector)
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: connector)
 
     first = execute_checks(case_id, agent, db)
     assert first["status"] == "pending"
@@ -836,7 +836,7 @@ def test_fresh_pending_claim_is_skipped_and_stale_claim_is_recovered(db: Session
             return {"status": "ok", "data": {"valid": True}, "transport_id": "recovered"}
 
     connector = SuccessfulConnector()
-    monkeypatch.setattr(connectors, "build_connector", lambda: connector)
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: connector)
 
     first = execute_checks(case_id, agent, db)
     assert first["status"] == "pending"
@@ -855,3 +855,80 @@ def test_fresh_pending_claim_is_skipped_and_stale_claim_is_recovered(db: Session
     ).all()
     assert [attempt.status for attempt in attempts] == ["failed", "succeeded"]
     assert attempts[0].error_code == "attempt_lease_expired"
+
+
+def test_admin_procedure_catalog_is_limited_to_own_administration(db):
+    from app.api import list_procedures
+    owner, other, procedure = add_procedure(db)
+    db.add(Procedure(code="other_procedure", title="Other", owner_administration_id=other.id, active=True, published=True))
+    db.commit()
+    principal = Principal("admin", frozenset({"local-admin", "citizen"}), owner.code, None)
+    assert [item["code"] for item in list_procedures(principal, db)] == [procedure.code]
+
+
+def test_case_rejects_identifiers_not_requested_by_procedure(db):
+    owner, _, procedure = add_procedure(db)
+    principal = Principal("admin", frozenset({"local-admin"}), owner.code, None)
+    body = CaseCreate(procedure_code=procedure.code, subject_ref="ACTE:OUAGA:2004:01234",
+                      registry_identifiers=[DocumentIdentifierInput(identifier_type="nationality_reference", value="NAT-UNNECESSARY")])
+    with pytest.raises(HTTPException) as error:
+        create_case(body, principal, db)
+    assert error.value.status_code == 422
+    assert db.scalar(select(func.count()).select_from(Case)) == 0
+
+
+def test_after_consent_agent_completes_only_missing_case_references(db, monkeypatch):
+    from cryptography.fernet import Fernet
+    from app.api import CaseReferencesInput, complete_case_identifiers, get_case
+    monkeypatch.setenv("CITIZEN_IDENTIFIER_ENCRYPTION_KEY", Fernet.generate_key().decode())
+    owner, other, procedure = add_procedure(db)
+    subject = "CITIZEN:DEFERRED-REFERENCES"
+    db.add(CitizenIdentityLink(principal_sub="citizen-sub", subject_ref=subject, phone_number="+22670000001")); db.commit()
+    agent = Principal("admin", frozenset({"local-admin"}), owner.code, None)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, subject)
+    created = create_case(CaseCreate(procedure_code=procedure.code, phone="70000001"), agent, db)
+    case_id = UUID(created["id"])
+    assert created["identifierStatus"] is None
+    with pytest.raises(HTTPException) as denied:
+        complete_case_identifiers(case_id, CaseReferencesInput(references={"cnib": "CNIB-123456"}), agent, db)
+    assert denied.value.status_code == 403
+    record_consent(case_id, ConsentCreate(decision="granted", question_codes=["passport_cnib_valid"], notice_version="test-v1", channel="web"), citizen, db)
+    result = get_case(case_id, agent, db)
+    assert [doc["key"] for doc in result["identifierStatus"]["missing"]] == ["cnib"]
+    with pytest.raises(HTTPException) as extra:
+        complete_case_identifiers(case_id, CaseReferencesInput(references={"birth": "ACTE-123456"}), agent, db)
+    assert extra.value.status_code == 422
+    stranger = Principal("other", frozenset({"local-admin"}), other.code, None)
+    with pytest.raises(HTTPException) as cross:
+        complete_case_identifiers(case_id, CaseReferencesInput(references={"cnib": "CNIB-123456"}), stranger, db)
+    assert cross.value.status_code == 403
+    result = complete_case_identifiers(case_id, CaseReferencesInput(references={"cnib": "CNIB-123456"}), agent, db)
+    assert result["identifierStatus"] == {"complete": True, "missing": []}
+    stored = db.scalar(select(RegistryRequest).where(RegistryRequest.case_id == case_id))
+    assert stored.lookup_identifier_ciphertext != "CNIB-123456"
+    assert db.scalar(select(func.count()).select_from(CitizenDocumentIdentifier)) == 0
+    assert "CNIB-123456" not in str(result)
+
+
+def test_citizen_starts_from_phone_identity_with_consent_and_no_registry_call(db, monkeypatch):
+    owner, _, procedure = add_procedure(db)
+    subject = "CITIZEN:PHONE-START"
+    db.add(CitizenIdentityLink(principal_sub="citizen-sub", subject_ref=subject, phone_number="+22670000001")); db.commit()
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, subject)
+    monkeypatch.setattr(connectors, "build_connector", lambda **kwargs: pytest.fail("No registry calls with missing identifiers"))
+    result = start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)
+    case = db.get(Case, UUID(result["id"]))
+    assert case.requester_administration_id == owner.id
+    assert not result["identifierStatus"]["complete"]
+    assert db.scalar(select(Consent).where(Consent.case_id == case.id)).status == "granted"
+
+
+def test_retired_administration_is_not_offered_to_citizens(db):
+    from app.api import list_procedures, citizen_administrations
+    owner, _, _ = add_procedure(db)
+    retired = Administration(code="BF/GOV/OLD/REMOVED", name="Ancienne administration", active=True)
+    db.add(retired); db.flush()
+    db.add(Procedure(code="retired_proc", title="Ancienne demarche", owner_administration_id=retired.id, published=True, active=True)); db.commit()
+    citizen = Principal("citizen", frozenset({"citizen"}), None, "CITIZEN:test")
+    assert retired.code not in {item["code"] for item in citizen_administrations(citizen, db)}
+    assert "retired_proc" not in {item["code"] for item in list_procedures(citizen, db)}

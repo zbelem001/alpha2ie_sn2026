@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Outfit } from "next/font/google";
+import { Geist_Mono, Geist } from "next/font/google";
 import "./globals.css";
 
 // Outfit pour tout le texte, Geist Mono pour les références et les heures (docs/charte-graphique.md).
 // Téléchargées à la construction et servies par l'application : le navigateur n'appelle pas Google.
-const outfit = Outfit({
-  variable: "--font-outfit",
+const outfit = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
   display: "swap",
 });
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#183624",
+  themeColor: "#2da497",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

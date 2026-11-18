@@ -56,6 +56,7 @@ def main() -> None:
     else:
         subprocess.run(["alembic", "upgrade", "head"], check=True)
     subprocess.run([sys.executable, "-m", "scripts.seed_demo"], check=True)
+    subprocess.run([sys.executable, "-m", "scripts.seed_administration_catalog"], check=True)
     os.execvp("uvicorn", ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"])
 
 

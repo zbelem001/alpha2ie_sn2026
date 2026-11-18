@@ -20,6 +20,7 @@ import httpx
 
 from .envelope import Status, make_envelope
 from .http_base import DEFAULT_TIMEOUT_S, BaseHttpConnector, RoutingError
+from .administrations import load_administrations
 
 IDENTIFIER_PART = re.compile(r"^[A-Za-z0-9._-]+$")
 
@@ -54,6 +55,9 @@ class XRoadConnector(BaseHttpConnector):
         self.security_server_url = security_server_url.rstrip("/")
 
     def _url(self, organization: str, service: str) -> str:
+        administration = load_administrations().get(organization)
+        if administration:
+            organization = administration.client_id
         _check_identifier(organization, 4, "Organisation")
         return f"{self.security_server_url}/r1/{organization}/{service}"
 

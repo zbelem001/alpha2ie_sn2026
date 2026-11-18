@@ -1,5 +1,5 @@
 // Relais vers l'API démarches : ajoute le jeton de la session, que le navigateur ne voit jamais.
-import { BACKEND_URL, currentAccessToken, IdentityUnavailableError, isSecureRequest } from "@/lib/server/auth";
+import { BACKEND_URL, currentAccessToken, decodeClaims, IdentityUnavailableError, isSecureRequest } from "@/lib/server/auth";
 import { SPACE } from "@/lib/space";
 
 type Context = { params: Promise<{ path: string[] }> };
@@ -21,6 +21,11 @@ async function forward(request: Request, { params }: Context) {
     throw error;
   }
   if (!token) return Response.json({ detail: "Session expirée. Reconnectez-vous." }, { status: 401 });
+
+  {
+    const roles = decodeClaims(token).realm_access?.roles;
+    if (!Array.isArray(roles) || !SPACE.roles.some((role) => roles.includes(role))) return Response.json({ detail: "Votre session ne permet pas d?acc?der au guichet. Reconnectez-vous avec un compte agent." }, { status: 403 });
+  }
 
   const hasBody = !["GET", "HEAD"].includes(request.method);
   const target = `${BACKEND_URL}/v1/${path.map(encodeURIComponent).join("/")}${new URL(request.url).search}`;

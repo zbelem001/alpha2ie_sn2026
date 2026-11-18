@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import json
 import secrets
+import os
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ from registries.common import (
 )
 from registries.common.envelope import utc_now_iso
 from registries.common.models import PIVOT_PATTERN
+from registries.common.database import DatabaseRecords
 
 ORGANIZATION = "BF/GOV/TRESOR/PAIEMENTS"
 DATA_FILE = Path(__file__).parent / "data" / "payments.json"
@@ -44,8 +46,9 @@ class NewPayment(BaseModel):
 
 def create_app(payments: list[dict[str, Any]] | None = None) -> FastAPI:
     if payments is None:
-        payments = json.loads(DATA_FILE.read_text(encoding="utf-8"))
-    payments = copy.deepcopy(payments)
+        payments = DatabaseRecords(os.environ["REGISTRY_DATABASE_URL"]) if os.getenv("REGISTRY_DATABASE_URL") else json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    if not isinstance(payments, DatabaseRecords):
+        payments = copy.deepcopy(payments)
 
     def payment_status(request: RegistryRequest) -> ServiceResult:
         if request.parameters.get("document_identifier"):
@@ -86,6 +89,8 @@ def create_app(payments: list[dict[str, Any]] | None = None) -> FastAPI:
             if entry["reference"] == reference:
                 entry["status"] = "paid"
                 entry["paid_at"] = entry["paid_at"] or utc_now_iso()
+                if isinstance(payments, DatabaseRecords):
+                    payments.save(entry)
                 return entry
         raise HTTPException(status_code=404, detail="Paiement inconnu")
 

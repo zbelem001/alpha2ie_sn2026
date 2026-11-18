@@ -7,10 +7,12 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
+from connectors.administrations import load_administrations
 
 from app.database.connection import get_db
 from app.database.models import (
@@ -27,6 +29,7 @@ from app.database.models import (
 )
 from app.keycloak_admin import KeycloakAdminClient
 from app.security import Principal, require_role
+from app.xroad_sync import XRoadSync, XRoadSyncError
 
 router = APIRouter(prefix="/v1/admin", tags=["administration"])
 
@@ -83,7 +86,8 @@ class ProcedureInput(BaseModel):
         if not any(check.required for check in self.checks):
             raise ValueError("Au moins une vérification doit être obligatoire")
         for check in self.checks:
-            if QUESTION_DOCUMENT_KEYS.get(check.question_code) != check.document.key:
+            expected = QUESTION_DOCUMENT_KEYS.get(check.question_code)
+            if expected is not None and expected != check.document.key:
                 raise ValueError("Le type de document ne correspond pas à la vérification sélectionnée")
         return self
 
@@ -109,16 +113,13 @@ class RegistryInput(BaseModel):
         return urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/"), "", ""))
 
 
-class RegistryTestInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    simulate_failure: bool = False
-
-
 class ServiceInput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     code: str = Field(min_length=3, max_length=64, pattern="^[a-z][a-z0-9-]{2,63}$")
     title: str = Field(min_length=3, max_length=200)
     description: str = Field(min_length=5, max_length=1000)
+    response_key: str = Field(default="valid", min_length=1, max_length=100,
+                              pattern="^[a-z][a-z0-9_]*$", validation_alias=AliasChoices("response_key", "responseKey"))
 
 
 class ActiveInput(BaseModel):
@@ -143,6 +144,7 @@ def _administration(db: Session, principal: Principal) -> Administration:
         raise HTTPException(status_code=403, detail="Le jeton administrateur n’est associé à aucune administration")
     administration = db.scalar(select(Administration).where(
         Administration.code == principal.administration_code,
+        Administration.code.in_(list(load_administrations())),
         Administration.active.is_(True),
     ))
     if administration is None:
@@ -222,6 +224,12 @@ def _question_provider(db: Session, question: Question) -> str:
     return owner.name if owner else ""
 
 
+def _question_provider_code(db: Session, question: Question) -> str | None:
+    registry = db.get(Registry, question.registry_id)
+    owner = db.get(Administration, registry.administration_id) if registry else None
+    return owner.code if owner else None
+
+
 def _registry_payload(registry: Registry | None) -> dict:
     if registry is None:
         return {"name": "", "url": "", "last_test": None, "lastTest": None}
@@ -295,6 +303,15 @@ def get_configuration(
     services = db.scalars(select(RegistryService).where(
         RegistryService.registry_id == registry.id,
     ).order_by(RegistryService.title)).all() if registry else []
+    available_services = db.execute(
+        select(RegistryService, Administration)
+        .join(Registry, RegistryService.registry_id == Registry.id)
+        .join(Administration, Registry.administration_id == Administration.id)
+        .where(RegistryService.active.is_(True), Registry.active.is_(True),
+               Administration.code.in_(list(load_administrations())),
+               Administration.active.is_(True), Administration.id != administration.id)
+        .order_by(Administration.name, RegistryService.title)
+    ).all()
     try:
         agents = [_agent_payload(item) for item in KeycloakAdminClient().list_agents(administration.code)]
         agent_management_available = True
@@ -305,6 +322,11 @@ def get_configuration(
         agent_management_available = False
     return {
         "administration": {"code": administration.code, "name": administration.name},
+        "availableServices": [{
+            "id": str(service.id), "code": service.code, "title": service.title,
+            "description": service.description, "provider": provider.name,
+            "providerCode": provider.code,
+        } for service, provider in available_services],
         "procedures": [_procedure_payload(db, item) for item in procedures],
         "agents": agents,
         "agent_management_available": agent_management_available,
@@ -348,6 +370,24 @@ def save_procedure(
             raise HTTPException(status_code=422, detail=f"Vérification inconnue ou inactive : {item.question_code}")
         questions[item.question_code] = question
     if body.published:
+        for item in body.checks:
+            question = questions[item.question_code]
+            permission = db.scalar(select(Permission).where(
+                Permission.requester_administration_id == administration.id,
+                Permission.question_id == question.id,
+            ))
+            if permission is None:
+                permission = Permission(
+                    requester_administration_id=administration.id,
+                    question_id=question.id,
+                    active=True,
+                )
+                db.add(permission)
+            permission.status = "approved"
+            permission.active = True
+            permission.purpose = body.purpose
+            permission.valid_from = datetime.now(timezone.utc)
+        db.flush()
         _ensure_publishable(db, administration.id, body.checks)
     if procedure is None:
         procedure = Procedure(
@@ -383,6 +423,18 @@ def save_procedure(
             document_label=document.label,
             document_hint=document.hint,
         ))
+    if body.published:
+        try:
+            sync = XRoadSync()
+            for item in body.checks:
+                question = questions[item.question_code]
+                provider_code = _question_provider_code(db, question)
+                if provider_code:
+                    sync.grant_access(administration.code, provider_code, question.service_code)
+        except XRoadSyncError as error:
+            raise HTTPException(status_code=503, detail=f"Synchronisation X-Road impossible : {error}") from error
+        except httpx.HTTPError as error:
+            raise HTTPException(status_code=503, detail="Le Security Server X-Road est indisponible") from error
     _audit(db, administration, principal,
            "Démarche publiée" if body.published else "Brouillon de démarche enregistré",
            body.title, f"Version {procedure.config_version}")
@@ -422,6 +474,28 @@ def set_procedure_active(
                               "hint": link.document_hint or ""},
                 ))
         _ensure_publishable(db, administration.id, checks)
+        try:
+            sync = XRoadSync()
+            for link in links:
+                question = db.get(Question, link.question_id)
+                if question:
+                    provider_code = _question_provider_code(db, question)
+                    if provider_code:
+                        sync.grant_access(administration.code, provider_code, question.service_code)
+        except (XRoadSyncError, httpx.HTTPError) as error:
+            raise HTTPException(status_code=503, detail=f"Synchronisation X-Road impossible : {error}") from error
+    else:
+        links = db.scalars(select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == procedure.id)).all()
+        try:
+            sync = XRoadSync()
+            for link in links:
+                question = db.get(Question, link.question_id)
+                if question:
+                    provider_code = _question_provider_code(db, question)
+                    if provider_code:
+                        sync.revoke_access(administration.code, provider_code, question.service_code)
+        except (XRoadSyncError, httpx.HTTPError) as error:
+            raise HTTPException(status_code=503, detail=f"Synchronisation X-Road impossible : {error}") from error
     procedure.active = body.active
     _audit(db, administration, principal,
            "Démarche activée" if body.active else "Démarche désactivée",
@@ -482,6 +556,12 @@ def suspend_right(
         raise HTTPException(status_code=409, detail="Aucun droit validé à suspendre")
     permission.active = False
     permission.status = "suspended"
+    try:
+        provider_code = _question_provider_code(db, question)
+        if provider_code:
+            XRoadSync().revoke_access(administration.code, provider_code, question.service_code)
+    except (XRoadSyncError, httpx.HTTPError) as error:
+        raise HTTPException(status_code=503, detail=f"Révocation X-Road impossible : {error}") from error
     _audit(db, administration, principal, "Droit d’échange suspendu", question.description)
     db.commit()
     return {"question_code": question.code, "status": permission.status}
@@ -508,7 +588,6 @@ def save_registry(
 
 @router.post("/registry/test")
 def test_registry(
-    body: RegistryTestInput,
     principal: Principal = Depends(require_role("local-admin")),
     db: Session = Depends(get_db),
 ):
@@ -516,13 +595,20 @@ def test_registry(
     registry = _primary_registry(db, administration)
     if registry is None or not registry.base_url:
         raise HTTPException(status_code=409, detail="Enregistrez d’abord l’URL du registre")
+    success = False
+    try:
+        response = httpx.get(f"{registry.base_url.rstrip('/')}/health", timeout=3.0)
+        success = response.status_code == 200 and response.json().get("status") == "up"
+    except (httpx.HTTPError, ValueError, TypeError):
+        success = False
+
     registry.last_test_at = datetime.now(timezone.utc)
-    registry.last_test_success = not body.simulate_failure
-    outcome = "échec simulé" if body.simulate_failure else "succès simulé"
-    _audit(db, administration, principal, "Test simulé du registre", registry.name,
-           f"{outcome}; aucune requête réseau réelle n’a été envoyée")
+    registry.last_test_success = success
+    outcome = "registre disponible" if success else "registre indisponible"
+    _audit(db, administration, principal, "Test réel du registre", registry.name,
+           f"{outcome}; requête HTTP GET /health")
     db.commit()
-    return {"at": registry.last_test_at, "success": registry.last_test_success, "simulated": True}
+    return {"at": registry.last_test_at, "success": success, "simulated": False}
 
 
 @router.post("/services", status_code=status.HTTP_201_CREATED)
@@ -534,15 +620,26 @@ def create_offered_service(
     administration = _administration(db, principal)
     registry = _primary_registry(db, administration, create=True)
     assert registry is not None
+    if not registry.base_url:
+        raise HTTPException(status_code=409, detail="Configurez l’adresse de votre API dans la connexion du registre avant de déclarer un service")
     existing = db.scalar(select(RegistryService).where(
         RegistryService.registry_id == registry.id,
         RegistryService.code == body.code,
     ))
     if existing:
         raise HTTPException(status_code=409, detail="Ce code de service existe déjà")
+    try:
+        XRoadSync().publish_service(administration.code, body.code, registry.base_url)
+    except (XRoadSyncError, httpx.HTTPError) as error:
+        raise HTTPException(status_code=503, detail=f"Publication X-Road impossible : {error}") from error
     service = RegistryService(registry_id=registry.id, code=body.code,
                               title=body.title, description=body.description, active=True)
     db.add(service)
+    db.flush()
+    # A declared API must also be selectable as a business verification.
+    db.add(Question(code=f"service_{service.id.hex}", registry_id=registry.id,
+                    service_code=service.code, response_key=body.response_key,
+                    description=service.title, active=True))
     _audit(db, administration, principal, "Service fournisseur déclaré", service.title,
            "Réponse minimale booléenne déclarée; le connecteur reste à implémenter")
     db.commit()
@@ -565,7 +662,15 @@ def set_service_active(
     registry = db.get(Registry, service.registry_id)
     if registry is None or registry.administration_id != administration.id:
         raise HTTPException(status_code=404, detail="Service introuvable")
+    try:
+        XRoadSync().set_service_active(administration.code, service.code, body.active)
+    except (XRoadSyncError, httpx.HTTPError) as error:
+        raise HTTPException(status_code=503, detail=f"Synchronisation X-Road impossible : {error}") from error
     service.active = body.active
+    for question in db.scalars(select(Question).where(
+        Question.registry_id == registry.id, Question.service_code == service.code,
+    )).all():
+        question.active = body.active
     _audit(db, administration, principal,
            "Service fournisseur activé" if body.active else "Service fournisseur désactivé", service.title)
     db.commit()

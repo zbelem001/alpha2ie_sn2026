@@ -8,8 +8,10 @@
 # Topologie (détails : passerelle/xroad/README.md) :
 #   xroad-cs       serveur central de l'instance BF
 #   xroad-ca       autorité de certification de test, OCSP et horodatage
-#   ss-registres   Security Server des administrations fournisseuses et services de gestion
-#   ss-demandeurs  Security Server des administrations demandeuses (ONI, Fonction publique)
+#   ss-registres   Security Server du groupe 1 et services de gestion
+#   ss-demandeurs  Security Server du groupe 2
+# Chaque groupe peut fournir ET demander des informations ; les noms historiques
+# des conteneurs ne déterminent pas le rôle métier des administrations.
 #
 # Les noms de service sont les adresses inscrites dans la configuration globale :
 # ne pas les renommer après la configuration.
@@ -95,6 +97,7 @@ services:
       - "127.0.0.1:${XROAD_SS_DEMANDEURS_CLIENT_PORT:-8280}:8080"
 
   xroad-setup:
+    image: dlnuf/initialisation-xroad:local
     # Configuration automatique du banc par les API REST, lancée avec le profil :
     # le script attend lui-même les serveurs, configure ce qui manque, puis s'arrête
     # (« Banc X-Road prêt »). Relançable sans casse. En cas d'échec, Docker le relance
@@ -109,6 +112,7 @@ services:
       XROAD_ADMIN_USER: ${XROAD_ADMIN_USER:-xrd}
       XROAD_ADMIN_PASSWORD: ${XROAD_ADMIN_PASSWORD:-secret}
       PYTHONUNBUFFERED: "1"
+      PYTHONPATH: /app
     volumes:
       - ./configuration:/xroad:ro
       - xroad-ca-certs:/ca:ro

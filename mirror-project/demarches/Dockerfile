@@ -7,10 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY passerelle /app/passerelle
-COPY demarches /app/demarches
+COPY demarches/requirements.txt /app/demarches/requirements.txt
 WORKDIR /app/demarches
 
 RUN pip install --no-cache-dir -r requirements.txt
+COPY demarches /app/demarches
 
 EXPOSE 8000
 CMD ["python", "-m", "scripts.start"]

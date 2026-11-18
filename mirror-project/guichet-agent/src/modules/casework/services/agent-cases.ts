@@ -35,6 +35,7 @@ export const agentCaseService: AgentCaseService = {
   async verifyCode(id, code) {
     await api(`cases/${id}/consent/otp/verify`, { body: { code } });
   },
+  async saveIdentifiers(id, references) { await api(`cases/${id}/identifiers`, { method: "PATCH", body: { references } }); },
   async runChecks(id) {
     await api(`cases/${id}/checks`, { method: "POST" });
     return reload(id);

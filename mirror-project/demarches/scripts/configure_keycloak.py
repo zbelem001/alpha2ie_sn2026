@@ -14,11 +14,13 @@ BASE_URL = os.getenv("KEYCLOAK_ADMIN_URL", "http://keycloak:8080")
 ADMIN_USERNAME = os.getenv("KEYCLOAK_ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.environ["KEYCLOAK_ADMIN_PASSWORD"]
 
-DEMO_ATTRIBUTES = {
-    "agent-demo": {"administration_code": ["BF/GOV/FONCTION-PUBLIQUE"]},
-    "agent-passeport-demo": {"administration_code": ["BF/GOV/DIPF/PASSEPORTS"]},
-    "citoyen-demo": {"phone_number_verified": ["false"]},
-}
+DEMO_AGENT_PHONE = os.getenv("DEMO_AGENT_PHONE", "70000000")
+DEMO_PASSPORT_AGENT_PHONE = os.getenv("DEMO_PASSPORT_AGENT_PHONE", "60000000")
+DEMO_LOCAL_ADMIN_PHONE = os.getenv("DEMO_LOCAL_ADMIN_PHONE", "50000000")
+DEMO_PIN = os.getenv("DEMO_ADMIN_PIN", "1234")
+
+DEMO_ATTRIBUTES = {"citoyen-demo": {"phone_number_verified": ["false"]}}
+
 demo_phone = os.getenv("CITIZEN_DEMO_PHONE", "").strip()
 demo_phone_verified = os.getenv("CITIZEN_DEMO_PHONE_VERIFIED", "false").strip().lower() == "true"
 if demo_phone:
@@ -33,8 +35,8 @@ PROFILE_ATTRIBUTES = {
     "phone_number": "Numéro de téléphone vérifié",
     "phone_number_verified": "Téléphone vérifié",
 }
-LOCAL_ADMIN_USERNAME = "admin-passeport-demo"
-LOCAL_ADMIN_PASSWORD = os.getenv("LOCAL_ADMIN_DEMO_PASSWORD", "AdminPasseport-2026!")
+LOCAL_ADMIN_USERNAME = DEMO_LOCAL_ADMIN_PHONE
+LOCAL_ADMIN_PASSWORD = DEMO_PIN
 LOCAL_ADMINISTRATION_CODE = "BF/GOV/DIPF/PASSEPORTS"
 
 
@@ -66,11 +68,21 @@ def admin_token() -> str:
 
 
 def configure(token: str) -> None:
+    request_json("/admin/realms/dlnuf", token, method="PUT", body={
+        "bruteForceProtected": True, "permanentLockout": False,
+        "failureFactor": 5, "waitIncrementSeconds": 60,
+        "maxFailureWaitSeconds": 900, "maxDeltaTimeSeconds": 900,
+    })
     status, profile = request_json("/admin/realms/dlnuf/users/profile", token)
     if status != 200 or not isinstance(profile, dict):
         raise RuntimeError("Keycloak returned an invalid user profile configuration")
 
     attributes = profile.setdefault("attributes", [])
+    # Le parcours national ne demande que le téléphone et le PIN.
+    # Ne pas imposer une adresse e-mail ou des noms factices pour autoriser le login.
+    for attribute in attributes:
+        if attribute.get("name") in {"email", "firstName", "lastName"}:
+            attribute.pop("required", None)
     existing_names = {item.get("name") for item in attributes}
     for name, label in PROFILE_ATTRIBUTES.items():
         if name not in existing_names:
@@ -85,6 +97,17 @@ def configure(token: str) -> None:
     for username, claims in DEMO_ATTRIBUTES.items():
         query = urllib.parse.urlencode({"username": username, "exact": "true"})
         _, users = request_json(f"/admin/realms/dlnuf/users?{query}", token)
+        if not isinstance(users, list):
+            raise RuntimeError(f"Keycloak returned an invalid demo user list: {username}")
+        if not users and username != "citoyen-demo":
+            request_json("/admin/realms/dlnuf/users", token, method="POST", body={
+                "username": username,
+                "enabled": True,
+                "emailVerified": True,
+                "attributes": claims,
+                "credentials": [{"type": "password", "value": DEMO_PIN, "temporary": False}],
+            })
+            _, users = request_json(f"/admin/realms/dlnuf/users?{query}", token)
         if not isinstance(users, list) or len(users) != 1:
             raise RuntimeError(f"Expected exactly one Keycloak demo user: {username}")
         user = users[0]
@@ -94,6 +117,31 @@ def configure(token: str) -> None:
             user_attributes.pop("phone_number", None)
         user_attributes.update(claims)
         request_json(f"/admin/realms/dlnuf/users/{user['id']}", token, method="PUT", body=user)
+        if username != "citoyen-demo":
+            request_json(
+                f"/admin/realms/dlnuf/users/{user['id']}/reset-password",
+                token,
+                method="PUT",
+                body={"type": "password", "value": DEMO_PIN, "temporary": False},
+            )
+            _, local_admin_role = request_json("/admin/realms/dlnuf/roles/local-admin", token)
+            _, mapped_roles = request_json(f"/admin/realms/dlnuf/users/{user['id']}/role-mappings/realm", token)
+            mapped_names = {role.get("name") for role in mapped_roles or []}
+            if "local-admin" not in mapped_names:
+                request_json(
+                    f"/admin/realms/dlnuf/users/{user['id']}/role-mappings/realm",
+                    token,
+                    method="POST",
+                    body=[local_admin_role],
+                )
+            if "agent" in mapped_names:
+                _, agent_role = request_json("/admin/realms/dlnuf/roles/agent", token)
+                request_json(
+                    f"/admin/realms/dlnuf/users/{user['id']}/role-mappings/realm",
+                    token,
+                    method="DELETE",
+                    body=[agent_role],
+                )
 
     role_path = "/admin/realms/dlnuf/roles/local-admin"
     try:
@@ -107,37 +155,8 @@ def configure(token: str) -> None:
         })
         _, local_admin_role = request_json(role_path, token)
 
-    query = urllib.parse.urlencode({"username": LOCAL_ADMIN_USERNAME, "exact": "true"})
-    _, users = request_json(f"/admin/realms/dlnuf/users?{query}", token)
-    if not isinstance(users, list):
-        raise RuntimeError("Keycloak returned an invalid local-admin user list")
-    if users:
-        admin_user = users[0]
-        admin_user["enabled"] = True
-        attrs = admin_user.get("attributes") or {}
-        attrs["administration_code"] = [LOCAL_ADMINISTRATION_CODE]
-        admin_user["attributes"] = attrs
-        request_json(f"/admin/realms/dlnuf/users/{admin_user['id']}", token, method="PUT", body=admin_user)
-    else:
-        request_json("/admin/realms/dlnuf/users", token, method="POST", body={
-            "username": LOCAL_ADMIN_USERNAME,
-            "firstName": "Administrateur local",
-            "lastName": "Passeport Demo",
-            "email": "admin-passeport-demo@example.test",
-            "enabled": True,
-            "emailVerified": True,
-            "attributes": {"administration_code": [LOCAL_ADMINISTRATION_CODE]},
-            "credentials": [{"type": "password", "value": LOCAL_ADMIN_PASSWORD, "temporary": False}],
-        })
-        _, users = request_json(f"/admin/realms/dlnuf/users?{query}", token)
-        if not isinstance(users, list) or len(users) != 1:
-            raise RuntimeError("Keycloak did not return the created local-admin account")
-        admin_user = users[0]
-
-    _, mapped_roles = request_json(f"/admin/realms/dlnuf/users/{admin_user['id']}/role-mappings/realm", token)
-    if not any(role.get("name") == "local-admin" for role in mapped_roles or []):
-        request_json(f"/admin/realms/dlnuf/users/{admin_user['id']}/role-mappings/realm",
-                     token, method="POST", body=[local_admin_role])
+    from scripts.local_administrators import ensure_local_administrators
+    ensure_local_administrators(token)
 
 
 def main() -> None:
@@ -149,9 +168,15 @@ def main() -> None:
             print("Profil et claims des comptes Keycloak de démonstration configurés.", flush=True)
             return
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as error:
+            detail = f": {error}"
+            if isinstance(error, urllib.error.HTTPError):
+                try:
+                    detail = f" HTTP {error.code}: {error.read().decode('utf-8', 'replace')}"
+                except Exception:
+                    detail = f" HTTP {error.code}: {error.reason}"
             if attempt == 60:
-                raise SystemExit(f"Configuration Keycloak impossible après 60 tentatives: {error}")
-            print(f"Keycloak pas encore prêt ({attempt}/60). Nouvelle tentative.", flush=True)
+                raise SystemExit(f"Configuration Keycloak impossible après 60 tentatives{detail}")
+            print(f"Keycloak pas encore prêt ({attempt}/60). Nouvelle tentative.{detail}", flush=True)
             time.sleep(2)
 
 

@@ -22,7 +22,7 @@ x-registry: &registry
   build:
     context: ../registres
   restart: unless-stopped
-  environment:
+  environment: &registry-env
     REFERENCE_DATE: ${REFERENCE_DATE:-}
     SIMULATED_LATENCY_MS: ${SIMULATED_LATENCY_MS:-0}
   healthcheck:
@@ -36,6 +36,7 @@ services:
   # --- Données et identité -----------------------------------------------------------
 
   postgres:
+    container_name: dlnuf-base-donnees
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -54,6 +55,7 @@ services:
       retries: 10
 
   keycloak:
+    container_name: dlnuf-identite
     image: quay.io/keycloak/keycloak:26.0.7
     command: ["start-dev", "--import-realm"]
     restart: unless-stopped
@@ -80,9 +82,8 @@ services:
         condition: service_healthy
 
   keycloak-profile-init:
-    build:
-      context: ..
-      dockerfile: demarches/Dockerfile
+    container_name: dlnuf-init-identite
+    image: dlnuf/api-demarches:local
     command: ["python", "-m", "scripts.configure_keycloak"]
     restart: "no"
     environment:
@@ -91,14 +92,17 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-dev}
       CITIZEN_DEMO_PHONE: ${TEST_PHONE_NUMBER:-}
       CITIZEN_DEMO_PHONE_VERIFIED: ${CITIZEN_DEMO_PHONE_VERIFIED:-false}
+      DEMO_AGENT_PHONE: ${DEMO_AGENT_PHONE:-70000000}
+      DEMO_PASSPORT_AGENT_PHONE: ${DEMO_PASSPORT_AGENT_PHONE:-60000000}
+      DEMO_LOCAL_ADMIN_PHONE: ${DEMO_LOCAL_ADMIN_PHONE:-50000000}
+      DEMO_ADMIN_PIN: ${DEMO_ADMIN_PIN:-1234}
     depends_on:
       keycloak:
         condition: service_started
 
   keycloak-admin-client-init:
-    build:
-      context: ..
-      dockerfile: demarches/Dockerfile
+    container_name: dlnuf-init-admin
+    image: dlnuf/api-demarches:local
     command: ["python", "-m", "scripts.configure_keycloak_admin_client"]
     profiles: ["admin-setup"]
     restart: "no"
@@ -115,38 +119,86 @@ services:
 
   # --- Registres simulés (une image, six registres) -----------------------------------
 
+  registry-db-init:
+    container_name: dlnuf-init-registres
+    image: dlnuf/initialisation-registres:local
+    build:
+      context: ../registres
+    command: ["python", "-m", "registries.common.seed_databases"]
+    restart: "no"
+    environment:
+      REGISTRY_ADMIN_DSN: postgresql://${POSTGRES_USER:-dlnuf}:${POSTGRES_PASSWORD:-dlnuf-dev}@postgres:5432/postgres
+      REGISTRY_CIVIL_PASSWORD: ${REGISTRY_CIVIL_PASSWORD:-civil-dev}
+      REGISTRY_JUSTICE_PASSWORD: ${REGISTRY_JUSTICE_PASSWORD:-justice-dev}
+      REGISTRY_TREASURY_PASSWORD: ${REGISTRY_TREASURY_PASSWORD:-treasury-dev}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   civil-registry:
+    container_name: dlnuf-registre-etat-civil
+    image: dlnuf/registre-etat-civil:local
     <<: *registry
+    environment:
+      <<: *registry-env
+      REGISTRY_DATABASE_URL: postgresql://registry_civil_owner:${REGISTRY_CIVIL_PASSWORD:-civil-dev}@postgres:5432/registry_civil
+    depends_on:
+      registry-db-init:
+        condition: service_completed_successfully
     command: ["uvicorn", "registries.civil_registry.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8101:8000"
 
   transport-registry:
+    profiles: [extended]
+    container_name: dlnuf-registre-transport
+    image: dlnuf/registre-transport:local
     <<: *registry
     command: ["uvicorn", "registries.transport_registry.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8102:8000"
 
   justice-registry:
+    container_name: dlnuf-registre-justice
+    image: dlnuf/registre-justice:local
     <<: *registry
+    environment:
+      <<: *registry-env
+      REGISTRY_DATABASE_URL: postgresql://registry_justice_owner:${REGISTRY_JUSTICE_PASSWORD:-justice-dev}@postgres:5432/registry_justice
+    depends_on:
+      registry-db-init:
+        condition: service_completed_successfully
     command: ["uvicorn", "mock_registry.justice.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8103:8000"
 
   oni-registry:
+    container_name: dlnuf-registre-cnib
+    image: dlnuf/registre-cnib:local
     <<: *registry
     command: ["uvicorn", "mock_registry.oni.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8106:8000"
 
   police-registry:
+    profiles: [extended]
+    container_name: dlnuf-registre-pertes
+    image: dlnuf/registre-pertes:local
     <<: *registry
     command: ["uvicorn", "mock_registry.police.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8104:8000"
 
   treasury-registry:
+    container_name: dlnuf-registre-tresor
+    image: dlnuf/registre-tresor:local
     <<: *registry
+    environment:
+      <<: *registry-env
+      REGISTRY_DATABASE_URL: postgresql://registry_treasury_owner:${REGISTRY_TREASURY_PASSWORD:-treasury-dev}@postgres:5432/registry_treasury
+    depends_on:
+      registry-db-init:
+        condition: service_completed_successfully
     command: ["uvicorn", "mock_registry.treasury.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8105:8000"
@@ -154,6 +206,8 @@ services:
   # --- Notifications simulées (même image) --------------------------------------------
 
   notifications:
+    container_name: dlnuf-notifications
+    image: dlnuf/notifications:local
     <<: *registry
     build:
       context: ../passerelle
@@ -170,6 +224,8 @@ services:
   # --- Applications ----------------------------------------------------------------------
 
   demarches:
+    container_name: dlnuf-api-demarches
+    image: dlnuf/api-demarches:local
     build:
       context: ..
       dockerfile: demarches/Dockerfile
@@ -186,9 +242,19 @@ services:
       REGISTRY_CONNECTOR: ${REGISTRY_CONNECTOR:-direct}
       REGISTRY_TIMEOUT_S: ${REGISTRY_TIMEOUT_S:-3}
       XROAD_CLIENT_ID: ${XROAD_CLIENT_ID:-BF/GOV/ONI/CNIB}
+      XROAD_SECURITY_SERVER_URL: ${XROAD_SECURITY_SERVER_URL:-}
+      XROAD_SYNC_ENABLED: ${XROAD_SYNC_ENABLED:-false}
+      XROAD_ADMIN_URL: ${XROAD_ADMIN_URL:-https://ss-registres:4000}
+      XROAD_ADMIN_URL_SS_REGISTRES: ${XROAD_ADMIN_URL_SS_REGISTRES:-https://ss-registres:4000}
+      XROAD_ADMIN_URL_SS_DEMANDEURS: ${XROAD_ADMIN_URL_SS_DEMANDEURS:-https://ss-demandeurs:4000}
+      XROAD_SECURITY_SERVER_URL_SS_REGISTRES: ${XROAD_SECURITY_SERVER_URL_SS_REGISTRES:-http://ss-registres:8080}
+      XROAD_SECURITY_SERVER_URL_SS_DEMANDEURS: ${XROAD_SECURITY_SERVER_URL_SS_DEMANDEURS:-http://ss-demandeurs:8080}
+      XROAD_ADMIN_USER: ${XROAD_ADMIN_USER:-xrd}
+      XROAD_ADMIN_PASSWORD: ${XROAD_ADMIN_PASSWORD:-secret}
       SMS_PROVIDER: ${SMS_PROVIDER:-simulated}
       OTP_SIMULATION_EXPOSE_CODE: ${OTP_SIMULATION_EXPOSE_CODE:-false}
       OTP_SIMULATION_SECRET: ${OTP_SIMULATION_SECRET:-}
+      PHONE_REGISTRATION_SECRET: ${PHONE_REGISTRATION_SECRET:-}
       INFOBIP_OTP_API_KEY: ${INFOBIP_OTP_API_KEY:-}
       INFOBIP_SMS_API_KEY: ${INFOBIP_SMS_API_KEY:-}
       INFOBIP_BASE_URL: ${INFOBIP_BASE_URL:-}
@@ -213,9 +279,13 @@ services:
         condition: service_started
       keycloak-profile-init:
         condition: service_completed_successfully
+      registry-db-init:
+        condition: service_completed_successfully
       civil-registry:
         condition: service_healthy
       justice-registry:
+        condition: service_healthy
+      treasury-registry:
         condition: service_healthy
       oni-registry:
         condition: service_healthy
@@ -224,6 +294,8 @@ services:
   # Applications Next.js : connexion Keycloak et relais vers l'API démarches côté serveur.
 
   espace-usager:
+    container_name: dlnuf-portail-citoyen
+    image: dlnuf/portail-citoyen:local
     build:
       context: ../espace-usager
     restart: unless-stopped
@@ -245,6 +317,8 @@ services:
         condition: service_healthy
 
   guichet-agent:
+    container_name: dlnuf-guichet-agent
+    image: dlnuf/guichet-agent:local
     build:
       context: ../guichet-agent
     restart: unless-stopped
@@ -253,6 +327,25 @@ services:
       - "3001:3001"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3001/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    depends_on:
+      demarches:
+        condition: service_healthy
+
+  administration:
+    container_name: dlnuf-console-administration
+    image: dlnuf/console-administration:local
+    build:
+      context: ../administration
+    restart: unless-stopped
+    environment: *interface-env
+    ports:
+      - "3002:3002"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3002/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 6

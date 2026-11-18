@@ -13,6 +13,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from connectors.administrations import load_administrations
 
 from app.database.connection import get_db
 from app.database.models import (
@@ -80,6 +81,10 @@ QUESTION_IDENTIFIER_TYPES = {
     "passport_fiscal_stamp_paid": "payment_reference",
     "loss_declared": "loss_report_number",
 }
+DOCUMENT_IDENTIFIER_TYPES = {
+    "cnib": "cnib_number", "birth": "birth_act_number", "nationality": "nationality_reference",
+    "criminal": "criminal_record_number", "payment": "payment_reference", "loss": "loss_report_number",
+}
 
 
 class DocumentIdentifierInput(BaseModel):
@@ -128,7 +133,7 @@ class CaseCreate(BaseModel):
     @model_validator(mode="after")
     def _requires_citizen_locator(self):
         if not self.subject_ref and self.citizen_identifier is None and not self.registry_identifiers and not self.phone_number:
-            raise ValueError("une référence de citoyen ou de document est requise")
+            return self
         if self.subject_ref and self.citizen_identifier is not None:
             raise ValueError("Fournir subject_ref ou citizen_identifier, pas les deux")
         types = [item.identifier_type for item in self.registry_identifiers]
@@ -358,6 +363,26 @@ def _serialize_check(db: Session, request: RegistryRequest) -> dict:
     }
 
 
+def _case_identifier_status(db: Session, case: Case) -> dict | None:
+    consent = db.scalar(select(Consent).where(Consent.case_id == case.id).order_by(Consent.created_at.desc()))
+    if not consent or consent.status != "granted" or (consent.expires_at and _utc(consent.expires_at) <= datetime.now(timezone.utc)):
+        return None
+    scope = set(db.scalars(select(ConsentQuestion.question_id).where(ConsentQuestion.consent_id == consent.id)))
+    if not scope:
+        return None
+    saved = set(db.scalars(select(CitizenDocumentIdentifier.identifier_type).where(CitizenDocumentIdentifier.subject_ref == case.subject_ref)))
+    missing = {}
+    for request in db.scalars(select(RegistryRequest).where(RegistryRequest.case_id == case.id)):
+        if request.question_id not in scope:
+            continue
+        document = _serialize_check(db, request)["document"]
+        identifier_type = DOCUMENT_IDENTIFIER_TYPES.get(document["key"])
+        if request.lookup_identifier_ciphertext or identifier_type in saved or request.status in {"confirmed", "rejected", "not_found", "ambiguous"} or case.subject_ref.startswith("ACTE:"):
+            continue
+        missing[document["key"]] = document
+    return {"complete": not missing, "missing": list(missing.values())}
+
+
 def _serialize_case(db: Session, case: Case) -> dict:
     procedure = db.get(Procedure, case.procedure_id)
     administration = db.get(Administration, case.requester_administration_id)
@@ -375,7 +400,13 @@ def _serialize_case(db: Session, case: Case) -> dict:
         "procedureCode": procedure.code,
         "createdAt": created_at.isoformat() if created_at else None,
         "applicantName": case.applicant_name,
-        "phone": identity_link.phone_number if identity_link else "",
+        "phone": (
+            identity_link.phone_number
+            if identity_link
+            else case.subject_ref.removeprefix("PHONE:")
+            if case.subject_ref.startswith("PHONE:")
+            else ""
+        ),
         "procedureTitle": procedure.title,
         "procedurePurpose": procedure.purpose,
         "procedureVersion": procedure.config_version,
@@ -386,6 +417,7 @@ def _serialize_case(db: Session, case: Case) -> dict:
         "status": status_value,
         "consent_channel": case.consent_channel,
         "checks": [_serialize_check(db, item) for item in checks],
+        "identifierStatus": _case_identifier_status(db, case),
         "created_at": created_at,
     }
 
@@ -506,7 +538,7 @@ def _find_identifier(db: Session, identifier: DocumentIdentifierInput) -> Citize
 
 
 def _citizen_reference_for_case(
-    db: Session, principal: Principal, body: CaseCreate
+    db: Session, principal: Principal, body: CaseCreate, allowed_identifier_types: set[str] | None = None
 ) -> tuple[str, dict[str, str]]:
     locator = body.citizen_identifier
     if locator is None and not body.subject_ref:
@@ -518,7 +550,7 @@ def _citizen_reference_for_case(
                 select(CitizenIdentityLink).where(CitizenIdentityLink.phone_number == phone_number)
             ).all()
             if not phone_links:
-                raise HTTPException(status_code=404, detail="Aucun compte citoyen n’est rattaché à ce numéro")
+                return f"PHONE:{phone_number}", {}
             if len(phone_links) > 1:
                 raise HTTPException(status_code=409, detail="Ce numéro est lié à plusieurs comptes citoyens")
             subject_ref = phone_links[0].subject_ref
@@ -549,13 +581,16 @@ def _citizen_reference_for_case(
     else:
         subject_ref = body.subject_ref.strip().upper()
 
-    saved = db.scalars(
-        select(CitizenDocumentIdentifier).where(CitizenDocumentIdentifier.subject_ref == subject_ref)
-    ).all()
+    saved_query = select(CitizenDocumentIdentifier).where(CitizenDocumentIdentifier.subject_ref == subject_ref)
+    if allowed_identifier_types is not None:
+        saved_query = saved_query.where(CitizenDocumentIdentifier.identifier_type.in_(allowed_identifier_types))
+    saved = db.scalars(saved_query).all()
     by_type = {item.identifier_type: item for item in saved}
     requested = {item.identifier_type: item for item in body.registry_identifiers}
     selected: dict[str, str] = {}
     for identifier_type, item in requested.items():
+        if allowed_identifier_types is not None and identifier_type not in allowed_identifier_types:
+            raise HTTPException(status_code=422, detail="Une référence transmise n’est pas nécessaire à cette démarche")
         try:
             record = _find_identifier(db, item)
         except IdentifierVaultError as error:
@@ -581,6 +616,14 @@ def _normalize_burkina_phone(phone: str) -> str | None:
     return normalized if re.fullmatch(r"\+[1-9][0-9]{7,14}", normalized) else None
 
 
+def _citizen_matches_case(principal: Principal, subject_ref: str) -> bool:
+    if principal.citizen_ref == subject_ref:
+        return True
+    if subject_ref.startswith("PHONE:+") and principal.phone_number:
+        return principal.phone_number == subject_ref.removeprefix("PHONE:")
+    return False
+
+
 def _mask_phone(phone: str) -> str:
     return f"{phone[:5]}{'*' * max(0, len(phone) - 7)}{phone[-2:]}"
 
@@ -590,7 +633,8 @@ def _authorize_case_access(case: Case, db: Session, principal: Principal) -> Non
         administration = db.get(Administration, case.requester_administration_id)
         if administration and principal.administration_code == administration.code:
             return
-    if "citizen" in principal.roles and principal.citizen_ref == case.subject_ref:
+        raise HTTPException(status_code=403, detail="Ce dossier appartient à une autre administration")
+    if "citizen" in principal.roles and _citizen_matches_case(principal, case.subject_ref):
         return
     raise HTTPException(status_code=403, detail="Accès interdit à ce dossier")
 
@@ -600,9 +644,17 @@ def list_procedures(
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
-    procedures = db.scalars(select(Procedure).where(
-        Procedure.active.is_(True), Procedure.published.is_(True)
-    )).all()
+    query = select(Procedure).where(
+        Procedure.active.is_(True), Procedure.published.is_(True),
+        Procedure.owner_administration_id.in_(select(Administration.id).where(
+            Administration.active.is_(True), Administration.code.in_(list(load_administrations()))))
+    )
+    if principal.roles.intersection({"agent", "local-admin"}):
+        owner = db.scalar(select(Administration).where(Administration.code == principal.administration_code, Administration.active.is_(True)))
+        if owner is None:
+            raise HTTPException(status_code=403, detail="Votre compte n’est rattaché à aucune administration active")
+        query = query.where(Procedure.owner_administration_id == owner.id)
+    procedures = db.scalars(query).all()
     result = []
     for procedure in procedures:
         links = db.scalars(
@@ -611,6 +663,8 @@ def list_procedures(
             .order_by(ProcedureQuestion.position)
         ).all()
         result.append({
+            "administration": {"code": db.get(Administration, procedure.owner_administration_id).code,
+                               "name": db.get(Administration, procedure.owner_administration_id).name},
             "code": procedure.code,
             "title": procedure.title,
             "purpose": procedure.purpose,
@@ -985,9 +1039,16 @@ def list_cases(
             raise HTTPException(status_code=403, detail="Administration agent inconnue ou inactive")
         query = query.where(Case.requester_administration_id == administration.id)
     elif "citizen" in principal.roles:
-        if not principal.citizen_ref:
-            raise HTTPException(status_code=403, detail="Jeton citoyen sans référence citoyen")
-        query = query.where(Case.subject_ref == principal.citizen_ref)
+        phone_subject = f"PHONE:{principal.phone_number}" if principal.phone_number else None
+        if principal.citizen_ref:
+            if phone_subject:
+                query = query.where(or_(Case.subject_ref == principal.citizen_ref, Case.subject_ref == phone_subject))
+            else:
+                query = query.where(Case.subject_ref == principal.citizen_ref)
+        elif phone_subject:
+            query = query.where(Case.subject_ref == phone_subject)
+        else:
+            raise HTTPException(status_code=403, detail="Jeton citoyen sans référence ni numéro")
     else:
         raise HTTPException(status_code=403, detail="Rôle insuffisant pour consulter les dossiers")
     cases = db.scalars(query.order_by(Case.created_at.desc()).limit(limit)).all()
@@ -998,7 +1059,7 @@ def _add_registry_requests(db: Session, case: Case, links: list[ProcedureQuestio
     """Une demande par vérification de la démarche, avec la référence de pièce chiffrée s'il y en a une."""
     for link in links:
         question = db.get(Question, link.question_id)
-        identifier_type = QUESTION_IDENTIFIER_TYPES.get(question.code)
+        identifier_type = DOCUMENT_IDENTIFIER_TYPES.get(link.document_type) or QUESTION_IDENTIFIER_TYPES.get(question.code)
         identifier_value = submitted_identifiers.get(identifier_type) if identifier_type else None
         try:
             encrypted_identifier = encrypt_identifier(identifier_value) if identifier_value else None
@@ -1033,13 +1094,19 @@ def create_case(
     links = db.scalars(select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == procedure.id)).all()
     if not links:
         raise HTTPException(status_code=409, detail="La démarche ne contient aucune vérification")
-    subject_ref, submitted_identifiers = _citizen_reference_for_case(db, principal, body)
+    needed_types = {
+        DOCUMENT_IDENTIFIER_TYPES.get(link.document_type) or QUESTION_IDENTIFIER_TYPES.get(db.get(Question, link.question_id).code)
+        for link in links
+    } - {None}
+    subject_ref, submitted_identifiers = _citizen_reference_for_case(db, principal, body, needed_types)
     if body.phone_number is not None:
         contact_phone = _normalize_burkina_phone(body.phone_number)
         identity_link = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.subject_ref == subject_ref))
         if contact_phone is None:
             raise HTTPException(status_code=422, detail="Le numéro de téléphone doit être international ou contenir 8 chiffres BF")
-        if identity_link is None or contact_phone != identity_link.phone_number:
+        if subject_ref.startswith("PHONE:"):
+            pass
+        elif identity_link is None or contact_phone != identity_link.phone_number:
             raise HTTPException(status_code=409, detail="Le numéro ne correspond pas au contact rattaché au compte citoyen")
     case = Case(procedure_id=procedure.id, requester_administration_id=requester.id,
                 subject_ref=subject_ref, applicant_name=body.applicant_name.strip() or "Citoyen",
@@ -1104,7 +1171,13 @@ def request_assisted_consent_otp(
         raise HTTPException(status_code=409, detail="Ce dossier attend un accord sur l’espace citoyen")
 
     identity_link = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.subject_ref == case.subject_ref))
-    if identity_link is None or not re.fullmatch(r"\+[1-9][0-9]{7,14}", identity_link.phone_number):
+    if identity_link is not None:
+        consent_phone = identity_link.phone_number
+    elif case.subject_ref.startswith("PHONE:+"):
+        consent_phone = case.subject_ref.removeprefix("PHONE:")
+    else:
+        raise HTTPException(status_code=422, detail="Aucun numéro international n’est rattaché au citoyen")
+    if not re.fullmatch(r"\+[1-9][0-9]{7,14}", consent_phone):
         raise HTTPException(status_code=422, detail="Aucun numéro international n’est rattaché au citoyen")
 
     now = datetime.now(timezone.utc)
@@ -1132,7 +1205,7 @@ def request_assisted_consent_otp(
     )
     if active_challenge and _utc(active_challenge.expires_at) > now:
         if not body.resend:
-            return _serialize_consent_challenge(active_challenge, identity_link.phone_number)
+            return _serialize_consent_challenge(active_challenge, consent_phone)
         if _utc(active_challenge.resend_after) > now:
             raise HTTPException(status_code=429, detail="Attendez avant de renvoyer un code")
     if active_challenge:
@@ -1162,12 +1235,12 @@ def request_assisted_consent_otp(
     else:
         try:
             otp_provider = InfobipOtpProvider.from_environment()
-            if _normalize_burkina_phone(otp_provider.settings.test_phone_number) != identity_link.phone_number:
+            if _normalize_burkina_phone(otp_provider.settings.test_phone_number) != consent_phone:
                 raise HTTPException(
                     status_code=409,
                     detail="Le numéro de test Infobip ne correspond pas au numéro du citoyen; aucun code n’a été envoyé.",
                 )
-            result = otp_provider.send_pin("consent", identity_link.phone_number)
+            result = otp_provider.send_pin("consent", consent_phone)
             provider_pin_id = result.pin_id
         except (SmsConfigurationError, SmsDeliveryError) as error:
             logger.warning("Consent OTP SMS failed: %s", getattr(error, "safe_code", str(error)))
@@ -1198,7 +1271,7 @@ def request_assisted_consent_otp(
     )
     db.commit()
     db.refresh(challenge)
-    return _serialize_consent_challenge(challenge, identity_link.phone_number)
+    return _serialize_consent_challenge(challenge, consent_phone)
 
 
 @router.post("/cases/{case_id}/consent/request")
@@ -1224,6 +1297,7 @@ def change_consent_channel(
 
     if body.consent_channel == case.consent_channel:
         return _serialize_case(db, case)
+
 
     now = datetime.now(timezone.utc)
     active_challenges = db.scalars(
@@ -1482,15 +1556,10 @@ def record_consent(
     db: Session = Depends(get_db),
 ):
     case = _case_or_404(db, case_id)
-    if principal.citizen_ref != case.subject_ref:
+    if not _citizen_matches_case(principal, case.subject_ref):
         raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut répondre au consentement")
     if body.channel != case.consent_channel:
         raise HTTPException(status_code=409, detail="Le canal ne correspond plus au parcours de consentement du dossier")
-    if case.consent_channel == "assisted" and body.decision == "granted":
-        raise HTTPException(
-            status_code=409,
-            detail="Ce dossier attend le code SMS du parcours assisté; le consentement direct sur le portail est désactivé.",
-        )
     links = db.scalars(select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == case.procedure_id)).all()
     allowed = {db.get(Question, link.question_id).code: link.question_id for link in links}
     if len(set(body.question_codes)) != len(body.question_codes) or not set(body.question_codes) <= allowed.keys():
@@ -1541,7 +1610,7 @@ def revoke_consent(
     db: Session = Depends(get_db),
 ):
     case = _case_or_404(db, case_id)
-    if principal.citizen_ref != case.subject_ref:
+    if not _citizen_matches_case(principal, case.subject_ref):
         raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut révoquer son consentement")
     consent = db.scalar(select(Consent).where(Consent.case_id == case.id)
                         .order_by(Consent.created_at.desc()))
@@ -1568,6 +1637,60 @@ def execute_checks(
     return _run_checks(case, db)
 
 
+class CaseReferencesInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    references: dict[str, str]
+
+
+@router.patch("/cases/{case_id}/identifiers")
+def complete_case_identifiers(case_id: UUID, body: CaseReferencesInput,
+                              principal: Principal = Depends(require_any_role("agent", "local-admin", "citizen")),
+                              db: Session = Depends(get_db)):
+    case = _case_or_404(db, case_id)
+    _authorize_case_access(case, db, principal)
+    status = _case_identifier_status(db, case)
+    if status is None:
+        raise HTTPException(status_code=403, detail="L’accord actif du citoyen est nécessaire avant de compléter les références")
+    if case.status in {"completed", "cancelled", "rejected"}:
+        raise HTTPException(status_code=409, detail="Ce dossier est clôturé")
+    missing_keys = {item["key"] for item in status["missing"]}
+    if not body.references or set(body.references) - missing_keys:
+        raise HTTPException(status_code=422, detail="Renseignez uniquement les références manquantes de cette démarche")
+    identity = db.scalar(select(CitizenIdentityLink).where(CitizenIdentityLink.subject_ref == case.subject_ref))
+    phone = identity.phone_number if identity else (
+        case.subject_ref.removeprefix("PHONE:")
+        if case.subject_ref.startswith("PHONE:")
+        else principal.phone_number
+    )
+    if not phone:
+        raise HTTPException(status_code=409, detail="Le numéro du dossier est requis pour compléter les références")
+    try:
+        request_body = CaseCreate.model_validate({"procedure_code": db.get(Procedure, case.procedure_id).code,
+            "subject_ref": case.subject_ref, "phone": phone, "references": body.references})
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Une référence est invalide. Utilisez la référence inscrite sur le document.") from error
+    _, selected = _citizen_reference_for_case(db, principal, request_body, {DOCUMENT_IDENTIFIER_TYPES[key] for key in missing_keys})
+    consent = db.scalar(select(Consent).where(Consent.case_id == case.id).order_by(Consent.created_at.desc()))
+    scope = set(db.scalars(select(ConsentQuestion.question_id).where(ConsentQuestion.consent_id == consent.id)))
+    for request in db.scalars(select(RegistryRequest).where(RegistryRequest.case_id == case.id)):
+        if request.question_id not in scope or request.status in {"confirmed", "rejected", "not_found", "ambiguous"}:
+            continue
+        document = _serialize_check(db, request)["document"]
+        if document["key"] not in body.references:
+            continue
+        identifier_type = DOCUMENT_IDENTIFIER_TYPES[document["key"]]
+        request.lookup_identifier_type = identifier_type
+        try:
+            request.lookup_identifier_ciphertext = encrypt_identifier(selected[identifier_type])
+        except IdentifierVaultError as error:
+            raise HTTPException(status_code=503, detail="Le chiffrement des références n’est pas configuré") from error
+        if request.status == "blocked":
+            request.status = "queued"
+    _add_event(db, case, "case_identifiers_completed", "Références nécessaires au dossier complétées", actor_type="agent", actor_ref=principal.subject)
+    db.commit()
+    return _serialize_case(db, case)
+
+
 def _run_checks(case: Case, db: Session) -> dict:
     """Vérifications d'un dossier : accord du citoyen, droits d'échange, registres, journal.
 
@@ -1590,9 +1713,20 @@ def _run_checks(case: Case, db: Session) -> dict:
         db.commit()
         raise HTTPException(status_code=403, detail="Consentement citoyen actif requis")
 
+    identifier_status = _case_identifier_status(db, case)
+    if identifier_status and not identifier_status["complete"]:
+        raise HTTPException(status_code=409, detail="Complétez les références manquantes avant de lancer les vérifications")
     from connectors import build_connector
 
-    connector = build_connector()
+    requester = db.get(Administration, case.requester_administration_id)
+    if requester is None or not requester.active:
+        raise HTTPException(status_code=403, detail="Administration demandeuse inactive ou inconnue")
+    registry_routes = dict(db.execute(
+        select(Administration.code, Registry.base_url)
+        .join(Registry, Registry.administration_id == Administration.id)
+        .where(Registry.active.is_(True), Administration.active.is_(True), Registry.base_url.is_not(None))
+    ).all())
+    connector = build_connector(administration_code=requester.code, registry_routes=registry_routes)
     stale_request_before = now - timedelta(seconds=REQUEST_LEASE_SECONDS)
     for request in requests:
         if request.status in {"confirmed", "rejected", "not_found", "ambiguous"}:
@@ -1612,7 +1746,7 @@ def _run_checks(case: Case, db: Session) -> dict:
             _add_event(db, case, "check_blocked", "consentement ou autorisation absent", outcome="blocked", question=question)
             continue
         if not request.lookup_identifier_ciphertext and case.subject_ref.startswith("CITIZEN:"):
-            identifier_type = QUESTION_IDENTIFIER_TYPES.get(question.code)
+            identifier_type = DOCUMENT_IDENTIFIER_TYPES.get(link.document_type) or QUESTION_IDENTIFIER_TYPES.get(question.code)
             if identifier_type:
                 saved_identifier = db.scalar(select(CitizenDocumentIdentifier).where(
                     CitizenDocumentIdentifier.subject_ref == case.subject_ref,
@@ -1733,6 +1867,13 @@ class CitizenCaseCreate(BaseModel):
     confirmed: bool
 
 
+@router.get("/citizen/administrations")
+def citizen_administrations(principal: Principal = Depends(require_role("citizen")), db: Session = Depends(get_db)):
+    return [{"code": item.code, "name": item.name} for item in db.scalars(
+        select(Administration).where(Administration.active.is_(True),
+                                     Administration.code.in_(list(load_administrations()))).order_by(Administration.name))]
+
+
 @router.post("/citizen/cases", status_code=status.HTTP_201_CREATED)
 def start_citizen_case(
     body: CitizenCaseCreate,
@@ -1746,8 +1887,8 @@ def start_citizen_case(
     """
     if not body.confirmed:
         raise HTTPException(status_code=422, detail="Confirmez que vous autorisez les vérifications de cette démarche")
-    if not principal.citizen_ref or not principal.citizen_ref.startswith("ACTE:"):
-        raise HTTPException(status_code=403, detail="Rattachez d’abord votre compte à votre acte de naissance")
+    if not principal.citizen_ref:
+        raise HTTPException(status_code=403, detail="Votre compte citoyen doit être identifié avant d’ouvrir une démarche")
     procedure = db.scalar(select(Procedure).where(
         Procedure.code == body.procedure_code,
         Procedure.active.is_(True),
@@ -1761,7 +1902,8 @@ def start_citizen_case(
     if not links:
         raise HTTPException(status_code=409, detail="La démarche ne contient aucune vérification")
     _, submitted_identifiers = _citizen_reference_for_case(
-        db, principal, CaseCreate(procedure_code=procedure.code, subject_ref=principal.citizen_ref)
+        db, principal, CaseCreate(procedure_code=procedure.code, subject_ref=principal.citizen_ref),
+        {DOCUMENT_IDENTIFIER_TYPES.get(link.document_type) or QUESTION_IDENTIFIER_TYPES.get(db.get(Question, link.question_id).code) for link in links} - {None}
     )
     case = Case(procedure_id=procedure.id, requester_administration_id=requester.id,
                 subject_ref=principal.citizen_ref, applicant_name=(principal.display_name or "Citoyen")[:100],
@@ -1779,7 +1921,9 @@ def start_citizen_case(
         db,
     )
     db.refresh(case)
-    _run_checks(case, db)
+    identifier_status = _case_identifier_status(db, case)
+    if identifier_status and identifier_status["complete"]:
+        _run_checks(case, db)
     db.refresh(case)
     return _serialize_case(db, case)
 
@@ -1830,7 +1974,7 @@ def report_consultation(
     n'est conservé.
     """
     case = _case_or_404(db, case_id)
-    if principal.citizen_ref != case.subject_ref:
+    if not _citizen_matches_case(principal, case.subject_ref):
         raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut signaler une consultation")
     reported = db.get(AuditEvent, event_id)
     if reported is None or reported.case_id != case.id:

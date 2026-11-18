@@ -47,9 +47,7 @@ Deux Security Servers au lieu d'un par administration : c'est ce qui tient en m�
 |---|---|---|
 | `BF/GOV/CENTRALE/MANAGEMENT` | `ss-registres` | Services de gestion du réseau |
 | `BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL` | `ss-registres` | `identity`, `identity-match`, `is-adult` |
-| `BF/GOV/TRANSPORT/PERMIS` | `ss-registres` | `driving-licence` |
 | `BF/GOV/JUSTICE/REGISTRES` | `ss-registres` | `nationality`, `criminal-record` |
-| `BF/GOV/POLICE/PERTES` | `ss-registres` | `loss-declaration` |
 | `BF/GOV/TRESOR/PAIEMENTS` | `ss-registres` | `payment-status` |
 | `BF/GOV/ONI/CNIB` | `ss-demandeurs` | Demandeur : démarche CNIB |
 | `BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT` | `ss-demandeurs` | Demandeur : démarche « prise de service » du guide |
@@ -60,7 +58,7 @@ Chaque service REST pointe vers `POST /services/{service}` du registre simulé c
 
 | Demandeur | Services autorisés |
 |---|---|
-| `BF/GOV/ONI/CNIB` | `identity`, `identity-match`, `is-adult`, `nationality`, `loss-declaration`, `payment-status` |
+| `BF/GOV/ONI/CNIB` | `identity`, `identity-match`, `is-adult`, `nationality`, `payment-status` |
 | `BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT` | `is-adult`, `nationality`, `criminal-record` |
 
 Tout autre appel est refusé par X-Road, avant même d'atteindre le registre. Par exemple, l'ONI qui demande le casier judiciaire : X-Road renvoie `server.serverproxy.access_denied`, que le connecteur traduit en `refused`. Les droits se modifient dans `CONSUMERS`, en haut du script, puis on relance `docker compose --profile xroad run --rm xroad-setup`.

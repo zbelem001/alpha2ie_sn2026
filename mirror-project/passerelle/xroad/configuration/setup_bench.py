@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from connectors.administrations import load_administrations
 
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
@@ -52,64 +53,15 @@ MEMBERS = {
     "ONI": "Office national d'identification",
     "FONCTION-PUBLIQUE": "Ministère de la Fonction publique",
     "MAIRIE-OUAGA": "Mairie de Ouagadougou",
-    "TRANSPORT": "Direction générale des transports",
     "JUSTICE": "Ministère de la Justice",
-    "POLICE": "Police nationale",
     "TRESOR": "Trésor public",
+    "DIPF": "Direction de l’immigration et de la police des frontières",
 }
 
 MANAGEMENT_SUBSYSTEM = ("CENTRALE", "MANAGEMENT")
 
 
-@dataclass(frozen=True)
-class Provider:
-    member: str
-    subsystem: str
-    base_url: str
-    services: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class Consumer:
-    member: str
-    subsystem: str
-    # (membre fournisseur, sous-système, service) autorisés : les « conventions » du banc.
-    allowed: tuple[tuple[str, str, str], ...]
-
-
-PROVIDERS = (
-    Provider("MAIRIE-OUAGA", "ETAT-CIVIL", "http://civil-registry:8000", ("identity", "identity-match", "is-adult")),
-    Provider("TRANSPORT", "PERMIS", "http://transport-registry:8000", ("driving-licence",)),
-    Provider("JUSTICE", "REGISTRES", "http://justice-registry:8000", ("nationality", "criminal-record")),
-    Provider("POLICE", "PERTES", "http://police-registry:8000", ("loss-declaration",)),
-    Provider("TRESOR", "PAIEMENTS", "http://treasury-registry:8000", ("payment-status",)),
-)
-
-CONSUMERS = (
-    # Démarche CNIB : ni casier, ni permis.
-    Consumer(
-        "ONI",
-        "CNIB",
-        (
-            ("MAIRIE-OUAGA", "ETAT-CIVIL", "identity"),
-            ("MAIRIE-OUAGA", "ETAT-CIVIL", "identity-match"),
-            ("MAIRIE-OUAGA", "ETAT-CIVIL", "is-adult"),
-            ("JUSTICE", "REGISTRES", "nationality"),
-            ("POLICE", "PERTES", "loss-declaration"),
-            ("TRESOR", "PAIEMENTS", "payment-status"),
-        ),
-    ),
-    # Démarche « prise de service » du guide : majorité, nationalité, casier.
-    Consumer(
-        "FONCTION-PUBLIQUE",
-        "RECRUTEMENT",
-        (
-            ("MAIRIE-OUAGA", "ETAT-CIVIL", "is-adult"),
-            ("JUSTICE", "REGISTRES", "nationality"),
-            ("JUSTICE", "REGISTRES", "criminal-record"),
-        ),
-    ),
-)
+ADMINISTRATIONS = tuple(load_administrations().values())
 
 
 @dataclass(frozen=True)
@@ -125,13 +77,13 @@ SECURITY_SERVERS = (
         host="ss-registres",
         code="SS-REGISTRES",
         owner="CENTRALE",
-        clients=tuple((p.member, p.subsystem) for p in PROVIDERS),
+        clients=tuple((a.member, a.subsystem) for a in ADMINISTRATIONS if a.server == "ss-registres"),
     ),
     SecurityServerSpec(
         host="ss-demandeurs",
         code="SS-DEMANDEURS",
         owner="ONI",
-        clients=tuple((c.member, c.subsystem) for c in CONSUMERS),
+        clients=tuple((a.member, a.subsystem) for a in ADMINISTRATIONS if a.server == "ss-demandeurs"),
     ),
 )
 
@@ -590,9 +542,11 @@ def register_clients(cs: Api, ss: Api, spec: SecurityServerSpec) -> None:
             log(f"   {client} déjà enregistré")
 
 
-def publish_services(ss: Api) -> None:
+def publish_services(host: str, ss: Api) -> None:
     log("5. Services REST des registres simulés")
-    for provider in PROVIDERS:
+    for provider in ADMINISTRATIONS:
+        if provider.server != host or not provider.services:
+            continue
         client = subsystem_id(provider.member, provider.subsystem)
         published = {
             service["service_code"]
@@ -610,11 +564,13 @@ def publish_services(ss: Api) -> None:
             log(f"   {client}/{code} publié")
 
 
-def grant_access(ss: Api) -> None:
+def grant_access(servers: dict) -> None:
     log("6. Droits d'accès (conventions du banc)")
-    for consumer in CONSUMERS:
+    for consumer in ADMINISTRATIONS:
         consumer_id = subsystem_id(consumer.member, consumer.subsystem)
         for member, subsystem, code in consumer.allowed:
+            connection = next(a for a in ADMINISTRATIONS if a.member == member and a.subsystem == subsystem)
+            ss = servers[connection.server][1]
             provider = subsystem_id(member, subsystem)
             path = f"/api/v1/clients/{provider}/service-clients/{consumer_id}/access-rights"
 
@@ -668,8 +624,9 @@ def main() -> int:
         setup_management_services(cs, registres, registres_spec)
         for spec, ss in servers.values():
             register_clients(cs, ss, spec)
-        publish_services(registres)
-        grant_access(registres)
+        for spec, ss in servers.values():
+            publish_services(spec.host, ss)
+        grant_access(servers)
         smoke_test()
     except ApiError as exc:
         log(f"ÉCHEC : {exc}")

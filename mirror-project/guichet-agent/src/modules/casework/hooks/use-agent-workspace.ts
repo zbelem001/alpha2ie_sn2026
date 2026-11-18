@@ -100,10 +100,17 @@ export function useAgentWorkspace() {
     if (!selectedId) return;
     await task("channel", async () => { await agentCaseService.requestConsent(selectedId, channel); setChallenge(null); });
   }
+  async function saveIdentifiers(references: DocumentReferences) {
+    if (!selectedId) return;
+    await task("identifiers", async () => {
+      await agentCaseService.saveIdentifiers(selectedId, references);
+      await agentCaseService.runChecks(selectedId);
+    });
+  }
   async function runChecks() {
     if (!selectedId) return;
     await task("checks", async () => { await agentCaseService.runChecks(selectedId); });
   }
   return { cases, procedures, view, loading, busy, error, expired, challenge, selectedSection, selected: cases.find((item) => item.id === selectedId),
-    showList, showNew, openCase, create, sendCode, verifyCode, changeChannel, runChecks };
+    showList, showNew, openCase, create, sendCode, verifyCode, changeChannel, saveIdentifiers, runChecks };
 }

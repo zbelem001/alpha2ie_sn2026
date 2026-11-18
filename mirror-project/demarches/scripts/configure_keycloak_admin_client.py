@@ -67,7 +67,7 @@ def provision() -> None:
         management_clients.raise_for_status()
         management_id = management_clients.json()[0]["id"]
         roles = []
-        for role_name in ("manage-users",):
+        for role_name in ("manage-users", "view-realm"):
             role_response = client.get(f"/admin/realms/{REALM}/clients/{management_id}/roles/{role_name}")
             role_response.raise_for_status()
             roles.append(role_response.json())

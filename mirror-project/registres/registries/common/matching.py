@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,9 @@ Record = dict[str, Any]
 
 
 def load_records(path: Path) -> list[Record]:
+    if os.getenv("REGISTRY_DATABASE_URL"):
+        from .database import DatabaseRecords
+        return DatabaseRecords(os.environ["REGISTRY_DATABASE_URL"])
     with path.open(encoding="utf-8") as handle:
         return json.load(handle)
 

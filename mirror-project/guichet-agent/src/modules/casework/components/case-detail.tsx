@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { CheckCircle2, Clock3, Flag, Send, ShieldCheck } from "lucide-react";
+import { CaseIdentifiersPanel } from "./case-identifiers-panel";
+import type { DocumentReferences } from "@/lib/document-references";
 import { CaseStatusBadge } from "@/modules/casework/components/case-status";
 import type { AgentCase, AssistedChallenge, CheckStatus, ConsentChannel } from "@/modules/casework/types/cases";
 import { useBrowserClock } from "@/lib/use-browser-clock";
@@ -9,12 +11,12 @@ import { consentIsActive, formatPhone } from "@/lib/journal";
 import styles from "@/modules/casework/styles/workspace.module.css";
 
 const checkLabels: Record<CheckStatus, string> = { queued: "Non lancé", confirmed: "Oui", rejected: "Non", ambiguous: "Identité ambiguë", not_found: "Introuvable", unavailable: "Indisponible", blocked: "Accès bloqué", error: "À reprendre" };
-const CITIZEN_SPACE_URL = process.env.NEXT_PUBLIC_CITIZEN_SPACE_URL ?? "http://localhost:3000";
 
-export function CaseDetail({ item, challenge, busy, focusSection, onSendCode, onVerifyCode, onChangeChannel, onRunChecks }: {
+export function CaseDetail({ item, challenge, busy, focusSection, onSendCode, onVerifyCode, onChangeChannel, onRunChecks, onSaveIdentifiers }: {
   item: AgentCase; challenge: AssistedChallenge | null; busy: string;
   focusSection?: "consent" | "checks";
   onSendCode: (resend?: boolean) => Promise<void>; onVerifyCode: (code: string) => Promise<void>;
+  onSaveIdentifiers: (references: DocumentReferences) => Promise<void>;
   onChangeChannel: (channel: ConsentChannel) => Promise<void>; onRunChecks: () => Promise<void>;
 }) {
   const [code, setCode] = useState("");
@@ -30,7 +32,7 @@ export function CaseDetail({ item, challenge, busy, focusSection, onSendCode, on
   const consentEnded = now > 0 && (consent.status === "revoked" || (consent.status === "granted" && !consentGranted));
   const resendIn = challenge ? Math.max(0, Math.ceil((challenge.resendAt - (now || challenge.resendAt - 30_000)) / 1000)) : 0;
   const hasUnavailable = item.checks.some((check) => check.status === "unavailable");
-  const canRun = consentGranted && item.status !== "completed" && item.checks.some((check) => ["queued", "unavailable", "error", "blocked"].includes(check.status));
+  const canRun = consentGranted && item.identifierStatus?.complete === true && item.status !== "completed" && item.checks.some((check) => ["queued", "unavailable", "error", "blocked"].includes(check.status));
   async function submit(e: FormEvent) { e.preventDefault(); if (!busy) await onVerifyCode(code); }
   const reportDate = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "long", year: "numeric", timeZone: "Africa/Ouagadougou" });
 
@@ -46,6 +48,7 @@ export function CaseDetail({ item, challenge, busy, focusSection, onSendCode, on
           : `Le ${reportDate.format(new Date(report.occurredAt))}, le citoyen demande une correction pour « ${label} » : à transmettre à ${check?.registry ?? "l’administration source"}.`}</li>;
       })}</ul>
     </section>}
+    {consentGranted && <CaseIdentifiersPanel item={item} busy={Boolean(busy)} onSave={onSaveIdentifiers} />}
     <div className={styles.detailGrid}>
       <section className={styles.consentPanel} aria-labelledby="consent-title">
         <div className={styles.panelTitle}><ShieldCheck size={19} aria-hidden="true" /><h3 id="consent-title" tabIndex={-1}>Accord du citoyen</h3></div>
@@ -56,13 +59,13 @@ export function CaseDetail({ item, challenge, busy, focusSection, onSendCode, on
             <p className={styles.channelLabel}>Sur place, au guichet</p>
             {!challenge ? <><p className={styles.hint}>Expliquez les vérifications au citoyen, puis adressez le code à son numéro de contact associé.</p><button className={styles.primary} type="button" disabled={Boolean(busy)} onClick={() => onSendCode()}><Send size={16} aria-hidden="true" />{busy === "code" ? "Envoi…" : "Envoyer le code d’accord"}</button></> : <>
               <p className={styles.hint}>Code demandé au numéro {challenge.phone}. Le citoyen vous le communique uniquement s’il accepte. Ne demandez jamais son mot de passe.</p>
+              {challenge.code && <p className={styles.hint}><strong>Code de validation :</strong> <span className={styles.codeInput}>{challenge.code}</span></p>}
               <form onSubmit={submit} noValidate className={styles.codeForm}>
                 <label className={styles.label} htmlFor="consent-code">Code communiqué par le citoyen</label>
                 <input className={`${styles.input} ${styles.codeInput}`} id="consent-code" name="consent_code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} placeholder="000000" disabled={Boolean(busy)} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
                 <button className={styles.primary} type="submit" disabled={Boolean(busy) || code.length !== 6}>{busy === "verify" ? "Vérification…" : "Valider le code"}</button>
               </form>
               <button className={styles.textButton} type="button" disabled={Boolean(busy) || resendIn > 0} onClick={() => { setCode(""); void onSendCode(true); }}>{resendIn > 0 ? `Renvoyer dans ${resendIn} s` : "Renvoyer un code"}</button>
-              {challenge.code && <details className={styles.demoTools}><summary>SMS de démonstration · aucun envoi réel</summary><p>{challenge.message}</p><p>Code de ce dossier : <strong data-demo-code={challenge.code}>{challenge.code}</strong></p></details>}
             </>}
             <button className={styles.textButton} type="button" disabled={Boolean(busy)} onClick={() => onChangeChannel("web")}>Le citoyen répondra à distance</button>
           </> : <>
@@ -81,6 +84,5 @@ export function CaseDetail({ item, challenge, busy, focusSection, onSendCode, on
         {item.status === "completed" ? <p className={styles.completion}><CheckCircle2 size={18} aria-hidden="true" /> Vérifications terminées. L’examen des pièces physiques et la décision restent à l’administration.</p> : <div className={styles.checkActions}><button className={styles.primary} type="button" disabled={Boolean(busy) || !canRun} onClick={onRunChecks}>{busy === "checks" || busy === "auto" ? "Vérifications…" : hasUnavailable ? "Reprendre les vérifications" : "Lancer les vérifications"}</button>{!consentGranted && <p className={styles.hint}>Accord citoyen requis avant tout appel aux registres.</p>}</div>}
       </section>
     </div>
-    {item.channel === "web" && !consentGranted && !consentRefused && <details className={styles.demoTools}><summary>Tester la réponse à distance</summary><p>Le citoyen répond depuis son espace, avec son propre compte. La réponse apparaît ici au prochain rafraîchissement (10 secondes au plus).</p><a href={CITIZEN_SPACE_URL} target="_blank" rel="noopener noreferrer">Ouvrir l’espace citoyen dans un autre onglet</a><p>Compte de démonstration : citoyen-demo / CitoyenDemo-2026! (Awa, téléphone 70 00 00 01).</p></details>}
   </>;
 }

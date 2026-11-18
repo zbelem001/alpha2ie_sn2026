@@ -20,7 +20,7 @@ dev = ["dlnuf-passerelle[service]", "pytest>=8", "jsonschema>=4.22"]
 include = ["connectors*", "notifications*"]
 
 [tool.setuptools.package-data]
-connectors = ["*.yaml"]
+connectors = ["*.yaml", "*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
