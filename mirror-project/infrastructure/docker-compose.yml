@@ -254,6 +254,8 @@ services:
       REGISTRY_TIMEOUT_S: ${REGISTRY_TIMEOUT_S:-3}
       XROAD_CLIENT_ID: ${XROAD_CLIENT_ID:-BF/GOV/ONI/CNIB}
       XROAD_CLIENTS: ${XROAD_CLIENTS:-}
+      # Mode X-Road (REGISTRY_CONNECTOR=xroad) : serveur de sécurité des demandeurs du banc.
+      XROAD_SECURITY_SERVER_URL: ${XROAD_SECURITY_SERVER_URL:-}
       # Reprise automatique des vérifications quand un registre revient (couche résilience).
       REGISTRY_RETRY_INTERVAL_S: ${REGISTRY_RETRY_INTERVAL_S:-15}
       REGISTRY_RETRY_MAX_ATTEMPTS: ${REGISTRY_RETRY_MAX_ATTEMPTS:-20}

@@ -91,6 +91,6 @@ Le corps envoyé à son registre est celui du contrat des registres, sans l'acco
 ## Limites
 
 - Une seule instance sert les six détenteurs simulés ; dans l'architecture cible, chaque détenteur exploite sa garde.
-- Mode direct : l'en-tête `X-Road-Client` est déclaratif. Avec X-Road, il est authentifié par les serveurs de sécurité ; le banc publie désormais ses services à l'adresse de la garde, mais n'a pas été relancé pour le vérifier (5,3 Go de mémoire).
+- Mode direct : l'en-tête `X-Road-Client` est déclaratif. Avec X-Road, il est authentifié par les serveurs de sécurité : vérifié le 18/11, le banc publie ses services à l'adresse de la garde et transmet l'en-tête `X-Consent-Id`.
 - Jetons de service statiques, pour la démonstration.
 - Les accords enregistrés avant le 18/11 dans l'ancienne table `consents` de la couche démarches ne sont pas repris : les dossiers de démonstration plus anciens n'ont plus d'accord actif.

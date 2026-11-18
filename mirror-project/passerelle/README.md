@@ -44,8 +44,6 @@ python3 passerelle/brancher.py retirer etat-civil
 
 Répété le 18/11 sur la pile : second registre d'état civil lancé à part (« équipe B »), sondé (règles applicables), branché ; la démarche d'Awa l'a interrogé à la place du nôtre ; débranché, retour à notre registre.
 
-En mode X-Road, brancher un registre étranger demande en plus de le déclarer comme fournisseur sur le banc (`PROVIDERS` de `xroad/configuration/setup_bench.py`) : non outillé.
-
 ## À faire
 
-- Relancer le banc X-Road (5,3 Go) pour vérifier sa nouvelle configuration : services publiés derrière la garde, ONI fournisseur de `cnib-status`, DIPF demandeur ; et que X-Road transmet l'en-tête `X-Consent-Id`.
+- Outiller le branchement d'un registre étranger en mode X-Road (le déclarer comme fournisseur sur le banc) : aujourd'hui à la main, dans `PROVIDERS` de `xroad/configuration/setup_bench.py`.

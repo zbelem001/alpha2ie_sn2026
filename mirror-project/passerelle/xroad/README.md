@@ -89,7 +89,26 @@ curl -s http://localhost:8280/r1/BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL/is-adult \
 # → refused : la garde exige un accord (en-tête X-Consent-Id), comme en mode direct
 ```
 
-**Non vérifié** : depuis le 18/11 (fournisseurs derrière la garde, ONI fournisseur, DIPF demandeur), le banc n'a pas été relancé, faute de mémoire (5,3 Go). À confirmer au premier lancement : que X-Road transmet l'en-tête `X-Consent-Id` jusqu'à la garde, et l'étape 7 de `xroad-setup` (rattachement d'Awa par X-Road, puis refus sans accord).
+Passer la couche démarches en mode X-Road, banc démarré, sans modifier de fichier :
+
+```bash
+REGISTRY_CONNECTOR=xroad XROAD_SECURITY_SERVER_URL=http://ss-demandeurs:8080 REGISTRY_TIMEOUT_S=15 docker compose up -d demarches
+docker compose up -d demarches   # retour au mode direct
+```
+
+## Vérifié le 18/11 sur `mirror-project/` (Docker natif)
+
+| Point | Résultat |
+|---|---|
+| Configuration automatique (`xroad-setup`) | Banc prêt en 612 s ; mémoire mesurée : serveur central 1,7 Go, `ss-registres` 1,6 Go, `ss-demandeurs` 1,4 Go, autorité de test 17 Mo |
+| Rattachement d'Awa par X-Road, puis la garde, puis l'état civil | `ok`, `match: true` |
+| `is-adult` sans accord | `refused` par la garde |
+| ONI → casier (hors convention) | refusé par X-Road (`access_denied`) |
+| Démarche « concours direct » lancée par Awa, en mode X-Road | 3 vérifications confirmées ; la garde reçoit le demandeur authentifié par X-Road (`BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT`) et l'en-tête `X-Consent-Id`, transmis par X-Road |
+| Démarche « passeport » au guichet de la DIPF, en mode X-Road | 5 vérifications confirmées (demandeur `BF/GOV/DIPF/PASSEPORTS`, ONI fournisseur de `cnib-status`) |
+| Tests de bout en bout des deux interfaces, en mode X-Road | 7 et 4 passés ; chaque tentative porte l'identifiant du message X-Road (`transport_id`) |
+
+Avec Docker Desktop, le banc ne tenait pas en mémoire sur un poste de 11 Go : sa machine virtuelle en prend déjà environ 1,8 Go. Avec Docker installé directement, toute la pile et le banc tournent ensemble.
 
 ## Ce qui a été vérifié sur le banc
 
