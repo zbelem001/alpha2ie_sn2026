@@ -4,7 +4,7 @@ Couche obligatoire de la carte du jury. Responsable : Personne 1.
 
 Application Next.js du citoyen, construite à partir d'une copie de `frontend/` (le dossier d'origine reste inchangé) et branchée sur Keycloak et l'API démarches. Le citoyen :
 
-- rattache une fois son compte à la référence de son acte de naissance ;
+- rattache une fois son compte à son acte de naissance, avec une preuve vérifiée par l'état civil (nom, prénoms, date de naissance, nom de la mère ; jamais conservés) ;
 - répond aux demandes d'accord des administrations (démarches « à distance ») ;
 - suit ses démarches et le résultat de chaque vérification (« Mes démarches ») ;
 - retrouve chaque consultation de ses informations, refus et blocages compris (« Historique des consultations », tiré du journal de traçabilité) ;
@@ -22,7 +22,7 @@ npm run dev        # http://localhost:3000
 npm run build && npm run lint
 ```
 
-Compte de démonstration : `citoyen-demo` / `CitoyenDemo-2026!` (Awa, acte `ACTE:OUAGA:2004:01234`, téléphone fictif 70 00 00 01).
+Compte de démonstration : `citoyen-demo` / `CitoyenDemo-2026!` (Awa, téléphone fictif 70 00 00 01). Rattachement : acte `ACTE:OUAGA:2004:01234`, KABORE Awa, née le 12/03/2004, mère : COMPAORE Salimata.
 
 | Variable (serveur) | Défaut | Rôle |
 |---|---|---|

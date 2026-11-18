@@ -32,7 +32,7 @@ L'identité est établie à l'inscription sur le portail ou au premier passage a
 
 Le résultat est enregistré dans Keycloak : attributs `identifiant_pivot` et `niveau_garantie`. Ils figurent dans le jeton de connexion. L'usager ne peut pas les modifier : seul un administrateur le peut.
 
-> Au 18/11 : remplacé par le rattachement du compte à l'acte dans l'API démarches (`POST /v1/citizen/identity-link`), sans niveau de garantie. Ce rattachement ne vérifie pas encore que la personne est titulaire de l'acte (§11.1).
+> Au 18/11 : remplacé par le rattachement du compte à l'acte dans l'API démarches (`POST /v1/citizen/identity-link`), sans niveau de garantie. Dans le miroir, ce rattachement exige une preuve de titularité vérifiée par l'état civil (§11.1).
 
 ## 2. Trouver le détenteur, à chaque démarche
 
@@ -273,7 +273,7 @@ Selon la pièce, le lien se fait ainsi :
 
 | Élément | État | Responsable |
 |---|---|---|
-| Identité établie une fois | Rattachement du compte à l'acte dans l'API démarches. Vérifie que l'acte existe, pas que la personne en est titulaire (§11.1). Plus de niveau de garantie. | P2 (API), P3 (registre) |
+| Identité établie une fois | Rattachement du compte à l'acte dans l'API démarches, avec preuve de titularité vérifiée par l'état civil (nom, prénoms, date de naissance, nom de la mère) et essais limités (§11.1). Pas de niveau de garantie enregistré. | P2 (API), P3 (registre) |
 | Registres interrogeables par pivot, par critères ou par référence de pièce ; `ambiguous` en cas d'homonymes | Fait : 6 registres simulés. Une fiche désignée par référence doit appartenir au titulaire (§11.2). | P3 |
 | Adressage d'une organisation : direct ou X-Road | Fait. Droits d'accès appliqués par le banc X-Road. Un seul demandeur X-Road pour toutes les démarches : à corriger. | P3, P2 |
 | Catalogue des services | Partiel : démarches, questions et registres en base dans l'API démarches ; correspondance « type de référence → registre » codée en dur (`IDENTIFIER_REGISTRIES`). | P2 |
@@ -288,13 +288,20 @@ Selon la pièce, le lien se fait ainsi :
 
 ## 11. Écarts constatés le 18/11 et corrections
 
-### 11.1 Le rattachement d'identité ne prouve pas la titularité (non corrigé)
+### 11.1 Le rattachement d'identité ne prouvait pas la titularité (corrigé dans le miroir)
 
 `POST /v1/citizen/identity-link` vérifie le format de la référence, un téléphone marqué « vérifié » dans le jeton, l'existence de l'acte à l'état civil, et que la référence n'est pas déjà rattachée à un autre compte. Il ne vérifie pas que la personne connectée est titulaire de l'acte.
 
 Conséquence : avec un téléphone vérifié, on peut rattacher l'acte d'une autre personne tant qu'il est libre. L'agent retrouve ensuite le citoyen par ce téléphone : le fraudeur voit les démarches de la victime, son journal, et peut accorder à sa place. La victime ne peut plus rattacher son propre acte.
 
-Proposition, conforme au §1 : demander un élément que seule la titulaire connaît et que l'état civil compare sans le révéler (date de naissance, nom de la mère), par le service `identity-match` (« correspond : oui ou non ») ; enregistrer un niveau de garantie (2 en ligne, 3 au guichet avec la pièce physique) ; prévoir la révision d'un rattachement contesté.
+Correction dans le miroir, conforme au §1 :
+
+- le rattachement exige nom, prénoms, date de naissance et **nom de la mère** tel qu'inscrit sur l'acte : un élément que le fraudeur ne connaît pas, même s'il connaît le nom et la date de naissance de la victime ;
+- l'état civil les compare à l'acte (`identity-match`) et ne répond que « correspond : oui ou non » ; rien n'est conservé ;
+- même refus pour une preuve fausse et pour un acte inexistant ; un acte déjà rattaché n'est signalé qu'après une preuve correcte, avec un renvoi vers le guichet ;
+- 5 essais manqués par compte et par quart d'heure, puis attente.
+
+Vérifié : mauvaise mère et acte inexistant → même refus ; l'autre Awa KABORE, née en 1979, ne peut pas prendre l'acte de 2004 ; bonne preuve → rattaché. Restent à faire : enregistrer un niveau de garantie (2 en ligne, 3 au guichet avec la pièce physique), prévoir la révision d'un rattachement contesté, et un compteur d'essais partagé en production (il est aujourd'hui en mémoire du processus).
 
 ### 11.2 Une référence de pièce n'était pas rapprochée de la personne (corrigé dans le miroir)
 
