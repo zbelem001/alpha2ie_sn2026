@@ -32,10 +32,13 @@ from app.api import (
     RegistrationOtpVerify,
     verify_registration_otp,
 )
+from journal_client import MemoryJournal
+
+from app.admin_api import list_admin_audit
 from app.database.base import Base
+from app.journal import use_journal
 from app.database.models import (
     Administration,
-    AuditEvent,
     Case,
     CitizenDocumentIdentifier,
     CitizenIdentityLink,
@@ -65,6 +68,15 @@ def db():
         yield session
     Base.metadata.drop_all(engine)
     engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def journal():
+    """Couche journal en mémoire (même interface que le client du service journal/)."""
+    memory = MemoryJournal(source="demarches")
+    use_journal(memory)
+    yield memory
+    use_journal(None)
 
 
 def add_procedure(db: Session) -> tuple[Administration, Administration, Procedure]:
@@ -473,7 +485,7 @@ def test_document_reference_is_sent_with_the_expected_holder(db: Session, monkey
     assert execute_checks(case_id, agent, db)["status"] == "completed"
 
 
-def test_citizen_can_start_a_procedure_without_an_agent(db: Session, monkeypatch):
+def test_citizen_can_start_a_procedure_without_an_agent(db: Session, monkeypatch, journal):
     """Démarche lancée depuis l'espace usager : accord enregistré, vérifications aussitôt, sans guichet."""
     owner, _, procedure = add_procedure(db)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234", display_name="Awa KABORE")
@@ -490,10 +502,10 @@ def test_citizen_can_start_a_procedure_without_an_agent(db: Session, monkeypatch
     assert result["checks"][0]["status"] == "confirmed"
     case = db.get(Case, UUID(result["id"]))
     assert case.requester_administration_id == owner.id and case.consent_channel == "web"
-    events = db.scalars(select(AuditEvent).where(AuditEvent.case_id == case.id).order_by(AuditEvent.occurred_at)).all()
-    assert [event.event_type for event in events][:2] == ["case_created", "consent_recorded"]
-    assert events[0].actor_type == "citizen"
-    assert any(event.event_type == "registry_check" and event.outcome == "confirmed" for event in events)
+    events = journal.search(case_id=str(case.id))
+    assert [event["event_type"] for event in events][:2] == ["case_created", "consent_recorded"]
+    assert events[0]["actor_type"] == "citizen"
+    assert any(event["event_type"] == "registry_check" and event["outcome"] == "confirmed" for event in events)
 
 
 def test_citizen_start_requires_link_confirmation_and_published_procedure(db: Session):
@@ -512,7 +524,7 @@ def test_citizen_start_requires_link_confirmation_and_published_procedure(db: Se
     assert db.scalar(select(func.count()).select_from(Case)) == 0
 
 
-def test_citizen_reports_a_consultation_once_and_the_requester_sees_it(db: Session, monkeypatch):
+def test_citizen_reports_a_consultation_once_and_the_requester_sees_it(db: Session, monkeypatch, journal):
     owner, _, procedure = add_procedure(db)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
 
@@ -522,23 +534,26 @@ def test_citizen_reports_a_consultation_once_and_the_requester_sees_it(db: Sessi
 
     monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
     case_id = UUID(start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)["id"])
-    consultation = db.scalar(select(AuditEvent).where(AuditEvent.case_id == case_id, AuditEvent.event_type == "registry_check"))
+    consultation = journal.search(case_id=str(case_id), event_type="registry_check")[0]
+    consultation_id = UUID(consultation["id"])
 
-    report = report_consultation(case_id, consultation.id, ConsultationReport(reason="not_me"), citizen, db)
-    assert report["status"] == "open" and report["event_id"] == str(consultation.id)
+    report = report_consultation(case_id, consultation_id, ConsultationReport(reason="not_me"), citizen, db)
+    assert report["status"] == "open" and report["event_id"] == consultation["id"]
     with pytest.raises(HTTPException) as again:
-        report_consultation(case_id, consultation.id, ConsultationReport(reason="not_me"), citizen, db)
+        report_consultation(case_id, consultation_id, ConsultationReport(reason="not_me"), citizen, db)
     assert again.value.status_code == 409
-    report_consultation(case_id, consultation.id, ConsultationReport(reason="wrong_result"), citizen, db)
+    report_consultation(case_id, consultation_id, ConsultationReport(reason="wrong_result"), citizen, db)
 
     agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
-    journal = get_journal(case_id, agent, db)
-    reports = {event["event_type"]: event for event in journal if event["event_type"] in {"consultation_contested", "correction_requested"}}
+    case_journal = get_journal(case_id, agent, db)
+    reports = {event["event_type"]: event for event in case_journal if event["event_type"] in {"consultation_contested", "correction_requested"}}
     assert set(reports) == {"consultation_contested", "correction_requested"}
-    assert all(event["correlation_id"] == str(consultation.id) and event["outcome"] == "open" for event in reports.values())
+    assert all(event["correlation_id"] == consultation["id"] and event["outcome"] == "open" for event in reports.values())
+    # Le signalement désigne la même question que la consultation visée.
+    assert {event["question_code"] for event in reports.values()} == {consultation["question_code"]}
 
 
-def test_only_the_citizen_can_report_and_only_a_registry_consultation(db: Session, monkeypatch):
+def test_only_the_citizen_can_report_and_only_a_registry_consultation(db: Session, monkeypatch, journal):
     _, _, procedure = add_procedure(db)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
 
@@ -548,14 +563,14 @@ def test_only_the_citizen_can_report_and_only_a_registry_consultation(db: Sessio
 
     monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
     case_id = UUID(start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)["id"])
-    created = db.scalar(select(AuditEvent).where(AuditEvent.case_id == case_id, AuditEvent.event_type == "case_created"))
-    consultation = db.scalar(select(AuditEvent).where(AuditEvent.case_id == case_id, AuditEvent.event_type == "registry_check"))
+    created = journal.search(case_id=str(case_id), event_type="case_created")[0]
+    consultation = journal.search(case_id=str(case_id), event_type="registry_check")[0]
     with pytest.raises(HTTPException) as not_a_consultation:
-        report_consultation(case_id, created.id, ConsultationReport(reason="not_me"), citizen, db)
+        report_consultation(case_id, UUID(created["id"]), ConsultationReport(reason="not_me"), citizen, db)
     assert not_a_consultation.value.status_code == 422
     someone_else = Principal("other-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:1998:00456")
     with pytest.raises(HTTPException) as forbidden:
-        report_consultation(case_id, consultation.id, ConsultationReport(reason="not_me"), someone_else, db)
+        report_consultation(case_id, UUID(consultation["id"]), ConsultationReport(reason="not_me"), someone_else, db)
     assert forbidden.value.status_code == 403
     with pytest.raises(ValidationError):
         ConsultationReport(reason="autre")
@@ -672,7 +687,7 @@ def test_consent_expiration_must_be_future_timezone_aware_and_within_30_days(db:
     assert db.scalar(select(func.count()).select_from(Consent)) == 0
 
 
-def test_citizen_can_revoke_consent_and_audit_hashes_form_a_chain(db: Session):
+def test_citizen_can_revoke_consent_and_every_step_is_in_the_journal(db: Session, journal):
     owner, _, procedure = add_procedure(db)
     agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
@@ -703,16 +718,15 @@ def test_citizen_can_revoke_consent_and_audit_hashes_form_a_chain(db: Session):
     request = db.scalar(select(RegistryRequest).where(RegistryRequest.case_id == case_id))
     assert request.status == "queued"
 
-    events = db.scalars(
-        select(AuditEvent).where(AuditEvent.case_id == case_id).order_by(AuditEvent.occurred_at)
-    ).all()
-    assert [event.event_type for event in events] == [
+    # Le refus (checks_blocked) figure au journal comme le reste ; le chaînage est celui de la
+    # couche journal (journal/tests).
+    events = journal.search(case_id=str(case_id))
+    assert [event["event_type"] for event in events] == [
         "case_created", "consent_requested", "consent_recorded", "consent_revoked", "checks_blocked"
     ]
-    assert events[0].previous_hash is None
-    for previous, current in zip(events, events[1:]):
-        assert current.previous_hash == previous.event_hash
-        assert current.event_hash
+    assert {event["subject_ref"] for event in events} == {"ACTE:OUAGA:2004:01234"}
+    assert [event["actor_type"] for event in events[2:4]] == ["citizen", "citizen"]
+    assert events[-1]["outcome"] == "blocked"
 
 
 @pytest.mark.parametrize(
@@ -855,3 +869,73 @@ def test_fresh_pending_claim_is_skipped_and_stale_claim_is_recovered(db: Session
     ).all()
     assert [attempt.status for attempt in attempts] == ["failed", "succeeded"]
     assert attempts[0].error_code == "attempt_lease_expired"
+
+
+# --- Couche journal (journal/) -----------------------------------------------------------------
+
+
+def test_consultation_is_recorded_with_who_asked_what_and_why(db: Session, monkeypatch, journal):
+    """Chaque consultation au journal : demandeur, détenteur, question, démarche, requête."""
+    owner, _, procedure = add_procedure(db)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+
+    class SuccessfulConnector:
+        def query(self, organization, service, payload):
+            return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
+
+    monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
+    case_id = start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)["id"]
+    [consultation] = journal.search(case_id=case_id, event_type="registry_check")
+    request = db.scalar(select(RegistryRequest).where(RegistryRequest.case_id == UUID(case_id)))
+
+    assert consultation["subject_ref"] == "ACTE:OUAGA:2004:01234"
+    assert consultation["procedure_code"] == "passeport_ordinaire_precheck"
+    assert (consultation["requester_code"], consultation["requester_name"]) == (owner.code, owner.name)
+    assert (consultation["holder_code"], consultation["registry_code"]) == (owner.code, "main")
+    assert (consultation["question_code"], consultation["service_code"]) == ("passport_cnib_valid", "cnib-status")
+    assert consultation["correlation_id"] == str(request.id)
+    assert consultation["outcome"] == "confirmed" and consultation["actor_type"] == "administration"
+
+
+def test_without_the_journal_nothing_happens_to_the_case(db: Session, journal):
+    """Fermé par défaut : si l'événement n'est pas inscrit, l'opération est annulée (503)."""
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    journal.unavailable = True
+
+    with pytest.raises(HTTPException) as error:
+        create_case(CaseCreate(procedure_code=procedure.code, subject_ref="ACTE:OUAGA:2004:01234"), agent, db)
+
+    assert error.value.status_code == 503
+    assert db.scalar(select(func.count()).select_from(Case)) == 0
+    assert db.scalar(select(func.count()).select_from(RegistryRequest)) == 0
+
+
+def test_the_journal_is_read_from_the_journal_layer(db: Session, journal):
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    case_id = UUID(create_case(CaseCreate(procedure_code=procedure.code, subject_ref="ACTE:OUAGA:2004:01234"), agent, db)["id"])
+
+    entries = get_journal(case_id, agent, db)
+    assert [entry["event_type"] for entry in entries] == ["case_created", "consent_requested"]
+    assert entries[0]["requester"] == owner.name and entries[0]["id"] == journal.events[0]["id"]
+
+    journal.unavailable = True
+    with pytest.raises(HTTPException) as error:
+        get_journal(case_id, agent, db)
+    assert error.value.status_code == 503
+
+
+def test_local_administration_audit_reads_its_cases_in_the_journal(db: Session, journal):
+    owner, other, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    create_case(CaseCreate(procedure_code=procedure.code, subject_ref="ACTE:OUAGA:2004:01234"), agent, db)
+    journal.append({"event_type": "case_created", "subject_ref": "ACTE:OUAGA:2004:01234", "purpose": "autre administration",
+                    "requester_code": other.code, "actor_type": "agent"})
+    admin = Principal("admin-sub", frozenset({"local-admin"}), owner.code, None)
+
+    entries = list_admin_audit(search=None, actor_role=None, limit=50, principal=admin, db=db)
+    assert [entry["action"] for entry in entries] == ["consent_requested", "case_created"]
+    assert entries[1]["role"] == "agent" and entries[1]["actor"] == owner.code
+    agents_only = list_admin_audit(search=None, actor_role="agent", limit=50, principal=admin, db=db)
+    assert [entry["action"] for entry in agents_only] == ["case_created"]

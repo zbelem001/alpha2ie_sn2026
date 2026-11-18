@@ -4,12 +4,15 @@ Responsable : Personne 2.
 
 Copie de `backend/` (le dossier d'origine reste sur `main`), qui installe les connecteurs depuis `../passerelle` au lieu de `../interoperability`.
 
-La carte du jury ne nomme pas cette couche : c'est l'orchestration des démarches (catalogue, dossiers, vérifications). Elle contient aussi, pour l'instant, le code de deux couches obligatoires à extraire : [consentement-minimisation](../consentement-minimisation/README.md) et [journal](../journal/README.md).
+La carte du jury ne nomme pas cette couche : c'est l'orchestration des démarches (catalogue, dossiers, vérifications). Elle contient encore le code de la couche obligatoire [consentement-minimisation](../consentement-minimisation/README.md), à extraire.
+
+**Journal** : chaque événement d'un dossier est inscrit dans la couche [journal](../journal/README.md) (`app/journal.py`, client `journal_client`), avant la validation de l'action. Si le journal ne répond pas, l'action est annulée (503) : aucune action sans trace. `GET /v1/cases/{id}/journal` et l'audit de l'administration locale (`GET /v1/admin/audit`) y lisent. L'ancienne table `audit_events` n'est plus écrite ; elle reste pour les migrations.
 
 ## Lancer et tester
 
 - Service `demarches` de `mirror-project/compose.yaml` (port 8000), construit depuis `mirror-project/` ([Dockerfile](Dockerfile)).
-- Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (36 tests).
+- Variables du journal : `JOURNAL_URL` (`http://journal:8000` dans Docker), `JOURNAL_TOKEN` (jeton de service `demarches`).
+- Tests : `pip install -r requirements-dev.txt`, puis `python -m pytest` (40 tests ; le journal y est remplacé par `journal_client.MemoryJournal`).
 
 ## Démarche lancée par le citoyen
 

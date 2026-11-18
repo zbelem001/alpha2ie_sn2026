@@ -5,6 +5,8 @@ info:
   description: >-
     Contrat MVP pour catalogue, dossiers, consentement, vérifications et journal usager.
     Les réponses brutes des registres ne sont jamais exposées ni conservées.
+    Chaque événement d’un dossier est inscrit dans la couche journal (journal/openapi.yaml)
+    avant la validation de l’action : si le journal ne répond pas, l’action est annulée (503).
 servers:
   - url: http://localhost:8000
 security:
@@ -291,6 +293,7 @@ paths:
         '200': { description: 'Événements du périmètre administratif, triés du plus récent au plus ancien' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
   /v1/auth/registration/otp:
     post:
       security: []
@@ -523,6 +526,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Invalid' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
   /v1/cases:
     get:
       tags: [cases]
@@ -611,6 +615,7 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
   /v1/cases/{case_id}/consent/otp:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -676,6 +681,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
   /v1/cases/{case_id}/consent/otp/verify:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -705,6 +711,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '410': { $ref: '#/components/responses/Expired' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
   /v1/cases/{case_id}:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -800,6 +807,7 @@ paths:
         '422': { $ref: '#/components/responses/Invalid' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
     delete:
       tags: [consent]
       summary: Révoquer le consentement actif du dossier
@@ -812,6 +820,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
   /v1/cases/{case_id}/checks:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -839,12 +848,16 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
   /v1/cases/{case_id}/journal:
     parameters:
       - $ref: '#/components/parameters/CaseId'
     get:
       tags: [audit]
       summary: Lire le journal métier du dossier
+      description: >-
+        Événements du dossier, lus dans la couche journal (journal/) dans l’ordre d’inscription :
+        refus et pannes compris. Réservé au citoyen du dossier et à l’administration demandeuse.
       responses:
         '200':
           description: Événements présentés pour l’usager
@@ -856,6 +869,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
   /v1/cases/{case_id}/journal/{event_id}/report:
     parameters:
       - $ref: '#/components/parameters/CaseId'
@@ -888,6 +902,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Invalid' }
+        '503': { $ref: '#/components/responses/JournalUnavailable' }
 components:
   securitySchemes:
     BearerAuth:
@@ -1137,6 +1152,13 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     Unavailable:
       description: Registre de démonstration momentanément indisponible
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    JournalUnavailable:
+      description: >-
+        Journal de traçabilité indisponible : l’action est annulée, pour qu’aucune action sur
+        un dossier n’existe sans sa trace.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

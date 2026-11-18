@@ -1,0 +1,650 @@
+openapi: 3.1.0
+info:
+  title: Couche journal de traçabilité
+  description: "Retrouver **chaque consultation** : qui a demandé quoi, quand, pour quelle démarche, sur quelle\
+    \ base.\n\n- Écriture : la couche démarches (dossiers, accords, vérifications, signalements) et la couche\n\
+    \  consentement-minimisation (ce qui sort de chez le détenteur, et ce qu'elle refuse).\n- Les refus et les pannes\
+    \ y figurent, pas seulement les réponses positives.\n- Ajout seul : aucune route ne modifie ni ne supprime ;\
+    \ chaque événement porte l'empreinte du\n  précédent (`GET /v1/chain/verify`).\n- Aucune valeur issue d'un registre\
+    \ n'y est inscrite : des références, des codes, le résultat.\n"
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      tags:
+      - santé
+      summary: État du service
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Health Health Get
+  /v1/events:
+    post:
+      tags:
+      - journal
+      summary: Inscrire un événement
+      operationId: append_event_v1_events_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '401':
+          description: Jeton absent ou inconnu
+        '403':
+          description: Jeton de lecture seule
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - journal
+      summary: 'Rechercher des événements : par citoyen, par demande, par date'
+      operationId: search_events_v1_events_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: subject_ref
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          description: Citoyen
+          title: Subject Ref
+        description: Citoyen
+      - name: case_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          description: Demande (dossier)
+          title: Case Id
+        description: Demande (dossier)
+      - name: correlation_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          description: Consultation (identifiant de requête)
+          title: Correlation Id
+        description: Consultation (identifiant de requête)
+      - name: event_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: array
+            items:
+              type: string
+          - type: 'null'
+          description: Type(s) d'événement, répétable
+          title: Event Type
+        description: Type(s) d'événement, répétable
+      - name: requester_code
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          description: Administration demandeuse
+          title: Requester Code
+        description: Administration demandeuse
+      - name: actor_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - citizen
+            - agent
+            - administration
+            - system
+            type: string
+          - type: 'null'
+          description: Qui agit
+          title: Actor Type
+        description: Qui agit
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          description: Texte cherché dans le type, la finalité, l'acteur et le résultat
+          title: Q
+        description: Texte cherché dans le type, la finalité, l'acteur et le résultat
+      - name: from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Depuis (inclus), ISO 8601
+          title: From
+        description: Depuis (inclus), ISO 8601
+      - name: to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Jusqu'à (exclu), ISO 8601
+          title: To
+        description: Jusqu'à (exclu), ISO 8601
+      - name: after
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            minimum: 0
+          - type: 'null'
+          description: 'Curseur : next_after de la page précédente'
+          title: After
+        description: 'Curseur : next_after de la page précédente'
+      - name: order
+        in: query
+        required: false
+        schema:
+          enum:
+          - asc
+          - desc
+          type: string
+          description: Ordre d'inscription
+          default: asc
+          title: Order
+        description: Ordre d'inscription
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 100
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+        '401':
+          description: Jeton absent ou inconnu
+        '403':
+          description: Jeton d'écriture seule
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/events/{event_id}:
+    get:
+      tags:
+      - journal
+      summary: Lire un événement
+      operationId: get_event_v1_events__event_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Event Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '404':
+          description: Événement introuvable
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/chain/verify:
+    get:
+      tags:
+      - journal
+      summary: Vérifier la chaîne d'empreintes de tout le journal
+      operationId: verify_chain_v1_chain_verify_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChainReport'
+      security:
+      - HTTPBearer: []
+components:
+  schemas:
+    ChainReport:
+      properties:
+        valid:
+          type: boolean
+          title: Valid
+          description: La chaîne d'empreintes est intacte
+        events:
+          type: integer
+          title: Events
+          description: Événements vérifiés
+        first_invalid_sequence:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: First Invalid Sequence
+          description: Premier événement modifié, retiré ou intercalé
+        last_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Hash
+          description: Empreinte du dernier événement (chaîne intacte)
+      type: object
+      required:
+      - valid
+      - events
+      - first_invalid_sequence
+      - last_hash
+      title: ChainReport
+    Event:
+      properties:
+        event_type:
+          type: string
+          maxLength: 60
+          minLength: 2
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Event Type
+          description: Type d'événement (ex. registry_check, consent_recorded, holder_refusal)
+        subject_ref:
+          type: string
+          maxLength: 160
+          minLength: 1
+          title: Subject Ref
+          description: Citoyen concerné (ex. ACTE:OUAGA:2004:01234)
+        case_id:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Case Id
+          description: Demande (dossier) concernée
+        procedure_code:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Procedure Code
+          description: Démarche
+        actor_type:
+          type: string
+          enum:
+          - citizen
+          - agent
+          - administration
+          - system
+          title: Actor Type
+          description: Qui agit
+          default: system
+        actor_ref:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Actor Ref
+        requester_code:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Requester Code
+          description: Administration demandeuse (identifiant X-Road)
+        requester_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Requester Name
+        holder_code:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Holder Code
+          description: Administration qui détient la donnée (identifiant X-Road)
+        holder_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Holder Name
+        registry_code:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Registry Code
+        question_code:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Question Code
+          description: Question posée (ex. candidate_minimum_age)
+        service_code:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Service Code
+          description: Service du registre (ex. is-adult)
+        purpose:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Purpose
+          description: Finalité ou motif, en clair
+        outcome:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Outcome
+          description: 'Résultat : confirmed, rejected, refused, unavailable, blocked…'
+        data_categories:
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 20
+          - type: 'null'
+          title: Data Categories
+          description: Catégories de données concernées, jamais leurs valeurs
+        consent_id:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Consent Id
+          description: Accord sur lequel repose l'événement
+        correlation_id:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Correlation Id
+          description: Relie les événements d'une même consultation (identifiant de requête)
+        id:
+          type: string
+          format: uuid
+          title: Id
+        sequence:
+          type: integer
+          title: Sequence
+          description: Ordre d'inscription, sans trou
+        occurred_at:
+          type: string
+          format: date-time
+          title: Occurred At
+        source:
+          type: string
+          title: Source
+          description: Couche qui a inscrit l'événement, déduite de son jeton
+        previous_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Previous Hash
+        event_hash:
+          type: string
+          title: Event Hash
+      additionalProperties: false
+      type: object
+      required:
+      - event_type
+      - subject_ref
+      - purpose
+      - id
+      - sequence
+      - occurred_at
+      - source
+      - previous_hash
+      - event_hash
+      title: Event
+      description: Événement inscrit, avec son numéro d'ordre et son empreinte.
+    EventIn:
+      properties:
+        event_type:
+          type: string
+          maxLength: 60
+          minLength: 2
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Event Type
+          description: Type d'événement (ex. registry_check, consent_recorded, holder_refusal)
+        subject_ref:
+          type: string
+          maxLength: 160
+          minLength: 1
+          title: Subject Ref
+          description: Citoyen concerné (ex. ACTE:OUAGA:2004:01234)
+        case_id:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Case Id
+          description: Demande (dossier) concernée
+        procedure_code:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Procedure Code
+          description: Démarche
+        actor_type:
+          type: string
+          enum:
+          - citizen
+          - agent
+          - administration
+          - system
+          title: Actor Type
+          description: Qui agit
+          default: system
+        actor_ref:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Actor Ref
+        requester_code:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Requester Code
+          description: Administration demandeuse (identifiant X-Road)
+        requester_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Requester Name
+        holder_code:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Holder Code
+          description: Administration qui détient la donnée (identifiant X-Road)
+        holder_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Holder Name
+        registry_code:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Registry Code
+        question_code:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Question Code
+          description: Question posée (ex. candidate_minimum_age)
+        service_code:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Service Code
+          description: Service du registre (ex. is-adult)
+        purpose:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Purpose
+          description: Finalité ou motif, en clair
+        outcome:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Outcome
+          description: 'Résultat : confirmed, rejected, refused, unavailable, blocked…'
+        data_categories:
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 20
+          - type: 'null'
+          title: Data Categories
+          description: Catégories de données concernées, jamais leurs valeurs
+        consent_id:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Consent Id
+          description: Accord sur lequel repose l'événement
+        correlation_id:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Correlation Id
+          description: Relie les événements d'une même consultation (identifiant de requête)
+      additionalProperties: false
+      type: object
+      required:
+      - event_type
+      - subject_ref
+      - purpose
+      title: EventIn
+      description: 'Événement à inscrire. Jamais de valeur issue d''un registre : des références, des codes, un
+        résultat.'
+    EventPage:
+      properties:
+        events:
+          items:
+            $ref: '#/components/schemas/Event'
+          type: array
+          title: Events
+        next_after:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Next After
+          description: 'À repasser dans « after » pour la page suivante ; null : dernière page'
+      type: object
+      required:
+      - events
+      - next_after
+      title: EventPage
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      description: Jeton de service de la couche appelante (JOURNAL_WRITE_TOKENS, JOURNAL_READ_TOKENS)
+      scheme: bearer

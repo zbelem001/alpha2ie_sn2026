@@ -267,6 +267,11 @@ class RequestAttempt(Base):
 
 
 class AuditEvent(Base):
+    """Ancien journal des dossiers, plus écrit ni lu : les événements sont dans la couche journal (journal/).
+
+    Conservé pour les migrations (0001, 0007) et les bases existantes.
+    """
+
     __tablename__ = "audit_events"
     __table_args__ = (
         CheckConstraint(

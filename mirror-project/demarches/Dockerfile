@@ -1,5 +1,6 @@
 # Couche démarches (API FastAPI, copie de backend/). Contexte de construction :
-# mirror-project/, car l'API installe les connecteurs de la couche passerelle.
+# mirror-project/, car l'API installe les connecteurs de la couche passerelle
+# et le client de la couche journal.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -7,6 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY passerelle /app/passerelle
+COPY journal /app/journal
 COPY demarches /app/demarches
 WORKDIR /app/demarches
 

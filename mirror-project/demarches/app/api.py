@@ -15,9 +15,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.journal import JournalUnavailable, journal
 from app.database.models import (
     Administration,
-    AuditEvent,
     Case,
     ConsentOtpChallenge,
     RegistrationOtpChallenge,
@@ -254,38 +254,56 @@ def _add_event(
     registry: Registry | None = None,
     categories: list[str] | None = None,
     correlation_id: str | None = None,
-) -> AuditEvent:
-    previous = db.scalar(
-        select(AuditEvent).where(AuditEvent.case_id == case.id).order_by(AuditEvent.occurred_at.desc())
-    )
-    occurred_at = datetime.now(timezone.utc)
-    fields = {
-        "case_id": str(case.id),
+    details: dict | None = None,
+) -> dict:
+    """Inscrit l'événement dans la couche journal (journal/), avant la validation de l'opération.
+
+    Si le journal ne l'inscrit pas, la transaction est annulée et la requête échoue (503) :
+    aucune action sur un dossier sans sa trace. Le journal numérote et chaîne les événements.
+    `details` complète ou remplace les champs déduits (ex. registre d'une consultation signalée).
+    """
+    requester = db.get(Administration, case.requester_administration_id) if case.requester_administration_id else None
+    holder = db.get(Administration, registry.administration_id) if registry else None
+    procedure = db.get(Procedure, case.procedure_id)
+    event = {
         "event_type": event_type,
+        "subject_ref": case.subject_ref,
+        "case_id": str(case.id),
+        "procedure_code": procedure.code if procedure else None,
+        "actor_type": actor_type,
+        "actor_ref": actor_ref,
+        "requester_code": requester.code if requester else None,
+        "requester_name": requester.name if requester else None,
+        "holder_code": holder.code if holder else None,
+        "holder_name": holder.name if holder else None,
+        "registry_code": registry.code if registry else None,
+        "question_code": question.code if question else None,
+        "service_code": question.service_code if question else None,
+        "purpose": purpose[:200],
         "outcome": outcome,
-        "occurred_at": occurred_at.isoformat(),
-        "previous_hash": previous.event_hash if previous else None,
+        "data_categories": categories,
+        "correlation_id": correlation_id,
+        **(details or {}),
     }
-    event_hash = hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()
-    event = AuditEvent(
-        case_id=case.id,
-        subject_ref=case.subject_ref,
-        actor_type=actor_type,
-        actor_ref=actor_ref,
-        requester_administration_id=case.requester_administration_id,
-        registry_id=registry.id if registry else None,
-        question_id=question.id if question else None,
-        event_type=event_type,
-        outcome=outcome,
-        purpose=purpose,
-        data_categories=categories,
-        occurred_at=occurred_at,
-        correlation_id=correlation_id,
-        previous_hash=previous.event_hash if previous else None,
-        event_hash=event_hash,
-    )
-    db.add(event)
-    return event
+    try:
+        return journal().append(event)
+    except JournalUnavailable as error:
+        db.rollback()
+        logger.warning("Journal indisponible, opération annulée : %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail="Journal de traçabilité indisponible : l’opération est annulée pour ne pas perdre sa trace",
+        ) from error
+
+
+def _journal_entry(event: dict) -> dict:
+    """Événement du journal tel que le lisent l'espace usager et le guichet (schéma AuditEvent)."""
+    return {"id": event["id"], "occurred_at": event["occurred_at"], "event_type": event["event_type"],
+            "requester": event.get("requester_name"), "registry": event.get("registry_code"),
+            "question_code": event.get("question_code"), "purpose": event["purpose"],
+            "outcome": event.get("outcome"), "data_categories": event.get("data_categories"),
+            # Rattache un signalement du citoyen à la consultation qu'il vise.
+            "correlation_id": event.get("correlation_id")}
 
 
 def _check_payload(db: Session, request: RegistryRequest) -> dict:
@@ -1790,19 +1808,14 @@ def get_journal(
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
+    """Événements du dossier, lus dans la couche journal (ordre d'inscription)."""
     case = _case_or_404(db, case_id)
     _authorize_case_access(case, db, principal)
-    events = db.scalars(select(AuditEvent).where(AuditEvent.case_id == case.id)
-                        .order_by(AuditEvent.occurred_at)).all()
-    return [{"id": str(event.id), "occurred_at": event.occurred_at,
-             "event_type": event.event_type, "requester": db.get(Administration, event.requester_administration_id).name
-             if event.requester_administration_id else None,
-             "registry": db.get(Registry, event.registry_id).code if event.registry_id else None,
-             "question_code": db.get(Question, event.question_id).code if event.question_id else None,
-             "purpose": event.purpose, "outcome": event.outcome,
-             "data_categories": event.data_categories,
-             # Rattache un signalement du citoyen à la consultation qu'il vise.
-             "correlation_id": event.correlation_id} for event in events]
+    try:
+        events = journal().search(case_id=str(case.id))
+    except JournalUnavailable as error:
+        raise HTTPException(status_code=503, detail="Journal de traçabilité indisponible") from error
+    return [_journal_entry(event) for event in events]
 
 
 class ConsultationReport(BaseModel):
@@ -1832,26 +1845,25 @@ def report_consultation(
     case = _case_or_404(db, case_id)
     if principal.citizen_ref != case.subject_ref:
         raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut signaler une consultation")
-    reported = db.get(AuditEvent, event_id)
-    if reported is None or reported.case_id != case.id:
-        raise HTTPException(status_code=404, detail="Consultation introuvable dans ce dossier")
-    if reported.event_type != "registry_check":
-        raise HTTPException(status_code=422, detail="Seule la consultation d’un registre peut être signalée")
     event_type = REPORT_EVENTS[body.reason]
-    already = db.scalar(select(AuditEvent).where(
-        AuditEvent.case_id == case.id,
-        AuditEvent.event_type == event_type,
-        AuditEvent.correlation_id == str(reported.id),
-    ))
-    if already is not None:
+    try:
+        reported = journal().get(str(event_id))
+        if reported is None or reported.get("case_id") != str(case.id):
+            raise HTTPException(status_code=404, detail="Consultation introuvable dans ce dossier")
+        if reported["event_type"] != "registry_check":
+            raise HTTPException(status_code=422, detail="Seule la consultation d’un registre peut être signalée")
+        already = journal().search(case_id=str(case.id), event_type=event_type, correlation_id=str(event_id), limit=1)
+    except JournalUnavailable as error:
+        raise HTTPException(status_code=503, detail="Journal de traçabilité indisponible") from error
+    if already:
         raise HTTPException(status_code=409, detail="Ce signalement a déjà été envoyé pour cette consultation")
-    question = db.get(Question, reported.question_id) if reported.question_id else None
-    registry = db.get(Registry, reported.registry_id) if reported.registry_id else None
     purpose = ("consultation non reconnue par le citoyen" if body.reason == "not_me"
                else "correction demandée à l’administration source")
+    # Le signalement désigne le même registre et la même question que la consultation visée.
+    consulted = {key: reported.get(key) for key in
+                 ("holder_code", "holder_name", "registry_code", "question_code", "service_code")}
     event = _add_event(db, case, event_type, purpose, outcome="open", actor_type="citizen",
-                       actor_ref=case.subject_ref, question=question, registry=registry,
-                       correlation_id=str(reported.id))
+                       actor_ref=case.subject_ref, correlation_id=str(event_id), details=consulted)
     db.commit()
-    return {"id": str(event.id), "case_id": str(case.id), "event_id": str(reported.id),
-            "reason": body.reason, "status": "open", "reported_at": event.occurred_at}
+    return {"id": event["id"], "case_id": str(case.id), "event_id": str(event_id),
+            "reason": body.reason, "status": "open", "reported_at": event["occurred_at"]}

@@ -13,10 +13,10 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.journal import JournalUnavailable, journal
 from app.database.models import (
     Administration,
     AdministrationAuditEvent,
-    AuditEvent,
     Case,
     Permission,
     Procedure,
@@ -661,19 +661,22 @@ def list_admin_audit(
                             "target": event.target, "detail": event.detail})
 
     if actor_role in {None, "agent", "citizen", "system"}:
-        query = select(AuditEvent).where(AuditEvent.requester_administration_id == administration.id)
-        if actor_role:
-            query = query.where(AuditEvent.actor_type == actor_role)
-        if search:
-            pattern = f"%{search.strip()}%"
-            query = query.where(or_(AuditEvent.event_type.ilike(pattern), AuditEvent.purpose.ilike(pattern),
-                                    AuditEvent.actor_ref.ilike(pattern), AuditEvent.outcome.ilike(pattern)))
-        for event in db.scalars(query.order_by(AuditEvent.occurred_at.desc()).limit(limit)).all():
-            case = db.get(Case, event.case_id)
-            entries.append({"id": str(event.id), "at": event.occurred_at,
-                            "actor": event.actor_ref or event.actor_type,
-                            "role": event.actor_type, "action": event.event_type,
-                            "target": case.id.hex[:8].upper() if case else str(event.case_id),
-                            "detail": event.purpose})
-    entries.sort(key=lambda item: item["at"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        # Événements des dossiers de l'administration, lus dans la couche journal.
+        try:
+            events = journal().search(requester_code=administration.code, actor_type=actor_role,
+                                      q=search.strip() if search else None, order="desc", limit=limit)
+        except JournalUnavailable as error:
+            raise HTTPException(status_code=503, detail="Journal de traçabilité indisponible") from error
+        for event in events:
+            entries.append({"id": event["id"], "at": datetime.fromisoformat(event["occurred_at"]),
+                            "actor": event.get("actor_ref") or event["actor_type"],
+                            "role": event["actor_type"], "action": event["event_type"],
+                            "target": (event.get("case_id") or "")[:8].upper(),
+                            "detail": event["purpose"]})
+    def moment(item: dict) -> datetime:
+        # Dates du journal avec fuseau, dates locales parfois sans (SQLite) : comparées en UTC.
+        at = item["at"] or datetime.min
+        return at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+
+    entries.sort(key=moment, reverse=True)
     return entries[:limit]
