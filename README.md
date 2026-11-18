@@ -150,7 +150,6 @@ sequenceDiagram
     participant A as API démarches
     participant G as Garde consentement et minimisation
     participant SD as Security Server demandeur
-    participant SC as Serveur central X-Road
     participant SF as Security Server fournisseur
     participant R as Registre
     participant J as Journal de traçabilité
@@ -171,7 +170,6 @@ sequenceDiagram
         G->>G: Réduit la requête aux données nécessaires
         G->>SD: Requête autorisée et minimisée
         SD->>SF: Échange X-Road signé et chiffré
-        Note over SD,SF: Transport assuré par X-Road ; configuration de confiance distribuée par le Central Server
         SF->>R: Appel du service de registre
         R-->>SF: Réponse métier
         SF-->>SD: Réponse X-Road
