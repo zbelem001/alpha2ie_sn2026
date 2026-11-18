@@ -1,0 +1,7 @@
+-r requirements.txt
+pytest>=8,<9
+jsonschema>=4.22,<5
+# Registres simulés, interrogés en mémoire derrière la garde (tests d'interopérabilité).
+-e ../registres
+# Connecteurs de la passerelle, pour le test de bout en bout connecteur → garde → registre.
+-e ../passerelle

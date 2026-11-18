@@ -5,6 +5,7 @@ Responsable à désigner (proposition : Personne 3). Couche **bonus** de la cart
 ## Ce qui existe déjà
 
 - Les connecteurs (`passerelle/connectors`) n'inventent jamais de réponse : un registre injoignable donne `unavailable`, jamais « oui ».
+- La garde de la couche consentement-minimisation non plus : registre injoignable ou réponse non conforme, `unavailable`, inscrit au journal côté détenteur (`holder_response`) ; journal injoignable, aucune donnée ne sort.
 - La couche démarches reprend les vérifications interrompues sans appel en double (bail sur les tentatives, `attempt_lease_expired`, dans `execute_checks` de `demarches/app/api.py`) ; tests de reprise après panne dans `demarches/tests`.
 - Banc X-Road : configuration persistante, reconnexion automatique des jetons ; si le serveur central tombe, les échanges continuent 10 minutes (validité de la configuration globale).
 

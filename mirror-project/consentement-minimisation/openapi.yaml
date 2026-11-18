@@ -1,0 +1,626 @@
+openapi: 3.1.0
+info:
+  title: Couche consentement et minimisation
+  description: "Rien ne sort de chez un détenteur sans l'accord du citoyen, et rien que l'utile (« majeur : oui\
+    \ »).\n\n- **Registre des accords** (`/v1/consents`, jeton de service de la couche démarches) : chaque\n  décision\
+    \ du citoyen pour un dossier, son périmètre exact (question, détenteur, service), sa\n  fin de validité, son\
+    \ retrait. Chaque décision et chaque retrait sont inscrits au journal.\n- **Garde** (`/holders/{détenteur}/services/{service}`),\
+    \ placée devant chaque registre et appelée\n  par la passerelle : même contrat que les registres. Elle vérifie\
+    \ l'accord désigné par\n  `X-Consent-Id` (demandeur `X-Road-Client`, démarche, personne, service), appelle le\
+    \ registre,\n  réduit sa réponse selon la règle du service (`GET /holders`), inscrit la réponse ou le refus\
+    \ au\n  journal, puis répond. Elle fonctionne devant n'importe quel registre qui respecte le contrat.\n"
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      tags:
+      - santé
+      summary: État du service
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Health Health Get
+  /v1/consents:
+    post:
+      tags:
+      - accords
+      summary: Enregistrer la décision du citoyen pour un dossier
+      operationId: record_consent_v1_consents_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Consent'
+        '401':
+          description: Jeton absent ou inconnu
+        '503':
+          description: Journal indisponible
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - accords
+      summary: Accords d'un dossier ou d'un citoyen, du plus récent au plus ancien
+      operationId: list_consents_v1_consents_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: case_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          description: Dossier
+          title: Case Id
+        description: Dossier
+      - name: subject_ref
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          description: Citoyen
+          title: Subject Ref
+        description: Citoyen
+      - name: active
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Seulement les accords actifs (true) ou inactifs (false)
+          title: Active
+        description: Seulement les accords actifs (true) ou inactifs (false)
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Consent'
+                title: Response List Consents V1 Consents Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/consents/{consent_id}:
+    get:
+      tags:
+      - accords
+      summary: Lire un accord
+      operationId: get_consent_v1_consents__consent_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: consent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Consent Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Consent'
+        '404':
+          description: Accord introuvable
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/consents/{consent_id}/revoke:
+    post:
+      tags:
+      - accords
+      summary: Retirer un accord actif
+      operationId: revoke_consent_v1_consents__consent_id__revoke_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: consent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Consent Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Consent'
+        '404':
+          description: Accord introuvable
+        '409':
+          description: Aucun accord actif
+        '503':
+          description: Journal indisponible
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /holders:
+    get:
+      tags:
+      - garde
+      summary: Détenteurs servis et ce que chaque service laisse sortir
+      operationId: list_holders_holders_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/HolderView'
+                type: array
+                title: Response List Holders Holders Get
+  /holders/{holder}/services/{service}:
+    post:
+      tags:
+      - garde
+      summary: Interroger un service d'un détenteur au travers de la garde (contrat des registres)
+      operationId: guarded_call_holders__holder__services__service__post
+      parameters:
+      - name: holder
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Holder
+      - name: service
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service
+      - name: x-road-client
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Demandeur (identifiant X-Road)
+          title: X-Road-Client
+        description: Demandeur (identifiant X-Road)
+      - name: x-consent-id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Accord du citoyen sur lequel repose la demande
+          title: X-Consent-Id
+        description: Accord du citoyen sur lequel repose la demande
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: registry-request (registres/schemas)
+              title: Body
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          description: Requête mal formée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '404':
+          description: Détenteur ou service inconnu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    Consent:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        case_id:
+          type: string
+          title: Case Id
+        subject_ref:
+          type: string
+          title: Subject Ref
+        requester_code:
+          type: string
+          title: Requester Code
+        requester_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requester Name
+        procedure_code:
+          type: string
+          title: Procedure Code
+        status:
+          type: string
+          enum:
+          - granted
+          - refused
+          - revoked
+          title: Status
+        active:
+          type: boolean
+          title: Active
+        channel:
+          type: string
+          enum:
+          - web
+          - in_person
+          - assisted
+          title: Channel
+        notice_version:
+          type: string
+          title: Notice Version
+        evidence_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Evidence Ref
+        scope:
+          items:
+            $ref: '#/components/schemas/ScopeItem'
+          type: array
+          title: Scope
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        granted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Granted At
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+        revoked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Revoked At
+      type: object
+      required:
+      - id
+      - case_id
+      - subject_ref
+      - requester_code
+      - requester_name
+      - procedure_code
+      - status
+      - active
+      - channel
+      - notice_version
+      - evidence_ref
+      - scope
+      - created_at
+      - granted_at
+      - expires_at
+      - revoked_at
+      title: Consent
+      description: 'Accord enregistré. active : accordé, ni retiré ni expiré.'
+    ConsentIn:
+      properties:
+        case_id:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Case Id
+          description: Dossier (demande)
+        subject_ref:
+          type: string
+          maxLength: 160
+          minLength: 1
+          title: Subject Ref
+          description: Citoyen (ex. ACTE:OUAGA:2004:01234)
+        requester_code:
+          type: string
+          maxLength: 160
+          minLength: 1
+          title: Requester Code
+          description: Administration demandeuse (identifiant X-Road)
+        requester_name:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Requester Name
+        procedure_code:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Procedure Code
+          description: Démarche
+        decision:
+          type: string
+          enum:
+          - granted
+          - refused
+          title: Decision
+        channel:
+          type: string
+          enum:
+          - web
+          - in_person
+          - assisted
+          title: Channel
+          description: 'web : espace usager ; assisted : code reçu par SMS au guichet ; in_person : au guichet'
+        notice_version:
+          type: string
+          maxLength: 60
+          minLength: 1
+          title: Notice Version
+          description: Version de l'information présentée au citoyen
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+          description: Fin de validité, obligatoire pour un accord (avec fuseau)
+        evidence_ref:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Evidence Ref
+          description: Preuve du recueil (ex. défi du code)
+        scope:
+          items:
+            $ref: '#/components/schemas/ScopeItem'
+          type: array
+          maxItems: 20
+          minItems: 1
+          title: Scope
+      additionalProperties: false
+      type: object
+      required:
+      - case_id
+      - subject_ref
+      - requester_code
+      - procedure_code
+      - decision
+      - channel
+      - notice_version
+      - scope
+      title: ConsentIn
+      description: Décision du citoyen pour un dossier, transmise par la couche démarches.
+    Envelope:
+      properties:
+        request_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Request Id
+        organization:
+          type: string
+          title: Organization
+        service:
+          type: string
+          title: Service
+        status:
+          type: string
+          enum:
+          - ok
+          - not_found
+          - ambiguous
+          - refused
+          - unavailable
+          - invalid_request
+          title: Status
+        data:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Data
+          description: Réponse réduite à l'utile ; présente seulement si status = ok
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        responded_at:
+          type: string
+          title: Responded At
+      type: object
+      required:
+      - request_id
+      - organization
+      - service
+      - status
+      - data
+      - message
+      - responded_at
+      title: Envelope
+      description: 'Réponse de la garde : l''enveloppe du contrat des registres (registry-response.json).'
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HolderView:
+      properties:
+        slug:
+          type: string
+          title: Slug
+        organization:
+          type: string
+          title: Organization
+        name:
+          type: string
+          title: Name
+        services:
+          items:
+            $ref: '#/components/schemas/RuleView'
+          type: array
+          title: Services
+      type: object
+      required:
+      - slug
+      - organization
+      - name
+      - services
+      title: HolderView
+    RuleView:
+      properties:
+        service:
+          type: string
+          title: Service
+        basis:
+          type: string
+          enum:
+          - consent
+          - citizen_request
+          title: Basis
+        procedures:
+          items:
+            type: string
+          type: array
+          title: Procedures
+        registry_service:
+          type: string
+          title: Registry Service
+        transmits:
+          type: string
+          title: Transmits
+          description: Ce qui sort de chez le détenteur, en clair
+      type: object
+      required:
+      - service
+      - basis
+      - procedures
+      - registry_service
+      - transmits
+      title: RuleView
+    ScopeItem:
+      properties:
+        question_code:
+          type: string
+          maxLength: 80
+          minLength: 1
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Question Code
+          examples:
+          - candidate_minimum_age
+        holder_code:
+          type: string
+          maxLength: 160
+          minLength: 1
+          title: Holder Code
+          description: Détenteur (identifiant X-Road)
+          examples:
+          - BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL
+        service_code:
+          type: string
+          maxLength: 80
+          minLength: 1
+          pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+          title: Service Code
+          examples:
+          - is-adult
+      additionalProperties: false
+      type: object
+      required:
+      - question_code
+      - holder_code
+      - service_code
+      title: ScopeItem
+      description: 'Une information couverte par l''accord : la question, et le service du détenteur qui y répond.'
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      description: Jeton de service de la couche démarches (CONSENT_TOKENS)
+      scheme: bearer

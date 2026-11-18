@@ -20,8 +20,8 @@ Couche obligatoire de la carte du jury. Extraite de la couche démarches le 18/1
 
 | Couche qui écrit | Événements |
 |---|---|
-| démarches | `case_created`, `consent_requested`, `consent_otp_simulated`, `consent_otp_sent`, `consent_otp_rejected`, `consent_recorded`, `consent_revoked`, `checks_blocked`, `check_blocked`, `registry_check` (une par consultation, avec l'identifiant de la requête en `correlation_id`), `consultation_contested`, `correction_requested` |
-| consentement-minimisation (prochaine étape) | ce qui sort de chez le détenteur, et ce que la couche refuse |
+| démarches | `case_created`, `consent_requested`, `consent_otp_simulated`, `consent_otp_sent`, `consent_otp_rejected`, `checks_blocked`, `check_blocked`, `registry_check` (une par consultation, avec l'identifiant de la requête en `correlation_id` et l'accord), `consultation_contested`, `correction_requested` |
+| consentement-minimisation | `consent_recorded` et `consent_revoked` (registre des accords) ; `holder_response` (ce qui est sorti de chez le détenteur : catégories, jamais les valeurs) et `holder_refusal` (refus de la garde, avec le motif), reliés à la consultation par l'identifiant de la requête |
 
 ## Spécification et API
 

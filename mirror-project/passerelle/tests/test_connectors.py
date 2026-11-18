@@ -224,6 +224,36 @@ def test_xroad_rejects_malformed_client_id():
         XRoadConnector("http://ss", client_id="ONI")
 
 
+# Demandeur et accord propres à chaque appel ---------------------------------------------
+
+
+def test_each_call_can_carry_its_requester_and_the_consent_reference():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.headers.get("X-Road-Client"), request.headers.get("X-Consent-Id"), request.content))
+        return httpx.Response(200, json={"request_id": "r-1", "organization": CIVIL, "service": "is-adult",
+                                         "status": "ok", "data": {"adult": True}, "message": None,
+                                         "responded_at": "2026-11-18T10:00:00Z"})
+
+    connector = connector_with(handler)
+    checked(connector.query(CIVIL, "is-adult", {**AWA, "request_id": "r-1"},
+                            client_id="BF/GOV/FONCTION-PUBLIQUE", consent_id="accord-1"))
+    checked(connector.query(CIVIL, "is-adult", {**AWA, "request_id": "r-2"}))
+    assert [(client, consent) for client, consent, _ in seen] == [
+        ("BF/GOV/FONCTION-PUBLIQUE", "accord-1"), (CLIENT_ID, None),
+    ]
+    # L'accord voyage dans l'en-tête : le corps reste celui du contrat des registres.
+    assert b"accord-1" not in seen[0][2]
+
+
+def test_xroad_requires_a_declared_subsystem_as_requester():
+    calls = []
+    connector = xroad_with(lambda request: calls.append(request) or httpx.Response(200))
+    envelope = checked(connector.query(CIVIL, "is-adult", AWA, client_id="BF/GOV/FONCTION-PUBLIQUE"))
+    assert envelope["status"] == "invalid_request" and not calls
+
+
 # Choix du connecteur par l'environnement ----------------------------------------------
 
 

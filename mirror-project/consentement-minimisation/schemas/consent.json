@@ -1,6 +1,189 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "consent",
-  "$comment": "Schéma réservé : propriétés et contraintes à définir collectivement avant utilisation.",
+  "$id": "consent.json",
+  "$defs": {
+    "ScopeItem": {
+      "additionalProperties": false,
+      "description": "Une information couverte par l'accord : la question, et le service du détenteur qui y répond.",
+      "properties": {
+        "question_code": {
+          "examples": [
+            "candidate_minimum_age"
+          ],
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Question Code",
+          "type": "string"
+        },
+        "holder_code": {
+          "description": "Détenteur (identifiant X-Road)",
+          "examples": [
+            "BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL"
+          ],
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Holder Code",
+          "type": "string"
+        },
+        "service_code": {
+          "examples": [
+            "is-adult"
+          ],
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "title": "Service Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question_code",
+        "holder_code",
+        "service_code"
+      ],
+      "title": "ScopeItem",
+      "type": "object"
+    }
+  },
+  "description": "Accord enregistré. active : accordé, ni retiré ni expiré.",
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "subject_ref": {
+      "title": "Subject Ref",
+      "type": "string"
+    },
+    "requester_code": {
+      "title": "Requester Code",
+      "type": "string"
+    },
+    "requester_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Requester Name"
+    },
+    "procedure_code": {
+      "title": "Procedure Code",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "granted",
+        "refused",
+        "revoked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "active": {
+      "title": "Active",
+      "type": "boolean"
+    },
+    "channel": {
+      "enum": [
+        "web",
+        "in_person",
+        "assisted"
+      ],
+      "title": "Channel",
+      "type": "string"
+    },
+    "notice_version": {
+      "title": "Notice Version",
+      "type": "string"
+    },
+    "evidence_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Evidence Ref"
+    },
+    "scope": {
+      "items": {
+        "$ref": "#/$defs/ScopeItem"
+      },
+      "title": "Scope",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "granted_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Granted At"
+    },
+    "expires_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Expires At"
+    },
+    "revoked_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Revoked At"
+    }
+  },
+  "required": [
+    "id",
+    "case_id",
+    "subject_ref",
+    "requester_code",
+    "requester_name",
+    "procedure_code",
+    "status",
+    "active",
+    "channel",
+    "notice_version",
+    "evidence_ref",
+    "scope",
+    "created_at",
+    "granted_at",
+    "expires_at",
+    "revoked_at"
+  ],
+  "title": "Consent",
   "type": "object"
 }

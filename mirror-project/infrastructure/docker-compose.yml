@@ -14,6 +14,7 @@
 # Notifications simulées : boîte d'envoi sur http://localhost:8107
 #
 # Journal de traçabilité : http://localhost:8108 (lecture avec le jeton auditeur, voir journal/README.md)
+# Consentement et minimisation : http://localhost:8109/holders (règles de chaque détenteur)
 
 name: dlnuf-couches
 
@@ -193,6 +194,37 @@ services:
       postgres:
         condition: service_healthy
 
+  # --- Consentement et minimisation (couche obligatoire) ----------------------------------
+  # Registre des accords, et garde placée devant chaque registre : la passerelle joint chaque
+  # détenteur par elle (passerelle/connectors/routing.detenteurs.yaml). Base « consentement »
+  # créée au démarrage si elle manque.
+
+  consentement-minimisation:
+    build:
+      context: ..
+      dockerfile: consentement-minimisation/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dlnuf}:${POSTGRES_PASSWORD:-dlnuf-dev}@postgres:5432/consentement
+      CONSENT_TOKENS: demarches=${CONSENT_TOKEN_DEMARCHES:-dev-consentement-demarches}
+      JOURNAL_URL: http://journal:8000
+      JOURNAL_TOKEN: ${JOURNAL_TOKEN_CONSENTEMENT:-dev-journal-consentement}
+      REGISTRY_TIMEOUT_S: ${REGISTRY_TIMEOUT_S:-3}
+      REFERENCE_DATE: ${REFERENCE_DATE:-}
+    ports:
+      - "8109:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      journal:
+        condition: service_healthy
+
   # --- Applications ----------------------------------------------------------------------
 
   demarches:
@@ -210,8 +242,11 @@ services:
       KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-dlnuf-admin-api}
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
       REGISTRY_CONNECTOR: ${REGISTRY_CONNECTOR:-direct}
+      # Connecteur direct : chaque détenteur est joint par la garde de la couche consentement-minimisation.
+      REGISTRY_ROUTES_FILE: ${REGISTRY_ROUTES_FILE:-/app/passerelle/connectors/routing.detenteurs.yaml}
       REGISTRY_TIMEOUT_S: ${REGISTRY_TIMEOUT_S:-3}
       XROAD_CLIENT_ID: ${XROAD_CLIENT_ID:-BF/GOV/ONI/CNIB}
+      XROAD_CLIENTS: ${XROAD_CLIENTS:-}
       SMS_PROVIDER: ${SMS_PROVIDER:-simulated}
       OTP_SIMULATION_EXPOSE_CODE: ${OTP_SIMULATION_EXPOSE_CODE:-false}
       OTP_SIMULATION_SECRET: ${OTP_SIMULATION_SECRET:-}
@@ -227,6 +262,9 @@ services:
       # Couche journal : chaque événement de dossier y est inscrit avant la validation de l'action.
       JOURNAL_URL: http://journal:8000
       JOURNAL_TOKEN: ${JOURNAL_TOKEN_DEMARCHES:-dev-journal-demarches}
+      # Registre des accords de la couche consentement-minimisation.
+      CONSENT_URL: http://consentement-minimisation:8000
+      CONSENT_TOKEN: ${CONSENT_TOKEN_DEMARCHES:-dev-consentement-demarches}
     ports:
       - "8000:8000"
     healthcheck:
@@ -243,6 +281,8 @@ services:
       keycloak-profile-init:
         condition: service_completed_successfully
       journal:
+        condition: service_healthy
+      consentement-minimisation:
         condition: service_healthy
       civil-registry:
         condition: service_healthy

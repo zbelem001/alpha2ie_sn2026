@@ -1,0 +1,7 @@
+# Comme routing.detenteurs.yaml, hors Docker : garde publiée sur le port 8109 de la machine.
+BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL: http://localhost:8109/holders/etat-civil
+BF/GOV/TRANSPORT/PERMIS: http://localhost:8109/holders/transport
+BF/GOV/JUSTICE/REGISTRES: http://localhost:8109/holders/justice
+BF/GOV/ONI/CNIB: http://localhost:8109/holders/oni
+BF/GOV/POLICE/PERTES: http://localhost:8109/holders/police
+BF/GOV/TRESOR/PAIEMENTS: http://localhost:8109/holders/tresor

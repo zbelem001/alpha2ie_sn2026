@@ -7,6 +7,9 @@ info:
     Les réponses brutes des registres ne sont jamais exposées ni conservées.
     Chaque événement d’un dossier est inscrit dans la couche journal (journal/openapi.yaml)
     avant la validation de l’action : si le journal ne répond pas, l’action est annulée (503).
+    Les accords du citoyen sont enregistrés par le registre des accords de la couche
+    consentement-minimisation (consentement-minimisation/openapi.yaml), relus avant chaque
+    vérification et revérifiés par la garde de chaque détenteur.
 servers:
   - url: http://localhost:8000
 security:
@@ -1157,8 +1160,8 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     JournalUnavailable:
       description: >-
-        Journal de traçabilité indisponible : l’action est annulée, pour qu’aucune action sur
-        un dossier n’existe sans sa trace.
+        Journal de traçabilité ou registre des accords indisponible : l’action est annulée, pour
+        qu’aucune action sur un dossier n’existe sans sa trace ni sans accord vérifié.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

@@ -14,6 +14,7 @@ from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.consents import ConsentRefused, ConsentServiceUnavailable, consents, requester_client
 from app.database.connection import get_db
 from app.journal import JournalUnavailable, journal
 from app.database.models import (
@@ -23,8 +24,6 @@ from app.database.models import (
     RegistrationOtpChallenge,
     CitizenDocumentIdentifier,
     CitizenIdentityLink,
-    Consent,
-    ConsentQuestion,
     Notification,
     Permission,
     Procedure,
@@ -293,6 +292,43 @@ def _add_event(
         raise HTTPException(
             status_code=503,
             detail="Journal de traçabilité indisponible : l’opération est annulée pour ne pas perdre sa trace",
+        ) from error
+
+
+def _active_consent(case: Case) -> dict | None:
+    """Accord actif du dossier, lu dans le registre des accords (couche consentement-minimisation)."""
+    try:
+        return consents().active(str(case.id))
+    except ConsentServiceUnavailable as error:
+        raise HTTPException(status_code=503, detail="Registre des accords indisponible") from error
+
+
+def _record_decision(db: Session, case: Case, *, decision: str, questions: list[Question], channel: str,
+                     notice_version: str, expires_at: datetime | None, evidence_ref: str | None = None) -> dict:
+    """Fait enregistrer la décision du citoyen par le registre des accords, qui l'inscrit au journal.
+
+    Le périmètre est exact : pour chaque question, le détenteur et le service qui y répondent.
+    """
+    requester = db.get(Administration, case.requester_administration_id)
+    procedure = db.get(Procedure, case.procedure_id)
+    scope = []
+    for question in questions:
+        registry = db.get(Registry, question.registry_id)
+        holder = db.get(Administration, registry.administration_id)
+        scope.append({"question_code": question.code, "holder_code": holder.code, "service_code": question.service_code})
+    try:
+        return consents().record({
+            "case_id": str(case.id), "subject_ref": case.subject_ref,
+            "requester_code": requester.code, "requester_name": requester.name,
+            "procedure_code": procedure.code, "decision": decision, "channel": channel,
+            "notice_version": notice_version, "expires_at": expires_at.isoformat() if expires_at else None,
+            "evidence_ref": evidence_ref, "scope": scope,
+        })
+    except ConsentRefused as refused:
+        raise HTTPException(status_code=refused.status_code, detail=refused.detail) from refused
+    except ConsentServiceUnavailable as error:
+        raise HTTPException(
+            status_code=503, detail="Registre des accords indisponible : la décision n’est pas enregistrée",
         ) from error
 
 
@@ -1126,12 +1162,7 @@ def request_assisted_consent_otp(
         raise HTTPException(status_code=422, detail="Aucun numéro international n’est rattaché au citoyen")
 
     now = datetime.now(timezone.utc)
-    latest_consent = db.scalar(
-        select(Consent).where(Consent.case_id == case.id).order_by(Consent.created_at.desc())
-    )
-    if latest_consent and latest_consent.status == "granted" and (
-        latest_consent.expires_at is None or _utc(latest_consent.expires_at) > now
-    ):
+    if _active_consent(case) is not None:
         raise HTTPException(status_code=409, detail="Un accord valide existe déjà pour ce dossier")
 
     scope, scope_digest = _consent_scope(db, case)
@@ -1232,12 +1263,7 @@ def change_consent_channel(
     if case.status in {"completed", "rejected", "cancelled"}:
         raise HTTPException(status_code=409, detail="Le parcours de consentement est clôturé pour ce dossier")
 
-    latest_consent = db.scalar(
-        select(Consent).where(Consent.case_id == case.id).order_by(Consent.created_at.desc())
-    )
-    if latest_consent and latest_consent.status == "granted" and (
-        latest_consent.expires_at is None or _utc(latest_consent.expires_at) > datetime.now(timezone.utc)
-    ):
+    if _active_consent(case) is not None:
         raise HTTPException(status_code=409, detail="Un consentement actif existe déjà pour ce dossier")
 
     if body.consent_channel == case.consent_channel:
@@ -1372,58 +1398,28 @@ def verify_assisted_consent_otp(
         raise HTTPException(status_code=400, detail="Code incorrect")
 
     scope, _ = _consent_scope(db, case)
-    links = {link.question_id for link, _ in scope}
     procedure = db.get(Procedure, case.procedure_id)
     consent_days = procedure.consent_days if procedure else 30
-    previous_grants = db.scalars(select(Consent).where(
-        Consent.case_id == case.id,
-        Consent.status == "granted",
-    )).all()
-    for previous in previous_grants:
-        previous.status = "revoked"
-        previous.revoked_at = now
-
     simulated_verification = challenge.code_digest is not None
-    consent = Consent(
-        case_id=case.id,
-        subject_ref=case.subject_ref,
-        status="granted",
-        granted_at=now,
-        expires_at=now + timedelta(days=consent_days),
-        notice_version="consent-assisted-v1",
-        channel="assisted",
-        evidence_ref=f"consent-otp-simulated:{challenge.id}" if simulated_verification
-        else f"consent-otp:{challenge.id}",
-        created_at=now,
+    # Le registre des accords remplace l'accord précédent du dossier et inscrit celui-ci au journal.
+    consent = _record_decision(
+        db, case, decision="granted", questions=[question for _, question in scope], channel="assisted",
+        notice_version="consent-assisted-v1", expires_at=now + timedelta(days=consent_days),
+        evidence_ref=f"consent-otp-simulated:{challenge.id}" if simulated_verification else f"consent-otp:{challenge.id}",
     )
-    db.add(consent)
-    db.flush()
-    for question_id in links:
-        db.add(ConsentQuestion(consent_id=consent.id, question_id=question_id))
     challenge.delivery_status = "consumed"
     challenge.consumed_at = now
     challenge.code_digest = None
     challenge.provider_pin_id = None
-    _add_event(
-        db,
-        case,
-        "consent_recorded",
-        "consentement saisi après validation OTP simulée; aucun téléphone vérifié"
-        if simulated_verification else "consentement confirmé par code à usage unique reçu par SMS",
-        outcome="granted",
-        actor_type="citizen",
-        actor_ref=case.subject_ref,
-    )
     db.commit()
-    db.refresh(consent)
     return {
-        "id": str(consent.id),
+        "id": consent["id"],
         "case_id": str(case.id),
-        "status": consent.status,
-        "channel": consent.channel,
+        "status": consent["status"],
+        "channel": consent["channel"],
         "question_codes": [question.code for _, question in scope],
-        "granted_at": consent.granted_at,
-        "expires_at": consent.expires_at,
+        "granted_at": consent["granted_at"],
+        "expires_at": consent["expires_at"],
     }
 
 
@@ -1525,31 +1521,17 @@ def record_consent(
     else:
         expires_at = now + timedelta(days=consent_days)
 
-    previous_grants = db.scalars(select(Consent).where(
-        Consent.case_id == case.id, Consent.status == "granted"
-    )).all()
-    for previous in previous_grants:
-        previous.status = "revoked"
-        previous.revoked_at = now
-
-    consent = Consent(case_id=case.id, subject_ref=case.subject_ref, status=body.decision,
-                      granted_at=now if body.decision == "granted" else None,
-                      expires_at=expires_at, notice_version=body.notice_version, channel=body.channel,
-                      created_at=now)
-    db.add(consent)
-    db.flush()
-    for code in body.question_codes:
-        db.add(ConsentQuestion(consent_id=consent.id, question_id=allowed[code]))
-    _add_event(db, case, "consent_recorded", "consentement pour la démarche",
-               outcome=body.decision, actor_type="citizen", actor_ref=case.subject_ref)
-    db.commit()
-    db.refresh(consent)
-    return {"id": str(consent.id), "case_id": str(case.id), "caseId": str(case.id), "status": consent.status,
-            "question_codes": body.question_codes, "notice_version": consent.notice_version,
-            "channel": consent.channel, "granted_at": consent.granted_at,
-            "questionCodes": body.question_codes, "noticeVersion": consent.notice_version,
-            "grantedAt": consent.granted_at, "revoked_at": consent.revoked_at,
-            "expires_at": consent.expires_at, "expiresAt": consent.expires_at}
+    # Le registre des accords remplace l'accord précédent du dossier et inscrit la décision au journal.
+    consent = _record_decision(
+        db, case, decision=body.decision, questions=[db.get(Question, allowed[code]) for code in body.question_codes],
+        channel=body.channel, notice_version=body.notice_version, expires_at=expires_at,
+    )
+    return {"id": consent["id"], "case_id": str(case.id), "caseId": str(case.id), "status": consent["status"],
+            "question_codes": body.question_codes, "notice_version": consent["notice_version"],
+            "channel": consent["channel"], "granted_at": consent["granted_at"],
+            "questionCodes": body.question_codes, "noticeVersion": consent["notice_version"],
+            "grantedAt": consent["granted_at"], "revoked_at": consent["revoked_at"],
+            "expires_at": consent["expires_at"], "expiresAt": consent["expires_at"]}
 
 
 @router.delete("/cases/{case_id}/consent")
@@ -1561,18 +1543,18 @@ def revoke_consent(
     case = _case_or_404(db, case_id)
     if principal.citizen_ref != case.subject_ref:
         raise HTTPException(status_code=403, detail="Seul le citoyen concerné peut révoquer son consentement")
-    consent = db.scalar(select(Consent).where(Consent.case_id == case.id)
-                        .order_by(Consent.created_at.desc()))
-    if (consent is None or consent.status != "granted" or
-            (consent.expires_at is not None and consent.expires_at <= datetime.now(timezone.utc))):
+    active = _active_consent(case)
+    if active is None:
         raise HTTPException(status_code=404, detail="Aucun consentement actif")
-    consent.status = "revoked"
-    consent.revoked_at = datetime.now(timezone.utc)
-    _add_event(db, case, "consent_revoked", "retrait du consentement", outcome="revoked",
-               actor_type="citizen", actor_ref=case.subject_ref)
-    db.commit()
-    return {"id": str(consent.id), "case_id": str(case.id), "status": consent.status,
-            "revoked_at": consent.revoked_at}
+    try:
+        # Le registre des accords inscrit le retrait au journal.
+        revoked = consents().revoke(active["id"])
+    except ConsentRefused as refused:
+        raise HTTPException(status_code=404, detail="Aucun consentement actif") from refused
+    except ConsentServiceUnavailable as error:
+        raise HTTPException(status_code=503, detail="Registre des accords indisponible : l’accord n’est pas retiré") from error
+    return {"id": revoked["id"], "case_id": str(case.id), "status": revoked["status"],
+            "revoked_at": revoked["revoked_at"]}
 
 
 @router.post("/cases/{case_id}/checks")
@@ -1592,16 +1574,13 @@ def _run_checks(case: Case, db: Session) -> dict:
     Commun au guichet (POST /cases/{id}/checks) et aux démarches lancées par le citoyen.
     """
     now = datetime.now(timezone.utc)
-    consent = db.scalar(select(Consent).where(Consent.case_id == case.id)
-                        .order_by(Consent.created_at.desc()))
+    # Accord actif, lu dans le registre des accords ; la garde du détenteur le revérifie à chaque appel.
+    consent = _active_consent(case)
     requests = db.scalars(select(RegistryRequest).where(RegistryRequest.case_id == case.id)).all()
     links = {link.question_id: link for link in db.scalars(
         select(ProcedureQuestion).where(ProcedureQuestion.procedure_id == case.procedure_id)).all()}
-    consent_ids = set()
-    if (consent and consent.status == "granted" and
-            (consent.expires_at is None or _utc(consent.expires_at) > now)):
-        consent_ids = set(db.scalars(select(ConsentQuestion.question_id).where(ConsentQuestion.consent_id == consent.id)).all())
-    if consent is None or not consent_ids:
+    consented_questions = {item["question_code"] for item in consent["scope"]} if consent else set()
+    if consent is None or not consented_questions:
         _add_event(db, case, "checks_blocked", "consentement absent ou expiré", outcome="blocked")
         if case.status in {"received", "in_progress", "pending"}:
             case.status = "pending"
@@ -1611,6 +1590,9 @@ def _run_checks(case: Case, db: Session) -> dict:
     from connectors import build_connector
 
     connector = build_connector()
+    # Demandeur annoncé au détenteur (X-Road-Client) : l'administration qui ouvre le dossier.
+    requester = db.get(Administration, case.requester_administration_id)
+    client_id = requester_client(requester.code)
     stale_request_before = now - timedelta(seconds=REQUEST_LEASE_SECONDS)
     for request in requests:
         if request.status in {"confirmed", "rejected", "not_found", "ambiguous"}:
@@ -1625,7 +1607,7 @@ def _run_checks(case: Case, db: Session) -> dict:
             (Permission.valid_from.is_(None) | (Permission.valid_from <= now)),
             (Permission.valid_until.is_(None) | (Permission.valid_until > now)),
         ))
-        if not question.active or permission is None or question.id not in consent_ids:
+        if not question.active or permission is None or question.code not in consented_questions:
             request.status = "blocked"
             _add_event(db, case, "check_blocked", "consentement ou autorisation absent", outcome="blocked", question=question)
             continue
@@ -1694,7 +1676,9 @@ def _run_checks(case: Case, db: Session) -> dict:
         db.add(attempt)
         db.commit()
         try:
-            reply = connector.query(registry_info["organization"], question.service_code, registry_info["payload"])
+            # La référence de l'accord voyage en en-tête (X-Consent-Id) : la garde du détenteur la vérifie.
+            reply = connector.query(registry_info["organization"], question.service_code, registry_info["payload"],
+                                    client_id=client_id, consent_id=consent["id"])
         except Exception:
             reply = {"status": "unavailable", "data": None, "message": "Registre indisponible", "transport_id": None}
         transport_status = reply.get("status")
@@ -1725,7 +1709,8 @@ def _run_checks(case: Case, db: Session) -> dict:
         attempt.transport_id = reply.get("transport_id")
         _add_event(db, case, "registry_check", question.description, outcome=request.status,
                    actor_type="administration", question=question, registry=registry_info["registry"],
-                   categories=[question.code], correlation_id=str(request.id))
+                   categories=[question.code], correlation_id=str(request.id),
+                   details={"consent_id": consent["id"]})
         db.commit()
 
     required_states = [request.status for request in requests if links[request.question_id].required]

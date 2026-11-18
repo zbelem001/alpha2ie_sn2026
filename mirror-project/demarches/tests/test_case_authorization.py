@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+import httpx
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
@@ -32,17 +33,20 @@ from app.api import (
     RegistrationOtpVerify,
     verify_registration_otp,
 )
+from consent_client import ConsentClient
+from consent_service.app import create_app as create_consent_app
+from fastapi.testclient import TestClient
 from journal_client import MemoryJournal
 
 from app.admin_api import list_admin_audit
 from app.database.base import Base
+from app.consents import requester_client, use_consents
 from app.journal import use_journal
 from app.database.models import (
     Administration,
     Case,
     CitizenDocumentIdentifier,
     CitizenIdentityLink,
-    Consent,
     Notification,
     Permission,
     Procedure,
@@ -54,6 +58,8 @@ from app.database.models import (
     RequestAttempt,
 )
 from app.security import Principal
+
+CONSENT_TOKEN = "jeton-demarches-consentement-0123"
 
 
 @pytest.fixture
@@ -77,6 +83,22 @@ def journal():
     use_journal(memory)
     yield memory
     use_journal(None)
+
+
+@pytest.fixture(autouse=True)
+def consent_registry(journal):
+    """Registre des accords de la couche consentement-minimisation, en mémoire (SQLite), joint par son client.
+
+    Il écrit dans le même journal que la couche démarches, comme dans la pile.
+    """
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    app = create_consent_app(engine=engine, journal=journal, tokens={CONSENT_TOKEN: "demarches"}, holders={})
+    with TestClient(app) as http:
+        client = ConsentClient("http://testserver", CONSENT_TOKEN, client=http)
+        use_consents(client)
+        yield client
+    use_consents(None)
+    engine.dispose()
 
 
 def add_procedure(db: Session) -> tuple[Administration, Administration, Procedure]:
@@ -292,7 +314,7 @@ class MatchConnector:
     def __init__(self, reply):
         self.reply = reply
 
-    def query(self, organization, service, payload):
+    def query(self, organization, service, payload, client_id=None, consent_id=None):
         return self.reply
 
 
@@ -344,7 +366,7 @@ def test_citizen_can_link_confirmed_reference_with_verified_phone(db: Session, m
     )
 
     class IdentityConnector:
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             assert organization == "BF/GOV/MAIRIE-OUAGA/ETAT-CIVIL"
             assert service == "identity-match"
             assert payload["subject"] == {
@@ -434,10 +456,9 @@ def test_agent_can_find_citizen_by_document_identifier(db: Session, monkeypatch)
         linked_citizen,
         db,
     )
-    db.get(Consent, UUID(consent["id"])).expires_at = None
 
     class RegistryConnector:
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             assert payload["subject"] == {}
             assert payload["parameters"] == {
                 "identifier_type": "cnib_number",
@@ -473,10 +494,9 @@ def test_document_reference_is_sent_with_the_expected_holder(db: Session, monkey
         citizen,
         db,
     )
-    db.get(Consent, UUID(consent["id"])).expires_at = None
 
     class RegistryConnector:
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             assert payload["subject"] == {"pivot_id": subject_ref}
             assert payload["parameters"] == {"identifier_type": "cnib_number", "document_identifier": "CNIB-DEMO-123456"}
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
@@ -491,7 +511,7 @@ def test_citizen_can_start_a_procedure_without_an_agent(db: Session, monkeypatch
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234", display_name="Awa KABORE")
 
     class SuccessfulConnector:
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             assert payload["subject"] == {"pivot_id": "ACTE:OUAGA:2004:01234"}
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
@@ -529,7 +549,7 @@ def test_citizen_reports_a_consultation_once_and_the_requester_sees_it(db: Sessi
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
 
     class SuccessfulConnector:
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
     monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
@@ -558,7 +578,7 @@ def test_only_the_citizen_can_report_and_only_a_registry_consultation(db: Sessio
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
 
     class SuccessfulConnector:
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
     monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
@@ -586,7 +606,7 @@ def test_sms_cannot_be_recorded_as_consent_channel():
         )
 
 
-def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Session, monkeypatch):
+def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Session, monkeypatch, consent_registry):
     owner, _, procedure = add_procedure(db)
     agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
@@ -600,7 +620,9 @@ def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Sessi
         citizen,
         db,
     )
-    assert granted["expires_at"] - granted["granted_at"] == timedelta(days=30)
+    # Fin de validité fixée par la couche démarches, date d'accord par le registre des accords : 30 jours.
+    lasts = datetime.fromisoformat(granted["expires_at"]) - datetime.fromisoformat(granted["granted_at"])
+    assert abs(lasts - timedelta(days=30)) < timedelta(seconds=5)
     refused = record_consent(
         case_id,
         ConsentCreate(decision="refused", question_codes=question_codes, notice_version="demo-1", channel="web"),
@@ -608,8 +630,7 @@ def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Sessi
         db,
     )
 
-    old_consent = db.get(Consent, UUID(granted["id"]))
-    assert old_consent.status == "revoked"
+    assert consent_registry.get(granted["id"])["status"] == "revoked"
     assert refused["status"] == "refused"
     with pytest.raises(HTTPException) as error:
         execute_checks(case_id, agent, db)
@@ -623,12 +644,9 @@ def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Sessi
         citizen,
         db,
     )
-    # SQLite does not preserve timezone-aware datetimes. The duration is checked
-    # above; clear expiry here to exercise the grant/resume path independently.
-    db.get(Consent, UUID(renewed["id"])).expires_at = None
 
     class SuccessfulConnector:
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
     monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
@@ -639,7 +657,7 @@ def test_refusal_replaces_prior_grant_and_a_later_grant_resumes_checks(db: Sessi
     assert result["checks"][0]["attempt_count"] == 1
 
 
-def test_only_the_case_citizen_can_record_consent(db: Session):
+def test_only_the_case_citizen_can_record_consent(db: Session, consent_registry):
     owner, _, procedure = add_procedure(db)
     agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
@@ -656,7 +674,7 @@ def test_only_the_case_citizen_can_record_consent(db: Session):
         )
 
     assert error.value.status_code == 403
-    assert db.scalar(select(func.count()).select_from(Consent)) == 0
+    assert consent_registry.search(case_id=case["id"]) == []
 
 
 @pytest.mark.parametrize(
@@ -668,7 +686,7 @@ def test_only_the_case_citizen_can_record_consent(db: Session):
     ],
     ids=["past", "over-30-days", "timezone-missing"],
 )
-def test_consent_expiration_must_be_future_timezone_aware_and_within_30_days(db: Session, expires_at):
+def test_consent_expiration_must_be_future_timezone_aware_and_within_30_days(db: Session, expires_at, consent_registry):
     owner, _, procedure = add_procedure(db)
     agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
@@ -684,10 +702,10 @@ def test_consent_expiration_must_be_future_timezone_aware_and_within_30_days(db:
         )
 
     assert error.value.status_code == 422
-    assert db.scalar(select(func.count()).select_from(Consent)) == 0
+    assert consent_registry.search(case_id=case["id"]) == []
 
 
-def test_citizen_can_revoke_consent_and_every_step_is_in_the_journal(db: Session, journal):
+def test_citizen_can_revoke_consent_and_every_step_is_in_the_journal(db: Session, journal, consent_registry):
     owner, _, procedure = add_procedure(db)
     agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
@@ -701,8 +719,6 @@ def test_citizen_can_revoke_consent_and_every_step_is_in_the_journal(db: Session
         citizen,
         db,
     )
-    # SQLite drops timezone metadata; revoke checks status and ownership here.
-    db.get(Consent, UUID(consent["id"])).expires_at = None
 
     with pytest.raises(HTTPException) as error:
         revoke_consent(case_id, stranger, db)
@@ -711,7 +727,7 @@ def test_citizen_can_revoke_consent_and_every_step_is_in_the_journal(db: Session
     result = revoke_consent(case_id, citizen, db)
 
     assert result["status"] == "revoked"
-    assert db.get(Consent, UUID(consent["id"])).status == "revoked"
+    assert consent_registry.get(consent["id"])["status"] == "revoked"
     with pytest.raises(HTTPException) as error:
         execute_checks(case_id, agent, db)
     assert error.value.status_code == 403
@@ -756,10 +772,9 @@ def test_registry_boolean_must_be_a_boolean(
         db,
     )
     # SQLite drops timezone metadata on reads; expiry was covered in the test above.
-    db.get(Consent, UUID(consent["id"])).expires_at = None
 
     class RegistryConnector:
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             return {"status": "ok", "data": {"valid": response_value}, "transport_id": "test-transport"}
 
     monkeypatch.setattr(connectors, "build_connector", lambda: RegistryConnector())
@@ -786,12 +801,11 @@ def test_unavailable_registry_can_be_retried_without_duplicate_request(db: Sessi
         citizen,
         db,
     )
-    db.get(Consent, UUID(consent["id"])).expires_at = None
 
     class IntermittentConnector:
         attempts = 0
 
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             self.attempts += 1
             if self.attempts == 1:
                 raise TimeoutError("registre hors ligne")
@@ -834,7 +848,6 @@ def test_fresh_pending_claim_is_skipped_and_stale_claim_is_recovered(db: Session
         citizen,
         db,
     )
-    db.get(Consent, UUID(consent["id"])).expires_at = None
     request = db.scalar(select(RegistryRequest).where(RegistryRequest.case_id == case_id))
     request.status = "pending"
     request.attempt_count = 1
@@ -845,7 +858,7 @@ def test_fresh_pending_claim_is_skipped_and_stale_claim_is_recovered(db: Session
     class SuccessfulConnector:
         calls = 0
 
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             self.calls += 1
             return {"status": "ok", "data": {"valid": True}, "transport_id": "recovered"}
 
@@ -880,7 +893,7 @@ def test_consultation_is_recorded_with_who_asked_what_and_why(db: Session, monke
     citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
 
     class SuccessfulConnector:
-        def query(self, organization, service, payload):
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
             return {"status": "ok", "data": {"valid": True}, "transport_id": "test-transport"}
 
     monkeypatch.setattr(connectors, "build_connector", lambda: SuccessfulConnector())
@@ -939,3 +952,58 @@ def test_local_administration_audit_reads_its_cases_in_the_journal(db: Session, 
     assert entries[1]["role"] == "agent" and entries[1]["actor"] == owner.code
     agents_only = list_admin_audit(search=None, actor_role="agent", limit=50, principal=admin, db=db)
     assert [entry["action"] for entry in agents_only] == ["case_created"]
+
+
+# --- Couche consentement-minimisation (consentement-minimisation/) ------------------------------
+
+
+def test_each_check_carries_its_requester_and_the_consent_reference(db: Session, monkeypatch, journal, consent_registry):
+    owner, _, procedure = add_procedure(db)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    calls = []
+
+    class RecordingConnector:
+        def query(self, organization, service, payload, client_id=None, consent_id=None):
+            calls.append((client_id, consent_id, payload))
+            return {"status": "ok", "data": {"valid": True}, "transport_id": None}
+
+    monkeypatch.setattr(connectors, "build_connector", lambda: RecordingConnector())
+    case_id = start_citizen_case(CitizenCaseCreate(procedure_code=procedure.code, confirmed=True), citizen, db)["id"]
+    consent = consent_registry.active(case_id)
+
+    [(client_id, consent_id, payload)] = calls
+    assert client_id == owner.code and consent_id == consent["id"]
+    assert "consent_id" not in payload  # le corps reste celui du contrat des registres
+    assert consent["scope"] == [{"question_code": "passport_cnib_valid", "holder_code": owner.code,
+                                 "service_code": "cnib-status"}]
+    [consultation] = journal.search(case_id=case_id, event_type="registry_check")
+    assert consultation["consent_id"] == consent["id"]
+    [recorded] = journal.search(case_id=case_id, event_type="consent_recorded")
+    assert recorded["consent_id"] == consent["id"] and recorded["outcome"] == "granted"
+
+
+def test_an_administration_can_be_announced_as_its_xroad_subsystem(monkeypatch):
+    monkeypatch.setenv("XROAD_CLIENTS", "BF/GOV/FONCTION-PUBLIQUE=BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT, X=Y")
+    assert requester_client("BF/GOV/FONCTION-PUBLIQUE") == "BF/GOV/FONCTION-PUBLIQUE/RECRUTEMENT"
+    assert requester_client("BF/GOV/DIPF/PASSEPORTS") == "BF/GOV/DIPF/PASSEPORTS"
+
+
+def test_without_the_consent_registry_nothing_is_recorded_nor_checked(db: Session, monkeypatch):
+    owner, _, procedure = add_procedure(db)
+    agent = Principal("agent-sub", frozenset({"agent"}), owner.code, None)
+    citizen = Principal("citizen-sub", frozenset({"citizen"}), None, "ACTE:OUAGA:2004:01234")
+    case_id = UUID(create_case(CaseCreate(procedure_code=procedure.code, subject_ref=citizen.citizen_ref), agent, db)["id"])
+
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refusé", request=request)
+
+    use_consents(ConsentClient("http://consentement:8000", CONSENT_TOKEN,
+                               client=httpx.Client(transport=httpx.MockTransport(down))))
+    monkeypatch.setattr(connectors, "build_connector", lambda: pytest.fail("aucun registre ne doit être appelé"))
+    with pytest.raises(HTTPException) as recording:
+        record_consent(case_id, ConsentCreate(decision="granted", question_codes=["passport_cnib_valid"],
+                                              notice_version="demo-1", channel="web"), citizen, db)
+    assert recording.value.status_code == 503
+    with pytest.raises(HTTPException) as checking:
+        execute_checks(case_id, agent, db)
+    assert checking.value.status_code == 503
