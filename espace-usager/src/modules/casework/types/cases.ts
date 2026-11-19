@@ -10,7 +10,7 @@ export type ApiCase = {
   applicantName: string; phone: string;
   procedureTitle: string; procedurePurpose: string; procedureVersion: number; consentDays: number;
   channel: ConsentChannel; status: CaseStatus; authorizationId: string;
-  checks: AgentCheck[];
+  checks: AgentCheck[]; identifierStatus?: { complete: boolean; missing: DocumentRequirement[] } | null;
 };
 /** Dossier affiché : celui de l'API, avec l'état de l'accord tiré de son journal. */
 export type AgentCase = ApiCase & { consent: ConsentView };

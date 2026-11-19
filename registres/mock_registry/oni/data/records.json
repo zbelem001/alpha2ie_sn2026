@@ -16,5 +16,79 @@
     "valid": false,
     "_scenario": "CNIB enregistrée mais non valide",
     "cnib_number": "CNIB-DEMO-OUAGA-1997-00933"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1985:98001",
+    "valid": true,
+    "cnib_number": "CNIB-TEST-0001",
+    "_scenario": "Fiche CNIB fictive complète ; le service ne renvoie que son statut de validité",
+    "_seed_batch": "complete-demo-10-v1",
+    "card_serial": "SERIE-CNIB-TEST-0001",
+    "issued_on": "2024-05-02",
+    "expires_on": "2034-05-01",
+    "card_status": "active"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1986:98002",
+    "valid": true,
+    "cnib_number": "CNIB-TEST-0002",
+    "_scenario": "CNIB fictive, état actif ou inactif selon le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1987:98003",
+    "valid": false,
+    "cnib_number": "CNIB-TEST-0003",
+    "_scenario": "CNIB fictive, état actif ou inactif selon le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1988:98004",
+    "valid": true,
+    "cnib_number": "CNIB-TEST-0004",
+    "_scenario": "CNIB fictive, état actif ou inactif selon le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1989:98005",
+    "valid": true,
+    "cnib_number": "CNIB-TEST-0005",
+    "_scenario": "CNIB fictive, état actif ou inactif selon le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1990:98006",
+    "valid": true,
+    "cnib_number": "CNIB-TEST-0006",
+    "_scenario": "CNIB fictive, état actif ou inactif selon le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1991:98007",
+    "valid": true,
+    "cnib_number": "CNIB-TEST-0007",
+    "_scenario": "CNIB fictive, état actif ou inactif selon le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1992:98008",
+    "valid": false,
+    "cnib_number": "CNIB-TEST-0008",
+    "_scenario": "CNIB fictive, état actif ou inactif selon le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1993:98009",
+    "valid": true,
+    "cnib_number": "CNIB-TEST-0009",
+    "_scenario": "CNIB fictive, état actif ou inactif selon le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1994:98010",
+    "valid": true,
+    "cnib_number": "CNIB-TEST-0010",
+    "_scenario": "CNIB fictive, état actif ou inactif selon le scénario",
+    "_seed_batch": "complete-demo-10-v1"
   }
 ]

@@ -352,6 +352,8 @@ services:
         condition: service_started
       keycloak-profile-init:
         condition: service_completed_successfully
+      keycloak-admin-client-init:
+        condition: service_completed_successfully
       registry-db-init:
         condition: service_completed_successfully
       civil-registry:

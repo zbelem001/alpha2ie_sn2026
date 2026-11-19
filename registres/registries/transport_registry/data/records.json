@@ -4,7 +4,13 @@
     "last_name": "KABORE",
     "first_names": "Awa",
     "birth_date": "2004-03-12",
-    "driving_licence": { "categories": ["B"], "issued_on": "2024-05-02", "expires_on": "2034-05-01" },
+    "driving_licence": {
+      "categories": [
+        "B"
+      ],
+      "issued_on": "2024-05-02",
+      "expires_on": "2034-05-01"
+    },
     "_scenario": "Permis B valide"
   },
   {
@@ -12,7 +18,14 @@
     "last_name": "SAWADOGO",
     "first_names": "Issa",
     "birth_date": "1998-07-23",
-    "driving_licence": { "categories": ["A", "B"], "issued_on": "2019-01-15", "expires_on": "2029-01-14" },
+    "driving_licence": {
+      "categories": [
+        "A",
+        "B"
+      ],
+      "issued_on": "2019-01-15",
+      "expires_on": "2029-01-14"
+    },
     "_scenario": "Permis A et B valide"
   },
   {
@@ -20,7 +33,13 @@
     "last_name": "TRAORE",
     "first_names": "Moussa",
     "birth_date": "1995-06-01",
-    "driving_licence": { "categories": ["B"], "issued_on": "2014-01-11", "expires_on": "2024-01-10" },
+    "driving_licence": {
+      "categories": [
+        "B"
+      ],
+      "issued_on": "2014-01-11",
+      "expires_on": "2024-01-10"
+    },
     "_scenario": "Homonyme 1 : permis expiré"
   },
   {
@@ -28,7 +47,146 @@
     "last_name": "YAMEOGO",
     "first_names": "Paul",
     "birth_date": "1988-02-20",
-    "driving_licence": { "categories": ["B", "C"], "issued_on": "2021-09-01", "expires_on": "2031-08-31" },
+    "driving_licence": {
+      "categories": [
+        "B",
+        "C"
+      ],
+      "issued_on": "2021-09-01",
+      "expires_on": "2031-08-31"
+    },
     "_scenario": "Permis B et C valide"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1985:98001",
+    "last_name": "DEMO",
+    "first_names": "Awa",
+    "birth_date": "1985-02-03",
+    "driving_licence": {
+      "number": "PERMIS-TEST-0001",
+      "categories": [
+        "B"
+      ],
+      "issued_on": "2024-05-02",
+      "expires_on": "2034-05-01",
+      "issuing_office": "Direction générale des transports terrestres",
+      "status": "active",
+      "points_remaining": 12
+    },
+    "_scenario": "Fiche de permis fictive détaillée ; le service ne renvoie que les champs prévus au contrat",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1986:98002",
+    "last_name": "TEST_002",
+    "first_names": "Citoyen fictif 002",
+    "birth_date": "1986-03-05",
+    "driving_licence": {
+      "categories": [
+        "A",
+        "B"
+      ],
+      "issued_on": "2022-01-15",
+      "expires_on": "2032-01-14"
+    },
+    "_scenario": "Permis fictif valide, expiré ou absent",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1987:98003",
+    "last_name": "TEST_003",
+    "first_names": "Citoyen fictif 003",
+    "birth_date": "1987-04-07",
+    "driving_licence": null,
+    "_scenario": "Aucun permis enregistré dans ce scénario fictif",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1988:98004",
+    "last_name": "TEST_004",
+    "first_names": "Citoyen fictif 004",
+    "birth_date": "1988-05-09",
+    "driving_licence": {
+      "categories": [
+        "B"
+      ],
+      "issued_on": "2016-01-15",
+      "expires_on": "2024-01-14"
+    },
+    "_scenario": "Permis fictif valide, expiré ou absent",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1989:98005",
+    "last_name": "TEST_005",
+    "first_names": "Citoyen fictif 005",
+    "birth_date": "1989-06-11",
+    "driving_licence": {
+      "categories": [
+        "B"
+      ],
+      "issued_on": "2022-01-15",
+      "expires_on": "2032-01-14"
+    },
+    "_scenario": "Permis fictif valide, expiré ou absent",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1990:98006",
+    "last_name": "TEST_006",
+    "first_names": "Citoyen fictif 006",
+    "birth_date": "1990-07-13",
+    "driving_licence": {
+      "categories": [
+        "A",
+        "B"
+      ],
+      "issued_on": "2022-01-15",
+      "expires_on": "2032-01-14"
+    },
+    "_scenario": "Permis fictif valide, expiré ou absent",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1991:98007",
+    "last_name": "TEST_007",
+    "first_names": "Citoyen fictif 007",
+    "birth_date": "1991-08-15",
+    "driving_licence": null,
+    "_scenario": "Aucun permis enregistré dans ce scénario fictif",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1992:98008",
+    "last_name": "TEST_008",
+    "first_names": "Citoyen fictif 008",
+    "birth_date": "1992-09-17",
+    "driving_licence": null,
+    "_scenario": "Aucun permis enregistré dans ce scénario fictif",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1993:98009",
+    "last_name": "TEST_009",
+    "first_names": "Citoyen fictif 009",
+    "birth_date": "1993-10-19",
+    "driving_licence": {
+      "categories": [
+        "B"
+      ],
+      "issued_on": "2022-01-15",
+      "expires_on": "2032-01-14"
+    },
+    "_scenario": "Permis fictif valide, expiré ou absent",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1994:98010",
+    "last_name": "TEST_010",
+    "first_names": "Citoyen fictif 010",
+    "birth_date": "1994-11-21",
+    "driving_licence": null,
+    "_scenario": "Aucun permis enregistré dans ce scénario fictif",
+    "_seed_batch": "complete-demo-10-v1"
   }
 ]

@@ -18,7 +18,7 @@ export function CaseIdentifiersPanel({ item, busy, onSave }: { item: AgentCase; 
   }
   if (!status) return null;
   return <section className={styles.consentPanel} aria-label="Références du citoyen">
-    {status.complete ? <><p className={styles.granted}><CheckCircle2 size={19} /> Références complètes pour cette démarche</p><p className={styles.hint}>Les références sont disponibles. Les vérifications sont lancées automatiquement.</p></> : <>
+    {status.complete ? <><p className={styles.granted}><CheckCircle2 size={19} /> Références complètes pour cette démarche</p><p className={styles.hint}>Les références sont prêtes. Cliquez sur « Vérifier » pour interroger les registres.</p></> : <>
       <h3>Références à compléter</h3><p className={styles.hint}>Accord reçu. Demandez au citoyen uniquement les références manquantes ci-dessous.</p>
       <form onSubmit={save} noValidate>
         <DocumentFields requirements={status.missing} values={values} onChange={setValues} disabled={busy} prefix="missing-reference" />

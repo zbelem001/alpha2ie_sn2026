@@ -92,6 +92,8 @@ textarea.input { resize: vertical; line-height: 1.7; }
 .questionChoices span { display: grid; gap: 7px; }
 .questionChoices strong { font-size: 12px; font-weight: 550; line-height: 1.7; }
 .questionChoices small { color: #9ba585; font-size: 10px; line-height: 1.6; }
+.activeService { color: #25744a; font-weight: 600; }
+.inactiveService { color: #a24b39; font-weight: 600; }
 .orderedChecks { margin: 28px 0; }
 .advancedOptions { padding: 0 20px 20px; }
 .documentConfig { flex: 1.5; min-width: 0; display: grid; gap: 10px; }

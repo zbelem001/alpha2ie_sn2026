@@ -5,7 +5,12 @@
     "first_names": "Mariam",
     "birth_date": "1997-10-21",
     "declarations": [
-      { "reference": "PV-OUAGA-2026-004512", "document_type": "CNIB", "document_number": "B1234567", "declared_on": "2026-10-02" }
+      {
+        "reference": "PV-OUAGA-2026-004512",
+        "document_type": "CNIB",
+        "document_number": "B1234567",
+        "declared_on": "2026-10-02"
+      }
     ],
     "_scenario": "CNIB déclarée perdue"
   },
@@ -15,8 +20,126 @@
     "first_names": "Paul",
     "birth_date": "1988-02-20",
     "declarations": [
-      { "reference": "PV-OUAGA-2025-011873", "document_type": "PASSEPORT", "document_number": "P0098765", "declared_on": "2025-06-14" }
+      {
+        "reference": "PV-OUAGA-2025-011873",
+        "document_type": "PASSEPORT",
+        "document_number": "P0098765",
+        "declared_on": "2025-06-14"
+      }
     ],
     "_scenario": "Passeport perdu, mais pas de CNIB"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1985:98001",
+    "last_name": "DEMO",
+    "first_names": "Awa",
+    "birth_date": "1985-02-03",
+    "declarations": [
+      {
+        "reference": "PV-TEST-0001",
+        "document_type": "CNIB",
+        "document_number": "ANCIENNE-CNIB-TEST-0001",
+        "declared_on": "2026-11-10",
+        "filed_at": "Commissariat central de Ouagadougou",
+        "statement": "Déclaration fictive de perte de l’ancienne carte"
+      }
+    ],
+    "_scenario": "Dossier fictif complet de déclaration de perte",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1986:98002",
+    "last_name": "TEST_002",
+    "first_names": "Citoyen fictif 002",
+    "birth_date": "1986-03-05",
+    "declarations": [],
+    "_scenario": "Aucune perte déclarée dans le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1987:98003",
+    "last_name": "TEST_003",
+    "first_names": "Citoyen fictif 003",
+    "birth_date": "1987-04-07",
+    "declarations": [
+      {
+        "reference": "PV-TEST-0003",
+        "document_type": "CNIB",
+        "document_number": "CNIB-TEST-0003",
+        "declared_on": "2026-11-10"
+      }
+    ],
+    "_scenario": "Déclaration fictive de perte",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1988:98004",
+    "last_name": "TEST_004",
+    "first_names": "Citoyen fictif 004",
+    "birth_date": "1988-05-09",
+    "declarations": [],
+    "_scenario": "Aucune perte déclarée dans le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1989:98005",
+    "last_name": "TEST_005",
+    "first_names": "Citoyen fictif 005",
+    "birth_date": "1989-06-11",
+    "declarations": [],
+    "_scenario": "Aucune perte déclarée dans le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1990:98006",
+    "last_name": "TEST_006",
+    "first_names": "Citoyen fictif 006",
+    "birth_date": "1990-07-13",
+    "declarations": [],
+    "_scenario": "Aucune perte déclarée dans le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1991:98007",
+    "last_name": "TEST_007",
+    "first_names": "Citoyen fictif 007",
+    "birth_date": "1991-08-15",
+    "declarations": [
+      {
+        "reference": "PV-TEST-0007",
+        "document_type": "PASSEPORT",
+        "document_number": "PASSEPORT-TEST-0007",
+        "declared_on": "2026-11-12"
+      }
+    ],
+    "_scenario": "Déclaration fictive de perte",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1992:98008",
+    "last_name": "TEST_008",
+    "first_names": "Citoyen fictif 008",
+    "birth_date": "1992-09-17",
+    "declarations": [],
+    "_scenario": "Aucune perte déclarée dans le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1993:98009",
+    "last_name": "TEST_009",
+    "first_names": "Citoyen fictif 009",
+    "birth_date": "1993-10-19",
+    "declarations": [],
+    "_scenario": "Aucune perte déclarée dans le scénario",
+    "_seed_batch": "complete-demo-10-v1"
+  },
+  {
+    "pivot_id": "ACTE:OUAGA:1994:98010",
+    "last_name": "TEST_010",
+    "first_names": "Citoyen fictif 010",
+    "birth_date": "1994-11-21",
+    "declarations": [],
+    "_scenario": "Aucune perte déclarée dans le scénario",
+    "_seed_batch": "complete-demo-10-v1"
   }
 ]

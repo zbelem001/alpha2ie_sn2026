@@ -52,7 +52,7 @@ export function CitizenHomeScreen() {
       <CitizenHeader help={help} onHelp={() => setHelp(!help)} />
 
       <main className={styles.main} id="contenu">
-        <div className={styles.accountLine}><span>Espace citoyen</span><span>{name ? `Bonjour ${name}` : "Mon espace"}</span></div>
+        <div className={styles.mainAction}><span className={styles.welcome}>Bonjour{name ? ` ${name}` : ""}</span><Link href="/usager/demarches" className={styles.primary}>Faire une démarche</Link></div>
 
         {help && <aside className={styles.help} id="citizen-help"><strong>Comprendre une consultation</strong><p>Choisissez « Voir le détail » pour connaître l’information vérifiée et la raison de la consultation. Si une consultation vous semble inhabituelle, vous pouvez la signaler depuis son détail.</p></aside>}
 
@@ -74,7 +74,7 @@ export function CitizenHomeScreen() {
                   <span className={styles.detailLink}><span>Voir le résultat</span><ChevronDown size={18} aria-hidden="true" /></span>
                 </summary>
                 <div className={styles.entryBody}>
-                  <dl>{item.checks.map((check) => <div key={check.questionCode}><dt>{check.label}</dt><dd>{CHECK_RESULTS[check.status] ?? "À reprendre"}{check.required ? "" : " · facultatif"}</dd></div>)}</dl>
+                  <dl>{item.checks.map((check) => <div key={check.questionCode}><dt>{check.label}</dt><dd>{check.result === true ? "Réponse minimale : Oui" : check.result === false ? "Réponse minimale : Non" : CHECK_RESULTS[check.status] ?? "À reprendre"}{check.required ? "" : " · facultatif"}</dd></div>)}</dl>
                   <ConsentControl item={item} onRevoke={async (caseId) => { await space.revokeConsent(caseId); setNotice("Votre accord est retiré : plus aucune vérification ne peut être faite avec cet accord."); }} />
                 </div>
               </details>
@@ -82,7 +82,7 @@ export function CitizenHomeScreen() {
           </ol>
         </section></details>}
         <section className={styles.journal} aria-labelledby="journal-title">
-          <div className={styles.journalHeading}><h2 id="journal-title">Historique des consultations</h2><span>{space.consultations.length} consultation{space.consultations.length === 1 ? "" : "s"}</span></div>
+          <div className={styles.journalHeading}><h2 id="journal-title">Historique des consultations</h2></div>
           <div className={styles.columnHead} aria-hidden="true"><span>Date</span><span>Administration et démarche</span><span>Détail</span></div>
           {space.loading ? <p className={styles.empty}>Chargement…</p> : space.consultations.length === 0 ? <p className={styles.empty}>Aucune consultation pour le moment.</p> : <ol className={styles.entries}>
             {space.consultations.map((entry) => <li key={entry.id}>
@@ -93,7 +93,7 @@ export function CitizenHomeScreen() {
                   <span className={styles.detailLink}><span>Voir le détail</span><ChevronDown size={18} aria-hidden="true" /></span>
                 </summary>
                 <div className={styles.entryBody}>
-                  <dl><div><dt>Démarche</dt><dd>{entry.purpose}</dd></div><div><dt>Information</dt><dd>{entry.information}</dd></div><div><dt>Registre</dt><dd>{entry.source}</dd></div><div><dt>Autorisation</dt><dd>{entry.basis}</dd></div><div><dt>Résultat</dt><dd>{OUTCOMES[entry.outcome] ?? "Vérification à examiner"}</dd></div></dl>
+                  <dl><div><dt>Démarche</dt><dd>{entry.purpose}</dd></div><div><dt>Information</dt><dd>{entry.information}</dd></div><div><dt>Registre</dt><dd>{entry.source}</dd></div><div><dt>Autorisation</dt><dd>{entry.basis}</dd></div><div><dt>Résultat</dt><dd>{entry.result === true ? "Réponse minimale : Oui" : entry.result === false ? "Réponse minimale : Non" : OUTCOMES[entry.outcome] ?? "Vérification à examiner"}</dd></div></dl>
                   <ReportActions entry={entry} reports={space.reports.filter((item) => item.consultationId === entry.id)} onReport={(kind) => space.report(entry.caseId, entry.id, kind)} />
                 </div>
               </details>

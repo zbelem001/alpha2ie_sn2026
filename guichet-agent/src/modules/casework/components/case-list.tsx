@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { Eye, ListChecks, MessageSquare, Search } from "lucide-react";
+import { consentIsActive } from "@/lib/journal";
 import type { AgentCase } from "@/modules/casework/types/cases";
 import { formatPhone } from "@/lib/journal";
 import { CaseStatusBadge, caseLabel } from "@/modules/casework/components/case-status";
 import { useBrowserClock } from "@/lib/use-browser-clock";
 import styles from "@/modules/casework/styles/workspace.module.css";
 
-export function CaseList({ cases, loading, onOpen }: {
+export function CaseList({ cases, loading, onOpen, onVerify }: {
   cases: AgentCase[]; loading: boolean;
   onOpen: (id: string, section?: "consent" | "checks") => void;
+  onVerify: (id: string) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -43,6 +45,8 @@ export function CaseList({ cases, loading, onOpen }: {
               const label = caseLabel(item, now);
               const needsConsent = label === "En attente du citoyen" || label === "Accord expiré" || label === "Accord retiré";
               const hasShortcut = item.status !== "completed" && item.consent.status !== "refused";
+              const canVerify = consentIsActive(item.consent, now) && item.identifierStatus?.complete === true &&
+                item.status !== "completed" && item.checks.some((check) => ["queued", "unavailable", "error", "blocked"].includes(check.status));
               return <tr key={item.id} className={styles.requestRow}>
                 <td><button type="button" className={styles.tableReference} onClick={() => onOpen(item.id)} aria-label={"Ouvrir le dossier " + item.reference}>{item.reference}</button></td>
                 <td className={styles.applicantName}>{item.applicantName}</td>
@@ -54,6 +58,8 @@ export function CaseList({ cases, loading, onOpen }: {
                 <td className={styles.actionsCell}><div className={styles.rowActions}>
                   <button type="button" className={styles.iconAction} title="Voir le détail" aria-label={"Voir le détail du dossier " + item.reference} onClick={() => onOpen(item.id)}><Eye size={18} aria-hidden="true" /></button>
                   {hasShortcut && <button type="button" className={styles.iconAction} title={needsConsent ? "Recueillir l’accord" : "Accéder aux vérifications"} aria-label={(needsConsent ? "Recueillir l’accord pour " : "Accéder aux vérifications de ") + item.reference} onClick={() => onOpen(item.id, needsConsent ? "consent" : "checks")}>{needsConsent ? <MessageSquare size={17} aria-hidden="true" /> : <ListChecks size={18} aria-hidden="true" />}</button>}
+                  {canVerify && <button type="button" className={styles.verifyAction} onClick={() => void onVerify(item.id)}>{item.checks.some((check) => check.status === "unavailable") ? "Reprendre" : "Vérifier"}</button>}
+                  {item.status === "completed" && <button type="button" className={styles.verifyAction} onClick={() => onOpen(item.id, "checks")}>Résultats</button>}
                 </div></td>
               </tr>;
             })}

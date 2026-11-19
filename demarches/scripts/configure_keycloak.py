@@ -58,6 +58,73 @@ def request_json(path: str, token: str, *, method: str = "GET", body: object = N
         return response.status, json.loads(content) if content else None
 
 
+def ensure_demo_citizen(token: str) -> None:
+    """Crée un compte téléphone/PIN pour ouvrir le profil de test prérempli."""
+    from scripts.demo_citizen import DEMO_CITIZEN
+
+    username = DEMO_CITIZEN["username"]
+    query = urllib.parse.urlencode({"username": username, "exact": "true"})
+    _, users = request_json(f"/admin/realms/dlnuf/users?{query}", token)
+    if not isinstance(users, list):
+        raise RuntimeError("Keycloak returned an invalid demo citizen list")
+    if not users:
+        request_json(
+            "/admin/realms/dlnuf/users",
+            token,
+            method="POST",
+            body={
+                "username": username,
+                "enabled": True,
+                "firstName": DEMO_CITIZEN["first_name"],
+                "lastName": DEMO_CITIZEN["last_name"],
+                "attributes": {
+                    "account_kind": ["citizen"],
+                    "phone_number": [DEMO_CITIZEN["phone_number"]],
+                    "phone_number_verified": ["true"],
+                    "citizen_ref": [DEMO_CITIZEN["subject_ref"]],
+                },
+                "credentials": [{"type": "password", "value": DEMO_CITIZEN["pin"], "temporary": False}],
+            },
+        )
+        _, users = request_json(f"/admin/realms/dlnuf/users?{query}", token)
+    if not isinstance(users, list) or len(users) != 1:
+        raise RuntimeError(f"Expected exactly one demo citizen account: {username}")
+
+    user = users[0]
+    attributes = user.get("attributes") or {}
+    attributes.update({
+        "account_kind": ["citizen"],
+        "phone_number": [DEMO_CITIZEN["phone_number"]],
+        "phone_number_verified": ["true"],
+        "citizen_ref": [DEMO_CITIZEN["subject_ref"]],
+    })
+    user.update({
+        "enabled": True,
+        "firstName": DEMO_CITIZEN["first_name"],
+        "lastName": DEMO_CITIZEN["last_name"],
+        "attributes": attributes,
+    })
+    request_json(f"/admin/realms/dlnuf/users/{user['id']}", token, method="PUT", body=user)
+    request_json(
+        f"/admin/realms/dlnuf/users/{user['id']}/reset-password",
+        token,
+        method="PUT",
+        body={"type": "password", "value": DEMO_CITIZEN["pin"], "temporary": False},
+    )
+
+    _, citizen_role = request_json("/admin/realms/dlnuf/roles/citizen", token)
+    _, mapped_roles = request_json(
+        f"/admin/realms/dlnuf/users/{user['id']}/role-mappings/realm", token
+    )
+    if "citizen" not in {role.get("name") for role in mapped_roles or []}:
+        request_json(
+            f"/admin/realms/dlnuf/users/{user['id']}/role-mappings/realm",
+            token,
+            method="POST",
+            body=[citizen_role],
+        )
+
+
 def admin_token() -> str:
     data = urllib.parse.urlencode({
         "grant_type": "password",
@@ -170,6 +237,7 @@ def configure(token: str) -> None:
 
     from scripts.local_administrators import ensure_local_administrators
     ensure_local_administrators(token)
+    ensure_demo_citizen(token)
 
 
 def main() -> None:

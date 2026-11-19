@@ -23,12 +23,35 @@ export function ProceduresPanel({ config, run, busy, error }: { config: LocalAdm
   const [editor, setEditor] = useState<LocalProcedure | null>(null);
   const [original, setOriginal] = useState<string | null>(null);
   const [checksError, setChecksError] = useState("");
-  function edit(item?: LocalProcedure) { setOriginal(item?.code ?? null); setEditor(item ? structuredClone(item) : blank()); setChecksError(""); }
+  function edit(item?: LocalProcedure) {
+    setOriginal(item?.code ?? null);
+    if (!item) setEditor(blank());
+    else {
+      const copy = structuredClone(item);
+      const indexes = new Map<string, number>();
+      copy.checks = [];
+      for (const check of item.checks) {
+        const question = LOCAL_QUESTIONS.find((entry) => entry.questionCodes.includes(check.questionCode));
+        if (!question) continue;
+        const key = `${question.providerCode}:${question.service}`;
+        const index = indexes.get(key);
+        if (index === undefined) {
+          indexes.set(key, copy.checks.length);
+          copy.checks.push({ ...check, questionCode: question.code });
+        } else if (check.required) copy.checks[index] = { ...copy.checks[index], required: true };
+      }
+      setEditor(copy);
+    }
+    setChecksError("");
+  }
   function toggleQuestion(code: string) {
     if (!editor) return;
-    const selected = editor.checks.some((check) => check.questionCode === code);
+    const question = LOCAL_QUESTIONS.find((item) => item.code === code);
+    if (!question) return;
+    const selected = editor.checks.some((check) => question.questionCodes.includes(check.questionCode));
+    if (!question.active && !selected) return;
     setChecksError("");
-    setEditor({ ...editor, checks: selected ? editor.checks.filter((check) => check.questionCode !== code) : [...editor.checks, { questionCode: code, required: true, document: serviceDocument(code) }] });
+    setEditor({ ...editor, checks: selected ? editor.checks.filter((check) => !question.questionCodes.includes(check.questionCode)) : [...editor.checks, { questionCode: code, required: true, document: serviceDocument(code) }] });
   }
   async function save(published: boolean) {
     if (!editor) return;
@@ -53,7 +76,11 @@ export function ProceduresPanel({ config, run, busy, error }: { config: LocalAdm
 
       <div className={styles.formGrid}><label>Nom de la démarche<input className={styles.input} id="procedure-title" value={editor.title} disabled={busy} onChange={(e) => setEditor({ ...editor, title: e.target.value })} /></label><label>Code métier<input className={styles.input} id="procedure-code" value={editor.code} readOnly={Boolean(original)} disabled={busy} placeholder="demarche_exemple" onChange={(e) => setEditor({ ...editor, code: e.target.value })} /></label></div>
       <label className={styles.formLabel}>Finalité des vérifications<textarea className={styles.input} id="procedure-purpose" value={editor.purpose} disabled={busy} rows={2} onChange={(e) => setEditor({ ...editor, purpose: e.target.value })} /></label>
-      <details className={styles.serviceDropdown} open={Boolean(checksError)}><summary>Vérifications obligatoires (questionCode) <span>{editor.checks.length} sélectionnée(s)</span></summary><fieldset className={styles.fieldset} disabled={busy} aria-describedby="question-code-help"><legend className={styles.srOnly}>Choisir les vérifications obligatoires</legend><p className={styles.hint} id="question-code-help">Sélectionnez au moins une vérification. Le questionCode affiché est celui attendu par le service et sera envoyé à la publication ; l’accès X-Road correspondant est configuré automatiquement.</p><div className={styles.questionChoices}>{LOCAL_QUESTIONS.map((question) => <label key={question.code}><input type="checkbox" checked={editor.checks.some((check) => check.questionCode === question.code)} onChange={() => toggleQuestion(question.code)} /><span><strong title={question.label}>{serviceName(question.code)}</strong><small>{question.provider} · questionCode : <code>{question.code}</code></small></span></label>)}</div>{checksError && <p className={styles.error} role="alert">{checksError}</p>}</fieldset></details>
+      <details className={styles.serviceDropdown} open={Boolean(checksError)}><summary>Vérifications obligatoires <span>{editor.checks.length} sélectionnée(s)</span></summary><fieldset className={styles.fieldset} disabled={busy} aria-describedby="question-code-help"><legend className={styles.srOnly}>Choisir les vérifications obligatoires</legend><p className={styles.hint} id="question-code-help">Choisissez les services disponibles pour cette démarche. Les services inactifs restent visibles pour signaler leur état, mais ne peuvent pas être sélectionnés. La publication configure automatiquement les accès X-Road des vérifications retenues.</p><div className={styles.questionChoices}>{LOCAL_QUESTIONS.map((question) => {
+        const selected = editor.checks.some((check) => question.questionCodes.includes(check.questionCode));
+        const accessLabel = question.status === "approved" ? "Accès X-Road autorisé" : question.status === "requested" ? "Accès en attente" : "Accès configuré à la publication";
+        return <label key={`${question.providerCode}:${question.service}`}><input type="checkbox" checked={selected} disabled={!question.active && !selected} onChange={() => toggleQuestion(question.code)} /><span><strong title={question.label}>{serviceName(question.code)}</strong><small>{question.provider} · <b className={question.active ? styles.activeService : styles.inactiveService}>{question.active ? "Actif" : "Inactif"}</b> · {accessLabel}</small></span></label>;
+      })}</div>{checksError && <p className={styles.error} role="alert">{checksError}</p>}</fieldset></details>
       <details className={styles.serviceDropdown}>
         <summary>Options avancées</summary>
         <div className={styles.advancedOptions}>

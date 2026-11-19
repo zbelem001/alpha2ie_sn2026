@@ -16,8 +16,8 @@ function messageFrom(body: unknown, status: number) {
     if (Array.isArray(detail)) {
       const fields: Record<string, string> = {
         code: "Code du service : 3 à 64 caractères, en minuscules, chiffres ou tirets, sans espace ni accent.",
-        questionCode: "Vérification : choisissez un questionCode actif dans la liste des services obligatoires.",
-        question_code: "Vérification : choisissez un questionCode actif dans la liste des services obligatoires.",
+        questionCode: "Vérification invalide ou inactive. Choisissez un service disponible.",
+        question_code: "Vérification invalide ou inactive. Choisissez un service disponible.",
         title: "Nom : renseignez entre 3 et 200 caractères.",
         description: "Description : renseignez entre 5 et 1 000 caractères.",
         response_key: "La réponse du service est invalide.",

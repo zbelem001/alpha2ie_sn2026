@@ -23,6 +23,7 @@ export type ConsentView = {
 export type Consultation = {
   id: string; caseId: string; dateTime: string; organization: string; information: string;
   purpose: string; source: string; basis: string; outcome: string;
+  result: boolean | null;
   // consultation : un registre a été interrogé (peut être signalée) ; blocked : aucun registre consulté.
   kind: "consultation" | "blocked";
 };
@@ -69,6 +70,7 @@ export function consultationsFromJournal(item: Pick<AgentCase, "id" | "procedure
       source: check?.registry ?? event.registry ?? "Registre",
       basis: blocked && event.outcome === "blocked" ? "Aucun accord valide" : channelBasis(item.channel),
       outcome: event.outcome ?? "error",
+      result: event.outcome === "confirmed" ? true : event.outcome === "rejected" ? false : null,
       kind: blocked ? "blocked" : "consultation",
     };
   });

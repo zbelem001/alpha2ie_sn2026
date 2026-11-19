@@ -31,7 +31,15 @@ def main():
             fixtures = json.loads(SOURCES[name].read_text(encoding="utf-8"))
             for index, record in enumerate(fixtures):
                 key = record["reference"] if name == "treasury" else f"fixture:{index:04d}"
-                connection.execute("INSERT INTO registry_records(record_key,data) VALUES (%s,%s) ON CONFLICT DO NOTHING", (key, Jsonb(record)))
+                if record.get("_seed_batch") == "complete-demo-10-v1":
+                    connection.execute(
+                        "INSERT INTO registry_records(record_key,data) VALUES (%s,%s) "
+                        "ON CONFLICT(record_key) DO UPDATE SET data=excluded.data, updated_at=now() "
+                        "WHERE registry_records.data->>'_seed_batch' = 'complete-demo-10-v1'",
+                        (key, Jsonb(record)),
+                    )
+                else:
+                    connection.execute("INSERT INTO registry_records(record_key,data) VALUES (%s,%s) ON CONFLICT DO NOTHING", (key, Jsonb(record)))
             for index, record in enumerate(generated[name], 1):
                 key = record["reference"] if name == "treasury" else f"synthetic:{index:04d}"
                 connection.execute("INSERT INTO registry_records(record_key,data) VALUES (%s,%s) ON CONFLICT DO NOTHING", (key, Jsonb(record)))

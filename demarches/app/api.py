@@ -418,16 +418,17 @@ def _serialize_check(db: Session, request: RegistryRequest) -> dict:
 
 
 def _case_identifier_status(db: Session, case: Case) -> dict | None:
-    consent = db.scalar(select(Consent).where(Consent.case_id == case.id).order_by(Consent.created_at.desc()))
-    if not consent or consent.status != "granted" or (consent.expires_at and _utc(consent.expires_at) <= datetime.now(timezone.utc)):
+    consent = _active_consent(case)
+    if not consent:
         return None
-    scope = set(db.scalars(select(ConsentQuestion.question_id).where(ConsentQuestion.consent_id == consent.id)))
+    scope = {item["question_code"] for item in consent.get("scope", []) if item.get("question_code")}
     if not scope:
         return None
     saved = set(db.scalars(select(CitizenDocumentIdentifier.identifier_type).where(CitizenDocumentIdentifier.subject_ref == case.subject_ref)))
     missing = {}
     for request in db.scalars(select(RegistryRequest).where(RegistryRequest.case_id == case.id)):
-        if request.question_id not in scope:
+        question = db.get(Question, request.question_id)
+        if question is None or question.code not in scope:
             continue
         document = _serialize_check(db, request)["document"]
         identifier_type = DOCUMENT_IDENTIFIER_TYPES.get(document["key"])
@@ -1670,10 +1671,13 @@ def complete_case_identifiers(case_id: UUID, body: CaseReferencesInput,
     except ValueError as error:
         raise HTTPException(status_code=422, detail="Une référence est invalide. Utilisez la référence inscrite sur le document.") from error
     _, selected = _citizen_reference_for_case(db, principal, request_body, {DOCUMENT_IDENTIFIER_TYPES[key] for key in missing_keys})
-    consent = db.scalar(select(Consent).where(Consent.case_id == case.id).order_by(Consent.created_at.desc()))
-    scope = set(db.scalars(select(ConsentQuestion.question_id).where(ConsentQuestion.consent_id == consent.id)))
+    consent = _active_consent(case)
+    if consent is None:
+        raise HTTPException(status_code=403, detail="L’accord actif du citoyen est nécessaire pour compléter les références")
+    scope = {item["question_code"] for item in consent.get("scope", []) if item.get("question_code")}
     for request in db.scalars(select(RegistryRequest).where(RegistryRequest.case_id == case.id)):
-        if request.question_id not in scope or request.status in {"confirmed", "rejected", "not_found", "ambiguous"}:
+        question = db.get(Question, request.question_id)
+        if question is None or question.code not in scope or request.status in {"confirmed", "rejected", "not_found", "ambiguous"}:
             continue
         document = _serialize_check(db, request)["document"]
         if document["key"] not in body.references:
@@ -1724,6 +1728,7 @@ def _run_checks(case: Case, db: Session) -> dict:
         .where(Registry.active.is_(True), Administration.active.is_(True), Registry.base_url.is_not(None))
     ).all())
     connector = build_connector(administration_code=requester.code, registry_routes=registry_routes)
+    client_id = requester_client(requester.code)
     stale_request_before = now - timedelta(seconds=REQUEST_LEASE_SECONDS)
     for request in requests:
         if request.status in {"confirmed", "rejected", "not_found", "ambiguous"}:
@@ -1922,8 +1927,8 @@ def start_citizen_case(
     )
     db.refresh(case)
     identifier_status = _case_identifier_status(db, case)
-    if identifier_status and identifier_status["complete"]:
-        _run_checks(case, db)
+    # La soumission et l'accord du citoyen ne déclenchent pas les consultations.
+    # Un agent lance les vérifications depuis le dossier après examen des références.
     db.refresh(case)
     return _serialize_case(db, case)
 

@@ -3,12 +3,10 @@ import type { DocumentReferences } from "@/lib/document-references";
 
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
-import { consentIsActive } from "@/lib/journal";
 import { agentCaseService } from "@/modules/casework/services/agent-cases";
 import type { AgentCase, AssistedChallenge, ConsentChannel, Procedure } from "@/modules/casework/types/cases";
 
 const REFRESH_MS = 10_000;
-const AUTO_RETRY_MS = 15_000;
 
 function messageOf(cause: unknown, fallback: string) {
   return cause instanceof Error ? cause.message : fallback;
@@ -55,23 +53,6 @@ export function useAgentWorkspace() {
     return () => { active = false; clearInterval(timer); window.removeEventListener("focus", load); };
   }, []);
 
-  // Reprise automatique : un registre indisponible est réinterrogé, tant que l'accord est valide.
-  // Le minuteur dépend du dossier en attente et de ses tentatives, pas de la liste : le
-  // rafraîchissement régulier (10 s) ne doit pas le relancer avant qu'il se déclenche (15 s).
-  const waiting = cases.find((item) => item.checks.some((check) => check.status === "unavailable") && consentIsActive(item.consent));
-  const waitingId = waiting?.id ?? "";
-  const waitingAttempts = waiting ? waiting.checks.map((check) => check.attemptCount).join(",") : "";
-  useEffect(() => {
-    if (busy || !waitingId) return;
-    const timer = setTimeout(async () => {
-      setBusy("auto");
-      try { await agentCaseService.runChecks(waitingId); await refresh(); }
-      catch (cause) { setError(messageOf(cause, "La reprise n’a pas abouti.")); }
-      finally { setBusy(""); }
-    }, AUTO_RETRY_MS);
-    return () => clearTimeout(timer);
-  }, [waitingId, waitingAttempts, busy, refresh]);
-
   async function task(name: string, action: () => Promise<void>) {
     if (busy) return;
     setBusy(name); setError("");
@@ -102,15 +83,16 @@ export function useAgentWorkspace() {
   }
   async function saveIdentifiers(references: DocumentReferences) {
     if (!selectedId) return;
-    await task("identifiers", async () => {
-      await agentCaseService.saveIdentifiers(selectedId, references);
-      await agentCaseService.runChecks(selectedId);
-    });
+    await task("identifiers", async () => { await agentCaseService.saveIdentifiers(selectedId, references); });
   }
   async function runChecks() {
     if (!selectedId) return;
     await task("checks", async () => { await agentCaseService.runChecks(selectedId); });
   }
+  async function verifyCase(id: string) {
+    setSelectedId(id); setSelectedSection("checks"); setChallenge(null); setError(""); setView("case");
+    await task("checks", async () => { await agentCaseService.runChecks(id); });
+  }
   return { cases, procedures, view, loading, busy, error, expired, challenge, selectedSection, selected: cases.find((item) => item.id === selectedId),
-    showList, showNew, openCase, create, sendCode, verifyCode, changeChannel, saveIdentifiers, runChecks };
+    showList, showNew, openCase, create, sendCode, verifyCode, changeChannel, saveIdentifiers, runChecks, verifyCase };
 }

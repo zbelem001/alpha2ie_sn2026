@@ -67,12 +67,13 @@
 .tableDate { display: grid; gap: 4px; color: var(--texte); font-size: 0.8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tableDate > span { color: var(--texte-secondaire); font-family: var(--police-mono); font-size: 0.75rem; }
 .actionsHeading { text-align: right; }
-.actionsCell { width: 112px; }
-.rowActions { display: flex; justify-content: flex-end; gap: 6px; min-width: 92px; opacity: 0; transition: opacity var(--duree) var(--courbe); }
-.requestRow:hover .rowActions, .requestRow:focus-within .rowActions { opacity: 1; }
+.actionsCell { width: 220px; }
+.rowActions { display: flex; justify-content: flex-end; gap: 6px; min-width: 92px; opacity: 1; }
 .iconAction { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; padding: 0; border: 1px solid var(--bordure); border-radius: var(--rayon-pilule); background: var(--champ-fond); color: var(--vert-faso); cursor: pointer; transition: background-color var(--duree) var(--courbe), border-color var(--duree) var(--courbe), color var(--duree) var(--courbe), transform var(--duree) var(--courbe); }
 .iconAction:hover { border-color: var(--vert-faso); background: var(--vert-faso); color: var(--texte-sur-vert); }
 .iconAction:active { transform: scale(0.97); }
+.verifyAction { min-height: 40px; padding: 0 12px; border: 1px solid var(--vert-faso); border-radius: var(--rayon-pilule); background: var(--vert-faso); color: #fff; font: inherit; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.verifyAction:hover { background: var(--vert-faso-survol); }
 .tableEmpty { padding: 48px 20px !important; color: var(--texte-secondaire); line-height: 1.7; text-align: center; }
 .tableEmpty strong { color: var(--texte); font-size: 1rem; font-weight: 500; }
 .tableEmpty p { margin: 8px 0 0; font-size: 0.875rem; }
@@ -148,6 +149,7 @@
 .checks li > div { display: grid; gap: 6px; }
 .checks strong { font-size: 0.9375rem; font-weight: 500; line-height: 1.5; }
 .checks li div > span { color: var(--texte-secondaire); font-size: 0.8125rem; }
+.checks li div > .booleanResult { color: var(--succes-texte); font-weight: 600; }
 .checkActions { margin-top: 20px; }
 .checkActions .hint { margin: 12px 0 0; }
 .pendingNote { margin: 18px 0; padding: 14px 18px; border-radius: var(--rayon); background: var(--avertissement-fond); color: var(--avertissement-texte); font-size: 0.875rem; line-height: 1.6; }

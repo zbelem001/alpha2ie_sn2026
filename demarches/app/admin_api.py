@@ -251,9 +251,18 @@ def _agent_payload(agent: dict) -> dict:
 
 
 def _rights(db: Session, administration_id: UUID) -> list[dict]:
-    questions = db.scalars(select(Question).where(Question.active.is_(True)).order_by(Question.code)).all()
+    administrations = list(load_administrations())
+    questions = db.execute(
+        select(Question, RegistryService, Registry, Administration)
+        .join(Registry, Question.registry_id == Registry.id)
+        .join(RegistryService, (RegistryService.registry_id == Registry.id) &
+              (RegistryService.code == Question.service_code))
+        .join(Administration, Registry.administration_id == Administration.id)
+        .where(Administration.code.in_(administrations))
+        .order_by(Administration.name, RegistryService.title, Question.code)
+    ).all()
     result = []
-    for question in questions:
+    for question, service, registry, provider in questions:
         permission = db.scalar(select(Permission).where(
             Permission.requester_administration_id == administration_id,
             Permission.question_id == question.id,
@@ -266,7 +275,10 @@ def _rights(db: Session, administration_id: UUID) -> list[dict]:
             "questionCode": question.code,
             "label": question.description,
             "service_code": question.service_code,
-            "provider": _question_provider(db, question),
+            "provider": provider.name,
+            "provider_code": provider.code,
+            "providerCode": provider.code,
+            "active": bool(question.active and service.active and registry.active and provider.active),
             "status": state,
             "purpose": permission.purpose if permission else None,
             "requested_at": permission.requested_at if permission else None,
